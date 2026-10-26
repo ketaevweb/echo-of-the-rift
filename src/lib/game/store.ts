@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Faction, InventoryEntry, SaveData, SignId, Stance } from './types'
+import { Faction, FormationId, InventoryEntry, SaveData, SignId, Stance } from './types'
 
 export type Screen = 'title' | 'game'
 export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'ending'
@@ -13,6 +13,8 @@ export interface PartyHud {
   maxHp: number
   alive: boolean
   stance: Stance
+  /** Фаза 4: одобрение 0..100 (у игрока — 100, в UI не показывается). */
+  approval: number
   abilities: Array<{ id: string; name: string; icon: string; cd: number; cdMax: number }>
 }
 
@@ -169,6 +171,8 @@ interface GameStore {
   daytime: number
   zoneLabel: string
   zoneFade: ZoneFadeState | null
+  // Фаза 4
+  formation: FormationId
   setScreen: (s: Screen) => void
   setPanel: (p: PanelId) => void
   patch: (partial: Partial<GameStore>) => void
@@ -205,6 +209,7 @@ export const useGame = create<GameStore>((set) => ({
   daytime: 0.3,
   zoneLabel: 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
   zoneFade: null,
+  formation: 'wedge',
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
   patch: (partial) => set(partial),

@@ -13,6 +13,7 @@ import { sfx } from '../sfx'
 import { EngineCtx } from '../core/ctx'
 import { pickEntity } from '../core/entity'
 import { chooseOption, closeDialogue, doInteract, openDialogue, pickInteractable, runInteractable } from './quest'
+import { cycleFormation } from './party'
 
 interface InputHandlers {
   keyDown: (ev: KeyboardEvent) => void
@@ -54,7 +55,21 @@ function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
   if (k === ' ') {
     ctx.tacticalPaused = !ctx.tacticalPaused
     useGame.getState().patch({ paused: ctx.tacticalPaused })
+    ctx.setTactical(ctx.tacticalPaused) // Фаза 4: изометрический отъём камеры
+    if (!ctx.tacticalPaused) ctx.selEid = null // снятие паузы рвёт выбор приказов
     sfx('click')
+    ev.preventDefault()
+    return
+  }
+  // Фаза 4: Tab — цикл цели по живым врагам (в бою и в паузе)
+  if (k === 'tab') {
+    cycleTarget(ctx)
+    ev.preventDefault()
+    return
+  }
+  // Фаза 4: V — сменить строй отряда (клин ⇄ линия)
+  if (k === 'v' || k === 'м') {
+    cycleFormation(ctx)
     ev.preventDefault()
     return
   }
@@ -75,6 +90,33 @@ function onKeyUp(ctx: EngineCtx, ev: KeyboardEvent) {
   ctx.keys.delete(ev.key.toLowerCase())
 }
 
+/** Tab: следующий живой враг в 500 ед. от героя (по возрастанию eid). */
+function cycleTarget(ctx: EngineCtx) {
+  const foes = ctx.entities
+    .filter((e) => e.kind === 'enemy' && e.alive && Math.hypot(e.pos.x - ctx.player.pos.x, e.pos.y - ctx.player.pos.y) < 500)
+    .sort((a, b) => a.eid - b.eid)
+  if (foes.length === 0) {
+    ctx.targetEid = null
+    return
+  }
+  const idx = foes.findIndex((e) => e.eid === ctx.targetEid)
+  const next = foes[(idx + 1) % foes.length]
+  ctx.targetEid = next.eid
+  sfx('click')
+  ctx.toast(`Цель: ${next.name}`, 'info')
+}
+
+/** Приказ компаньону «идти сюда» (Фаза 4, тактическая пауза). */
+function orderCompanionMove(ctx: EngineCtx, eid: number, to: Vec) {
+  const e = ctx.entities.find((x) => x.eid === eid)
+  if (!e || e.kind !== 'companion') return
+  e.dest = { ...to }
+  e.stance = 'hold'
+  e.home = { ...to } // «держать» — удерживать этот пятачок
+  ctx.toast(`${e.name}: выдвигаюсь!`, 'info')
+  sfx('click')
+}
+
 function canvasPoint(ctx: EngineCtx, ev: PointerEvent): Vec {
   const rect = ctx.inputCanvas.getBoundingClientRect()
   return {
@@ -86,6 +128,12 @@ function canvasPoint(ctx: EngineCtx, ev: PointerEvent): Vec {
 function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
   if (useGame.getState().panel || ctx.dialogueTree) return
   if (ev.button !== 0) return
+
+  // --- Фаза 4: приказы в тактической паузе (DAO-lite) ---
+  if (ctx.tacticalPaused) {
+    handleTacticalClick(ctx, ev)
+    return
+  }
 
   // --- 3D-режим: проекционный пикинг + луч в рельеф ---
   if (ctx.renderMode === '3d' && ctx.view3d) {
@@ -132,6 +180,58 @@ function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
   }
   ctx.targetEid = null
   ctx.player.dest = p
+}
+
+/** Клик в тактической паузе: компаньон — выбрать; враг — цель отряда;
+ *  земля — движение выбранного (или маршрут героя, если никто не выбран). */
+function handleTacticalClick(ctx: EngineCtx, ev: PointerEvent) {
+  const pos =
+    ctx.renderMode === '3d' && ctx.view3d
+      ? ctx.view3d.screenToGround(ev.clientX, ev.clientY)
+      : canvasPoint(ctx, ev)
+
+  // Пикинг сущностей: в 3D честный проекционный, в 2D — по радиусу
+  let picked: { eid: number; kind: 'player' | 'companion' | 'npc' | 'enemy'; alive: boolean } | null = null
+  if (ctx.renderMode === '3d' && ctx.view3d) {
+    picked = ctx.view3d.pickAtScreen(ev.clientX, ev.clientY, 18)
+  } else if (pos) {
+    const e = pickEntity(ctx, pos, (x) => (x.kind === 'companion' || x.kind === 'enemy') && x.alive, 14)
+    if (e) picked = { eid: e.eid, kind: e.kind, alive: e.alive }
+  }
+
+  // 1) Компаньон: выбрать/снять выбор
+  if (picked && picked.kind === 'companion') {
+    const ent = ctx.entities.find((x) => x.eid === picked!.eid)
+    if (ent && ent.alive) {
+      ctx.selEid = ctx.selEid === picked.eid ? null : picked.eid
+      sfx('click')
+      ctx.toast(ctx.selEid ? `${ent.name}: жду приказа` : 'Выбор снят', 'info')
+      ctx.syncUi()
+      return
+    }
+  }
+  // 2) Враг: назначить цель всему отряду
+  if (picked && picked.kind === 'enemy' && picked.alive) {
+    const ent = ctx.entities.find((x) => x.eid === picked!.eid)
+    if (ent) {
+      ctx.targetEid = ent.eid
+      sfx('click')
+      ctx.toast(`Отряд, цель: ${ent.name}!`, 'info')
+      ctx.syncUi()
+      return
+    }
+  }
+  // 3) Земля: движение выбранного компаньона, иначе — маршрут героя
+  if (pos) {
+    if (ctx.selEid !== null) {
+      orderCompanionMove(ctx, ctx.selEid, pos)
+      ctx.selEid = null
+      ctx.syncUi()
+      return
+    }
+    ctx.player.dest = pos
+    sfx('click')
+  }
 }
 
 export function bindInput(ctx: EngineCtx) {

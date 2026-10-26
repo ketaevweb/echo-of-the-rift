@@ -12,6 +12,7 @@ import {
   Entity,
   Faction,
   Floater,
+  FormationId,
   InventoryEntry,
   Particle,
   QuestState,
@@ -54,6 +55,7 @@ import {
 import { castAbility as castAbilitySys } from './systems/combat'
 import { bindInput as bindInputSys, unbindInput as unbindInputSys } from './systems/input'
 import { moveWithCollisions as moveWithCollisionsSys } from './systems/movement'
+import { cycleFormation as cycleFormationSys } from './systems/party'
 import {
   chooseOption as chooseOptionSys,
   closeDialogue as closeDialogueSys,
@@ -152,6 +154,11 @@ export class GameEngine implements EngineCtx {
   oilT = 0
   oilKind: string | null = null
   private zoneBusy = false
+
+  // --- Фаза 4: партия (формации/одобрение/тактика) ---
+  approval = { kaya: 45, torvald: 45 }
+  formation: FormationId = 'wedge'
+  selEid: number | null = null
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -375,9 +382,11 @@ export class GameEngine implements EngineCtx {
       this.player.pos = { ...p }
       this.player.dest = null
       this.targetEid = null
+      this.selEid = null
       for (const e of this.entities) {
         if (e.kind === 'companion') {
           e.pos = { x: p.x - 26, y: p.y + 18 }
+          e.home = { x: p.x - 26, y: p.y + 18 } // не возвращаться в прошлую зону
           e.dest = null
         }
       }
@@ -433,12 +442,23 @@ export class GameEngine implements EngineCtx {
     const next: Stance = cur === 'follow' ? 'hold' : cur === 'hold' ? 'aggressive' : 'follow'
     e.stance = next
     if (next === 'hold') e.home = { ...e.pos }
+    else e.dest = null // уходя с «держать», сбрасываем приказ движения
     this.toast(
       `${e.name}: ${next === 'follow' ? 'следовать' : next === 'hold' ? 'держать позицию' : 'атаковать всех'}`,
       'info',
     )
     sfx('click')
     this.syncUi()
+  }
+
+  // ---------------- Фаза 4: партия ----------------
+
+  cycleFormation() {
+    cycleFormationSys(this)
+  }
+
+  setTactical(on: boolean) {
+    this.view3d?.setTactical(on)
   }
 
   saveGame(manual = true) {
@@ -495,6 +515,8 @@ export class GameEngine implements EngineCtx {
         removedProps: this.removedProps,
         zone: this.zone,
         dayT: this.dayClock,
+        tactical: this.tacticalPaused,
+        selEid: this.selEid,
       })
       return
     }
@@ -518,6 +540,8 @@ export class GameEngine implements EngineCtx {
       playerAlive: this.player.alive,
       zone: this.zone,
       dayT: this.dayClock,
+      tactical: this.tacticalPaused,
+      selEid: this.selEid,
     })
   }
 }

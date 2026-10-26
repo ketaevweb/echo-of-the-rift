@@ -16,6 +16,7 @@ import { makeEntity, nearestEnemyOf, nearestParty } from '../core/entity'
 import { playerAc, playerAtk } from './progression'
 import { beam, damage, floater, meleeAttack, rangedAttack, ring, spawnTelegraph } from './combat'
 import { openDialogue } from './quest'
+import { companionIndex, formationSlot } from './party'
 
 // ---------------- Инициализация/спавн ----------------
 
@@ -81,8 +82,10 @@ export function spawnWorld(ctx: EngineCtx) {
   for (const c of VELD_CLUES) {
     if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
   }
-  if (ctx.companionIds.kaya) spawnCompanion(ctx, 'kaya')
-  if (ctx.companionIds.torvald) spawnCompanion(ctx, 'torvald')
+  // Фаза 4: спавним по наличию в мире (а не по флагу — сейв ставит
+  // companionIds=true до spawnWorld, и старый гвард молча терял партию при загрузке)
+  if (ctx.companionIds.kaya && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'kaya')) spawnCompanion(ctx, 'kaya')
+  if (ctx.companionIds.torvald && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'torvald')) spawnCompanion(ctx, 'torvald')
   if (ctx.flags.gateOpen) {
     ctx.removedProps.add('barrier')
     ctx.removedProps.add('barrier2')
@@ -150,7 +153,8 @@ export function spawnUnique(ctx: EngineCtx, type: 'alpha' | 'captain' | 'boss' |
 }
 
 export function spawnCompanion(ctx: EngineCtx, id: 'kaya' | 'torvald') {
-  if (ctx.companionIds[id]) return
+  // Гвард по сущности в мире (а не по флагу вербовки): флаг уже true при загрузке сейва
+  if (ctx.entities.some((x) => x.kind === 'companion' && x.id === id)) return
   ctx.companionIds[id] = true
   const npcDef = NPCS.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
   const isKaya = id === 'kaya'
@@ -202,17 +206,26 @@ export function updateCompanion(ctx: EngineCtx, e: Entity, dt: number) {
   let target: Entity | null = null
 
   if (stance === 'hold') {
-    if (Math.hypot(e.home.x - e.pos.x, e.home.y - e.pos.y) > 14) desired = { ...e.home }
+    // Фаза 4: приказ движения из тактической паузы — идём в точку, встаём на пост
+    if (e.dest) {
+      const dx = e.dest.x - e.pos.x
+      const dy = e.dest.y - e.pos.y
+      if (Math.hypot(dx, dy) < 12) e.dest = null
+      else desired = { ...e.dest }
+    } else if (Math.hypot(e.home.x - e.pos.x, e.home.y - e.pos.y) > 14) desired = { ...e.home }
     target = nearestEnemyOf(ctx, e, 260)
   } else if (stance === 'aggressive') {
     target = nearestEnemyOf(ctx, e, 460)
-    if (!target) desired = { x: player.pos.x - 20, y: player.pos.y + 16 }
+    if (!target) {
+      const slot = formationSlot(ctx, companionIndex(e.id))
+      desired = slot
+    }
   } else {
     const t = ctx.targetEid ? ctx.entities.find((x) => x.eid === ctx.targetEid) : null
     if (t && t.alive && Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) < 400) target = t
     else target = nearestEnemyOf(ctx, e, 240)
-    const off = e.id === 'torvald' ? { x: -30, y: 22 } : { x: -26, y: -26 }
-    desired = { x: player.pos.x + off.x, y: player.pos.y + off.y }
+    // Фаза 4: слот формации (клин/линия) вместо жёстких офсетов.
+    desired = formationSlot(ctx, companionIndex(e.id))
   }
   if (target) {
     const dist = Math.hypot(target.pos.x - e.pos.x, target.pos.y - e.pos.y)
@@ -231,6 +244,8 @@ export function updateCompanion(ctx: EngineCtx, e: Entity, dt: number) {
       castCompanionAbility(ctx, e.eid, 'frostbolt', target.eid)
     }
   }
+  // Фаза 4: активный приказ движения важнее погони (атаки в радиусе не прерываются)
+  if ((e.stance ?? 'follow') === 'hold' && e.dest) desired = { x: e.dest.x, y: e.dest.y }
   if (e.id === 'kaya' && e.cds['mend'] <= 0) castCompanionAbility(ctx, e.eid, 'mend', null)
 
   if (desired) {

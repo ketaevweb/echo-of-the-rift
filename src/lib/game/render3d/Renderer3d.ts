@@ -13,7 +13,7 @@ import { heightAt } from './heightmap'
 import { Terrain, buildSky } from './Terrain'
 import { Props3d } from './Props'
 import { AvatarFactory } from './Avatars'
-import { Fx3d } from './Fx'
+import { Fx3d, OrderLine } from './Fx'
 import { daylightOf } from '../data/tables'
 import type { ZoneId } from '../core/ctx'
 
@@ -32,6 +32,9 @@ export interface SceneView3d {
   removedProps: Set<string>
   zone: ZoneId
   dayT: number
+  /** Фаза 4: тактическая пауза — отъём камеры + линии приказов. */
+  tactical: boolean
+  selEid: number | null
 }
 
 export interface EntityPick {
@@ -66,10 +69,14 @@ export class Renderer3d {
   private sunDay = new THREE.Color(0xffe0b0)
   private sunDusk = new THREE.Color(0xff9a50)
 
-  // Орбита камеры
+  // Орбита камеры (Фаза 4): user-значения правит ввод, pitch/dist —
+  // анимируемые текущие (лерп к целям, тактика отъезжает в изометрию)
   private yaw = 0
+  private userPitch = 0.62
+  private userDist = 120
   private pitch = 0.62
   private dist = 120
+  private tactical = false
   private camTarget = new THREE.Vector3()
   private dragging = false
   private lastX = 0
@@ -143,6 +150,12 @@ export class Renderer3d {
     return this.yaw
   }
 
+  /** Фаза 4: тактическая камера — изометрический отъём (DAO-вайб).
+   *  yaw остаётся свободным (вращать можно и в паузе). */
+  setTactical(on: boolean) {
+    this.tactical = on
+  }
+
   private bindOrbit() {
     const c = this.canvas
     c.addEventListener('pointerdown', this.onOrbitDown)
@@ -169,7 +182,7 @@ export class Renderer3d {
     this.lastX = e.clientX
     this.lastY = e.clientY
     this.yaw -= dx * 0.0052
-    this.pitch = Math.max(0.16, Math.min(1.25, this.pitch + dy * 0.004))
+    this.userPitch = Math.max(0.16, Math.min(1.25, this.userPitch + dy * 0.004))
   }
 
   private onOrbitUp = () => {
@@ -178,7 +191,7 @@ export class Renderer3d {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    this.dist = Math.max(40, Math.min(260, this.dist + e.deltaY * 0.09))
+    this.userDist = Math.max(40, Math.min(260, this.userDist + e.deltaY * 0.09))
   }
 
   private updateCamera(view: SceneView3d) {
@@ -194,6 +207,12 @@ export class Renderer3d {
     const lerp = 1 - Math.pow(0.00002, 1 / 60)
     this.camTarget.x += (px - this.camTarget.x) * lerp
     this.camTarget.z += (pz - this.camTarget.z) * lerp
+    // Фаза 4: анимация наклона/дистанции к тактической изометрии или к пользовательской орбите
+    const goalPitch = this.tactical ? Math.max(this.userPitch, 1.08) : this.userPitch
+    const goalDist = this.tactical ? Math.max(this.userDist, 235) : this.userDist
+    const k = 0.08
+    this.pitch += (goalPitch - this.pitch) * k
+    this.dist += (goalDist - this.dist) * k
     const groundH = heightAt(this.camTarget.x, this.camTarget.z)
     const focusY = groundH + 6
 
@@ -390,6 +409,19 @@ export class Renderer3d {
     this.props.update(view.time, view.removedProps, 1 - this.daylight)
     const target = view.targetEid ? view.entities.find((x) => x.eid === view.targetEid) ?? null : null
     this.fx.update(view.particles, view.floaters, view.telegraphs, target, view.time)
+
+    // Фаза 4: тактический оверлей — линии приказов и кольцо выбора
+    if (view.tactical) {
+      const lines: OrderLine[] = []
+      for (const e of view.entities) {
+        if (e.kind !== 'companion' || !e.alive) continue
+        lines.push({ ax: view.player.pos.x, ay: view.player.pos.y, bx: e.pos.x, by: e.pos.y, color: e.color })
+      }
+      const sel = view.selEid ? view.entities.find((x) => x.eid === view.selEid) ?? null : null
+      this.fx.updateTactical(lines, sel, view.time)
+    } else {
+      this.fx.updateTactical(null, null, view.time)
+    }
 
     this.updateCamera(view)
     this.renderer.render(this.scene, this.camera)

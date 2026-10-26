@@ -20,6 +20,7 @@ import { heightAt } from '../render3d/heightmap'
 import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, signPower } from './progression'
 import { advanceQuest, checkProof } from './quest'
+import { approvalOnDowned, approvalOnKill, trySynergyFrostAndFlame, trySynergyWallAndHammer } from './party'
 
 // ---------------- Атаки ----------------
 
@@ -112,6 +113,7 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
     if (t.kind === 'enemy') onEnemyKilled(ctx, t)
     else if (t.kind === 'companion') {
       t.downT = 12
+      approvalOnDowned(ctx, t) // Фаза 4: компаньон выведен из боя — доверие падает
       floater(ctx, t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
     } else if (t.kind === 'player') onPlayerDeath(ctx)
   }
@@ -121,6 +123,7 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
   const type = e.enemyType!
   ctx.kills++
   sfx('death')
+  approvalOnKill(ctx, e.pos) // Фаза 4: живой компаньон рядом — +1 доверие
   if (e.zoneId) {
     const z = SPAWN_ZONES.find((zz) => zz.id === e.zoneId)
     if (z) e.respawnAt = ctx.time + z.respawnSec
@@ -263,23 +266,29 @@ export function castAbility(ctx: EngineCtx, id: string) {
     sfx('fire')
     coneParticles(ctx, ctx.player.pos, ctx.player.facing, 150, '#e08a3a')
     spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 150, width: 0.62, life: 0.3, maxLife: 0.3, color: '#e08a3a' })
-    for (const e of enemiesInCone(ctx, 150, 0.62)) {
+    const cone = enemiesInCone(ctx, 150, 0.62)
+    for (const e of cone) {
       const weak = FIRE_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
       damage(ctx, e, Math.round(d(6) * 2 * power * weak), { color: '#e08a3a' })
       e.burnT = 4
       e.burnTick = 0.5
     }
+    // Фаза 4: синергия с Кайей — паровой взрыв на цели конуса
+    trySynergyFrostAndFlame(ctx, cone)
   } else if (id === 'aard') {
     if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
     sfx('shield')
     coneParticles(ctx, ctx.player.pos, ctx.player.facing, 160, '#d9e3ea')
     spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 160, width: 0.95, life: 0.3, maxLife: 0.3, color: '#d9e3ea' })
-    for (const e of enemiesInCone(ctx, 160, 0.95)) {
+    const cone = enemiesInCone(ctx, 160, 0.95)
+    for (const e of cone) {
       damage(ctx, e, Math.round(d(4) * power), { color: '#d9e3ea' })
       e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
       const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
       ctx.kb.set(e.eid, { x: Math.cos(a) * 300, y: Math.sin(a) * 300 })
     }
+    // Фаза 4: синергия с Торвальдом — усиленный стан всего конуса
+    trySynergyWallAndHammer(ctx, cone)
   } else if (id === 'quen') {
     const sh = Math.round((25 + 12 * ctx.level) * power)
     ctx.player.shield = sh

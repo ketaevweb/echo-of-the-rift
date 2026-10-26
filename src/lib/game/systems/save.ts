@@ -73,6 +73,9 @@ export function collectSave(ctx: EngineCtx): SaveData {
     dayClock: ctx.dayClock,
     oilKind: ctx.oilKind,
     oilT: ctx.oilT,
+    // Фаза 4: одобрение и строй (старые сейвы получат дефолты в applySave)
+    approval: { ...ctx.approval },
+    formation: ctx.formation,
   }
 }
 
@@ -113,6 +116,12 @@ export function applySave(ctx: EngineCtx, s: SaveData) {
   ctx.dayClock = typeof s.dayClock === 'number' ? s.dayClock : 0.3
   ctx.oilKind = s.oilKind ?? null
   ctx.oilT = typeof s.oilT === 'number' ? s.oilT : 0
+  // Фаза 4: одобрение/строй — дефолты для сейвов до Фазы 4
+  ctx.approval = {
+    kaya: typeof s.approval?.kaya === 'number' ? s.approval.kaya : 45,
+    torvald: typeof s.approval?.torvald === 'number' ? s.approval.torvald : 45,
+  }
+  ctx.formation = s.formation === 'line' ? 'line' : 'wedge'
   ctx.createPlayer({ ...s.pos })
   ctx.spawnWorld()
 }

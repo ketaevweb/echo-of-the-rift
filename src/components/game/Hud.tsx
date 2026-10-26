@@ -25,10 +25,11 @@ function Bar({ value, max, color, bg = 'bg-[#241c14]' }: { value: number; max: n
 function PartyFrame({
   p,
 }: {
-  p: { eid: number; id: string; name: string; role: string; hp: number; maxHp: number; alive: boolean; stance: string; abilities: Array<{ id: string; name: string; icon: string; cd: number; cdMax: number }> }
+  p: { eid: number; id: string; name: string; role: string; hp: number; maxHp: number; alive: boolean; stance: string; approval: number; abilities: Array<{ id: string; name: string; icon: string; cd: number; cdMax: number }> }
 }) {
   const engine = getEngine()
   const isPlayer = p.id === 'player'
+  const trusted = p.approval >= 60 // порог парных приёмов (Фаза 4)
   return (
     <div className="pointer-events-auto w-56 rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm">
       <div className="flex items-center justify-between gap-2">
@@ -50,6 +51,19 @@ function PartyFrame({
       <div className="mt-1.5">
         <Bar value={p.hp} max={p.maxHp} color={p.alive ? (isPlayer ? 'bg-[#8fbf7f]' : 'bg-[#7a9a6a]') : 'bg-[#c94f3d]'} />
       </div>
+      {/* Фаза 4: одобрение компаньона — при ≥60 открываются парные приёмы */}
+      {!isPlayer && (
+        <div className="mt-1 flex items-center gap-1.5" title={trusted ? 'Доверие высоко — парные приёмы доступны' : 'Доверие растёт от боёв и квестов. При 60 — парные приёмы'}>
+          <Heart className={`h-2.5 w-2.5 shrink-0 ${trusted ? 'text-[#e08a6b]' : 'text-[#6a5f4a]'}`} />
+          <div className="h-1 w-full overflow-hidden rounded-sm bg-[#241c14]">
+            <div
+              className={`h-full transition-[width] duration-300 ${trusted ? 'bg-[#d9a441]' : 'bg-[#6a5f4a]'}`}
+              style={{ width: `${Math.max(0, Math.min(100, p.approval))}%` }}
+            />
+          </div>
+          <span className={`shrink-0 text-[9px] tabular-nums ${trusted ? 'text-[#f5c96b]' : 'text-[#8a8068]'}`}>{p.approval}</span>
+        </div>
+      )}
       {!isPlayer && (
         <div className="mt-1.5 flex items-center gap-1">
           <button
@@ -97,6 +111,7 @@ export default function Hud() {
   const oil = useGame((s) => s.oil)
   const daytime = useGame((s) => s.daytime)
   const zoneLabel = useGame((s) => s.zoneLabel)
+  const formation = useGame((s) => s.formation)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -225,13 +240,23 @@ export default function Hud() {
         </div>
       )}
 
-      {/* Тактическая пауза */}
+      {/* Тактическая пауза (Фаза 4): приказы DAO-lite */}
       {paused && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <p className="game-title-font rounded border border-[#d9a441]/70 bg-[#181410]/90 px-6 py-2 text-xl tracking-[0.4em] text-[#f5c96b]">
-            ПАУЗА
-          </p>
-        </div>
+        <>
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <p className="game-title-font rounded border border-[#d9a441]/70 bg-[#181410]/90 px-6 py-2 text-xl tracking-[0.4em] text-[#f5c96b]">
+              ТАКТИЧЕСКАЯ ПАУЗА
+            </p>
+          </div>
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded border border-[#5a4632]/70 bg-[#181410]/90 px-4 py-2 text-center backdrop-blur-sm">
+            <p className="text-[11px] leading-relaxed text-[#cfc0a0]">
+              <span className="text-[#f5c96b]">ЛКМ по компаньону</span> — выбрать · <span className="text-[#f5c96b]">ЛКМ по земле</span> — приказ движения · <span className="text-[#f5c96b]">ЛКМ по врагу</span> — цель отряда
+            </p>
+            <p className="mt-0.5 text-[10px] text-[#8a8068]">
+              <span className="text-[#f5c96b]">V</span> — строй: {formation === 'wedge' ? 'клин' : 'линия'} · <span className="text-[#f5c96b]">Tab</span> — цель · <span className="text-[#f5c96b]">Пробел</span> — отпустить мир
+            </p>
+          </div>
+        </>
       )}
 
       {/* Подсказка взаимодействия */}

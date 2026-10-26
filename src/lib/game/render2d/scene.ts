@@ -33,6 +33,9 @@ export interface SceneView {
   // Фаза 3: атмосфера
   zone: 'valley' | 'veld'
   dayT: number
+  // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
+  tactical?: boolean
+  selEid?: number | null
 }
 
 export function drawScene(v: SceneView) {
@@ -114,8 +117,41 @@ export function drawScene(v: SceneView) {
     ctx.globalAlpha = 1
   }
   const sorted = [...v.entities].sort((a, b) => a.pos.y - b.pos.y)
+  // Фаза 4: линии приказов — под сущностями
+  if (v.tactical) {
+    const player = v.entities.find((e) => e.kind === 'player')
+    if (player) {
+      ctx.setLineDash([7, 6])
+      ctx.lineWidth = 1.8
+      ctx.globalAlpha = 0.75
+      for (const e of v.entities) {
+        if (e.kind !== 'companion' || !e.alive) continue
+        ctx.strokeStyle = e.color
+        ctx.beginPath()
+        ctx.moveTo(player.pos.x, player.pos.y)
+        ctx.lineTo(e.pos.x, e.pos.y)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
+    }
+  }
   for (const e of sorted) {
     v.renderer.drawEntity(ctx, e, v.time, v.targetEid === e.eid)
+  }
+  // Фаза 4: кольцо выбора компаньона — над сущностями
+  if (v.tactical && v.selEid) {
+    const sel = v.entities.find((e) => e.eid === v.selEid && e.alive)
+    if (sel) {
+      const pulse = 1 + Math.sin(v.time * 4) * 0.07
+      ctx.strokeStyle = '#f5c96b'
+      ctx.lineWidth = 2.4
+      ctx.globalAlpha = 0.85
+      ctx.beginPath()
+      ctx.ellipse(sel.pos.x, sel.pos.y, (sel.radius + 9) * pulse, (sel.radius + 9) * 0.55 * pulse, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
   }
   v.renderer.drawParticles(ctx, v.particles)
   v.renderer.drawFloaters(ctx, v.floaters)

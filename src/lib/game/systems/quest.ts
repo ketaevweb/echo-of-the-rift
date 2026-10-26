@@ -22,6 +22,7 @@ import { gainXp, openShop, openTrainer } from './progression'
 import { saveGame } from './save'
 import { floater } from './combat'
 import { spawnAshMother } from './ai'
+import { approvalOnQuestDone } from './party'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -338,7 +339,10 @@ export function advanceQuest(ctx: EngineCtx, id: string, stage: number) {
   if (!q || q.done) return
   q.stage = stage
   const def = QUEST_MAP[id]
-  if (stage >= def.stages.length) q.done = true
+  if (stage >= def.stages.length) {
+    q.done = true
+    approvalOnQuestDone(ctx) // Фаза 4: завершение квеста — доверие компаньонов +6
+  }
   if (id === 'main' && stage === 5 && !ctx.flags.gateOpen) {
     ctx.flags.gateOpen = true
     ctx.removedProps.add('barrier')

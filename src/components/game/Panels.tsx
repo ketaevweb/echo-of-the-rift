@@ -447,7 +447,8 @@ function PausePanel() {
         <div className="mt-2 rounded border border-[#3a2e20] bg-[#211a12]/70 p-3 text-[12px] leading-relaxed text-[#a89a7d]">
           <p className="mb-1 font-semibold text-[#c9b06b]">Управление</p>
           WASD / ЛКМ — движение · ЛКМ по врагу — цель · 1–4 знаки · 5 — Голос Древних · Q/E — зелья ·
-          F — взаимодействие · Пробел — тактическая пауза · C/I/J/M — панели · Esc — меню
+          F — взаимодействие · Пробел — тактическая пауза и приказы · V — строй · Tab — цель ·
+          C/I/J/M — панели · Esc — меню
           {renderMode === '3d' && (
             <>
               <br />

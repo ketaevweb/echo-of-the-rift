@@ -28,6 +28,7 @@ export function syncUi(ctx: EngineCtx): void {
       maxHp: ctx.maxHp,
       alive: ctx.player.alive,
       stance: 'follow',
+      approval: 100,
       abilities: [],
     },
   ]
@@ -42,6 +43,7 @@ export function syncUi(ctx: EngineCtx): void {
       maxHp: e.maxHp,
       alive: e.alive,
       stance: e.stance ?? 'follow',
+      approval: ctx.approval[e.id as 'kaya' | 'torvald'] ?? 0,
       abilities:
         e.id === 'torvald'
           ? [
@@ -124,5 +126,6 @@ export function syncUi(ctx: EngineCtx): void {
     oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
     daytime: ctx.dayClock,
     zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+    formation: ctx.formation,
   })
 }

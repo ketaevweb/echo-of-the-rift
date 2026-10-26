@@ -13,6 +13,7 @@ const MAX_PARTICLES = 600
 const MAX_RINGS = 28
 const MAX_FLOATERS = 40
 const MAX_TELEGRAPHS = 14
+const MAX_ORDER_LINES = 6
 
 const KIND_COLOR: Record<Particle['kind'], [number, number, number]> = {
   spark: [1.0, 0.72, 0.3],
@@ -25,6 +26,15 @@ const KIND_COLOR: Record<Particle['kind'], [number, number, number]> = {
   rune: [0.75, 0.55, 1.0],
   slam: [0.9, 0.35, 0.25],
   telegraph: [1.0, 0.35, 0.25],
+}
+
+/** Линия приказа на земле (Фаза 4): герой → компаньон. */
+export interface OrderLine {
+  ax: number
+  ay: number
+  bx: number
+  by: number
+  color: string
 }
 
 export class Fx3d {
@@ -55,6 +65,11 @@ export class Fx3d {
   // Кольцо выбранной цели
   private targetRing: THREE.Mesh
   private targetRingMat: THREE.MeshBasicMaterial
+
+  // Фаза 4: тактический оверлей — линии приказов + кольцо выбора компаньона
+  private orderLines: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; active: boolean }> = []
+  private selRing: THREE.Mesh
+  private selRingMat: THREE.MeshBasicMaterial
 
   constructor() {
     // --- Points-пул ---
@@ -92,6 +107,25 @@ export class Fx3d {
     this.targetRing.rotation.x = -Math.PI / 2
     this.targetRing.visible = false
     this.group.add(this.targetRing)
+
+    // --- Фаза 4: линии приказов (тонкие полосы на земле) ---
+    const lineGeo = new THREE.PlaneGeometry(1, 1)
+    for (let i = 0; i < MAX_ORDER_LINES; i++) {
+      const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+      const mesh = new THREE.Mesh(lineGeo, m)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.renderOrder = 5
+      mesh.visible = false
+      this.group.add(mesh)
+      this.orderLines.push({ mesh, mat: m, active: false })
+    }
+    // Кольцо выбранного компаньона
+    this.selRingMat = new THREE.MeshBasicMaterial({ color: 0xf5c96b, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false })
+    this.selRing = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 36), this.selRingMat)
+    this.selRing.rotation.x = -Math.PI / 2
+    this.selRing.renderOrder = 7
+    this.selRing.visible = false
+    this.group.add(this.selRing)
 
     // --- Телеграфы АоЕ ---
     for (let i = 0; i < MAX_TELEGRAPHS; i++) {
@@ -277,6 +311,48 @@ export class Fx3d {
     this.targetRingMat.opacity = 0.55 + Math.sin(time * 5) * 0.2
   }
 
+  /** Фаза 4: тактический оверлей. lines=null — всё скрыть (вышли из паузы). */
+  updateTactical(lines: OrderLine[] | null, sel: Entity | null, time: number) {
+    const n = lines ? Math.min(lines.length, MAX_ORDER_LINES) : 0
+    for (let i = 0; i < n; i++) {
+      const slot = this.orderLines[i]
+      slot.active = true
+      slot.mesh.visible = true
+      const l = lines![i]
+      const dx = l.bx - l.ax
+      const dy = l.by - l.ay
+      const len = Math.hypot(dx, dy)
+      if (len < 2) {
+        slot.mesh.visible = false
+        continue
+      }
+      const mx = (l.ax + l.bx) / 2
+      const my = (l.ay + l.by) / 2
+      slot.mesh.position.set(mx, heightAt(mx, my) + 0.45, my)
+      slot.mesh.scale.set(len, 2.2, 1)
+      slot.mesh.rotation.z = 0
+      slot.mesh.rotation.y = -Math.atan2(dy, dx)
+      slot.mat.color.set(l.color)
+      slot.mat.opacity = 0.55 + 0.2 * Math.sin(time * 6)
+    }
+    for (let i = n; i < MAX_ORDER_LINES; i++) {
+      const slot = this.orderLines[i]
+      if (!slot.active) break
+      slot.active = false
+      slot.mesh.visible = false
+      slot.mat.opacity = 0
+    }
+    if (sel && sel.alive) {
+      this.selRing.visible = true
+      const r = (sel.radius + 10) * (1 + Math.sin(time * 4) * 0.07)
+      this.selRing.scale.setScalar(r)
+      this.selRing.position.set(sel.pos.x, heightAt(sel.pos.x, sel.pos.y) + 0.5, sel.pos.y)
+      this.selRingMat.opacity = 0.65 + Math.sin(time * 4) * 0.2
+    } else {
+      this.selRing.visible = false
+    }
+  }
+
   /** Кадровая синхронизация (вызывается из Renderer3d). */
   update(ps: Particle[], fs: Floater[], ts: Telegraph[], target: Entity | null, time: number) {
     this.syncParticles(ps)
@@ -296,6 +372,9 @@ export class Fx3d {
     for (const t of this.telegraphPool) t.mesh.geometry.dispose()
     this.targetRing.geometry.dispose()
     this.targetRingMat.dispose()
+    for (const l of this.orderLines) l.mat.dispose()
+    this.selRing.geometry.dispose()
+    this.selRingMat.dispose()
   }
 }
 
