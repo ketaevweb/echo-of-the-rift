@@ -6,12 +6,13 @@
 // ============================================================
 
 import * as THREE from 'three'
-import { Entity, Floater, Particle } from '../types'
+import { Entity, Floater, Particle, Telegraph, TelegraphShape } from '../types'
 import { heightAt } from './heightmap'
 
 const MAX_PARTICLES = 600
 const MAX_RINGS = 28
 const MAX_FLOATERS = 40
+const MAX_TELEGRAPHS = 14
 
 const KIND_COLOR: Record<Particle['kind'], [number, number, number]> = {
   spark: [1.0, 0.72, 0.3],
@@ -23,6 +24,7 @@ const KIND_COLOR: Record<Particle['kind'], [number, number, number]> = {
   ember: [1.0, 0.42, 0.2],
   rune: [0.75, 0.55, 1.0],
   slam: [0.9, 0.35, 0.25],
+  telegraph: [1.0, 0.35, 0.25],
 }
 
 export class Fx3d {
@@ -36,6 +38,16 @@ export class Fx3d {
 
   // Кольца на земле (ring/slam/руны)
   private ringPool: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; active: boolean }> = []
+
+  // Телеграфы АоЕ (круг/конус/коридор) — Фаза 2
+  private telegraphPool: Array<{
+    group: THREE.Group
+    mesh: THREE.Mesh
+    mat: THREE.MeshBasicMaterial
+    shape: TelegraphShape
+    width: number
+    active: boolean
+  }> = []
 
   // Всплывающий текст
   private floaterPool: Array<{ sprite: THREE.Sprite; tex: THREE.CanvasTexture; canvas: HTMLCanvasElement; active: boolean; life: number; maxLife: number; vy: number }> = []
@@ -80,6 +92,28 @@ export class Fx3d {
     this.targetRing.rotation.x = -Math.PI / 2
     this.targetRing.visible = false
     this.group.add(this.targetRing)
+
+    // --- Телеграфы АоЕ ---
+    for (let i = 0; i < MAX_TELEGRAPHS; i++) {
+      const group = new THREE.Group()
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      })
+      const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 40), mat)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.renderOrder = 6
+      group.add(mesh)
+      group.visible = false
+      this.group.add(group)
+      this.telegraphPool.push({ group, mesh, mat, shape: 'circle', width: -1, active: false })
+    }
   }
 
   /** Синхронизация пула частиц со снимком движка. */
@@ -127,6 +161,65 @@ export class Fx3d {
       slot.active = false
       slot.mesh.visible = false
       slot.mat.opacity = 0
+    }
+  }
+
+  /** Телеграфы АоЕ: круг/конус/коридор, пульсируют до срабатывания. */
+  private syncTelegraphs(ts: Telegraph[], time: number) {
+    let ti = 0
+    for (const t of ts) {
+      if (ti >= MAX_TELEGRAPHS) break
+      const slot = this.telegraphPool[ti++]
+      slot.active = true
+      slot.group.visible = true
+      const h = heightAt(t.x, t.y)
+      slot.group.position.set(t.x, h + 0.5, t.y)
+      slot.mat.color.set(t.color)
+      const progress = 1 - t.life / t.maxLife
+      const pulse = 0.5 + 0.5 * Math.sin(time * 13)
+      slot.mat.opacity = (0.2 + 0.2 * pulse) * Math.min(1, 0.4 + progress * 1.4)
+      if (slot.shape !== t.shape) {
+        slot.mesh.geometry.dispose()
+        slot.mesh.geometry =
+          t.shape === 'circle'
+            ? new THREE.CircleGeometry(1, 40)
+            : t.shape === 'cone'
+              ? new THREE.CircleGeometry(1, 26, -1, 2)
+              : new THREE.PlaneGeometry(1, 1)
+        slot.shape = t.shape
+        slot.width = -1
+      }
+      if (t.shape === 'circle') {
+        // Круг слегка сжимается к моменту удара — классический телеграф
+        const r = t.radius * (1.06 - progress * 0.06)
+        slot.mesh.scale.setScalar(r)
+        slot.mesh.position.x = 0
+        slot.group.rotation.y = 0
+      } else if (t.shape === 'cone') {
+        // Полуугол у каждого телеграфа свой — пересобираем геометрию при смене
+        const w = Math.round(t.width * 100) / 100
+        if (slot.width !== w) {
+          slot.mesh.geometry.dispose()
+          slot.mesh.geometry = new THREE.CircleGeometry(1, 26, -t.width, t.width * 2)
+          slot.width = w
+        }
+        slot.mesh.scale.setScalar(t.radius)
+        slot.mesh.position.x = 0
+        slot.group.rotation.y = -t.facing
+      } else {
+        // Коридор: плоскость 1×1, растянута по длине, вынесена вперёд по +X
+        slot.mesh.scale.set(t.radius, t.width * 2, 1)
+        slot.mesh.position.x = t.radius / 2
+        slot.group.rotation.y = -t.facing
+      }
+    }
+    for (let i = ti; i < MAX_TELEGRAPHS; i++) {
+      const slot = this.telegraphPool[i]
+      if (!slot.active) break
+      slot.active = false
+      slot.group.visible = false
+      slot.mat.opacity = 0
+      slot.mesh.position.x = 0
     }
   }
 
@@ -185,9 +278,10 @@ export class Fx3d {
   }
 
   /** Кадровая синхронизация (вызывается из Renderer3d). */
-  update(ps: Particle[], fs: Floater[], target: Entity | null, time: number) {
+  update(ps: Particle[], fs: Floater[], ts: Telegraph[], target: Entity | null, time: number) {
     this.syncParticles(ps)
     this.syncRings(ps)
+    this.syncTelegraphs(ts, time)
     this.syncFloaters(fs)
     this.updateTarget(target, time)
   }
@@ -199,6 +293,7 @@ export class Fx3d {
       s.tex.dispose()
       ;(s.sprite.material as THREE.Material).dispose()
     }
+    for (const t of this.telegraphPool) t.mesh.geometry.dispose()
     this.targetRing.geometry.dispose()
     this.targetRingMat.dispose()
   }

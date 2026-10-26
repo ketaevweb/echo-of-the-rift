@@ -14,7 +14,7 @@ import { d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { makeEntity, nearestEnemyOf, nearestParty } from '../core/entity'
 import { playerAc, playerAtk } from './progression'
-import { beam, damage, floater, meleeAttack, rangedAttack, ring } from './combat'
+import { beam, damage, floater, meleeAttack, rangedAttack, ring, spawnTelegraph } from './combat'
 import { openDialogue } from './quest'
 
 // ---------------- Инициализация/спавн ----------------
@@ -396,20 +396,59 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
 
   e.aiState = 'chase'
   const dist = Math.hypot(prey.pos.x - e.pos.x, prey.pos.y - e.pos.y)
-  e.facing = Math.atan2(prey.pos.y - e.pos.y, prey.pos.x - e.pos.x)
+  // Замах рывка босса: направление зафиксировано (иначе коридор-телеграф врал бы)
+  if (!((e.chargeT ?? 0) > 0)) {
+    e.facing = Math.atan2(prey.pos.y - e.pos.y, prey.pos.x - e.pos.x)
+  }
 
-  if (e.boss) bossLogic(ctx, e, dist)
+  if (e.boss) bossLogic(ctx, e, dist, dt)
+
+  // Замах/рывок босса: обычное движение и атаки заблокированы —
+  // вся логика внутри bossLogic (return после него не выходим,
+  // но дистанционно он уже управляет боссом)
+  if ((e.chargeT ?? 0) > 0 || (e.dashT ?? 0) > 0) {
+    e.vel = { x: 0, y: 0 }
+    e.walkPhase += dt * ((e.dashT ?? 0) > 0 ? 2 : 0.3)
+    return
+  }
 
   const isRanged = !!e.ranged
   const wantRange = isRanged ? e.ranged! * 0.85 : e.attackRange + prey.radius * 0.6
   let vx = 0
   let vy = 0
-  if (isRanged && dist < wantRange * 0.6) {
-    vx = -Math.cos(e.facing) * e.speed
-    vy = -Math.sin(e.facing) * e.speed
+  if (isRanged) {
+    if (dist < wantRange * 0.55) {
+      // Слишком близко — отступаем
+      vx = -Math.cos(e.facing) * e.speed
+      vy = -Math.sin(e.facing) * e.speed
+    } else if (dist > wantRange) {
+      vx = Math.cos(e.facing) * e.speed
+      vy = Math.sin(e.facing) * e.speed
+    } else if (e.cds['atk'] > 0.15) {
+      // В удобном поясе: стрейф поперёк луча (Фаза 2), чтобы не стоять столбом под ударом
+      const s = e.eid % 2 === 0 ? 1 : -1
+      const pa = e.facing + (Math.PI / 2) * s
+      vx = Math.cos(pa) * e.speed * 0.5
+      vy = Math.sin(pa) * e.speed * 0.5
+    }
   } else if (dist > wantRange) {
-    vx = Math.cos(e.facing) * e.speed
-    vy = Math.sin(e.facing) * e.speed
+    if (dist > wantRange * 1.5 && !e.boss) {
+      // Фланкирование (Фаза 2): каждый враг заходит на свой сектор дуги вокруг цели
+      // (стабильно по eid — стая естественно окружает, как волки в W3)
+      const base = Math.atan2(e.pos.y - prey.pos.y, e.pos.x - prey.pos.x)
+      const flankA = (((e.eid * 7) % 9) - 4) * 0.32 // −1.28..+1.28 рад
+      const fa = base + flankA
+      const tx = prey.pos.x + Math.cos(fa) * wantRange * 0.85
+      const ty = prey.pos.y + Math.sin(fa) * wantRange * 0.85
+      const dx = tx - e.pos.x
+      const dy = ty - e.pos.y
+      const l = Math.hypot(dx, dy) || 1
+      vx = (dx / l) * e.speed
+      vy = (dy / l) * e.speed
+    } else {
+      vx = Math.cos(e.facing) * e.speed
+      vy = Math.sin(e.facing) * e.speed
+    }
   }
   const spd = e.slowT > 0 ? 0.5 : 1
   ctx.moveWithCollisions(e, vx * spd, vy * spd, dt)
@@ -421,9 +460,50 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
   }
 }
 
-export function bossLogic(ctx: EngineCtx, e: Entity, dist: number) {
+export function bossLogic(ctx: EngineCtx, e: Entity, dist: number, dt: number) {
+  // --- Активный рывок (Фаза 2): несёмся по коридору, сметая партию ---
+  if ((e.dashT ?? 0) > 0) {
+    e.dashT = (e.dashT ?? 0) - dt
+    const dir = e.dashDir ?? e.facing
+    e.facing = dir
+    const sp = 660
+    e.vel = { x: Math.cos(dir) * sp, y: Math.sin(dir) * sp }
+    ctx.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
+    if (!e.dashHits) e.dashHits = new Set()
+    for (const a of ctx.entities) {
+      if (a.team !== 'party' || !a.alive) continue
+      if (e.dashHits.has(a.eid)) continue
+      if (Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < e.radius + 46) {
+        e.dashHits.add(a.eid)
+        damage(ctx, a, d(10) + d(10) + e.dmgMod, { color: '#e0653a' })
+        ctx.kb.set(a.eid, { x: Math.cos(dir) * 420, y: Math.sin(dir) * 420 })
+        sfx('hit')
+      }
+    }
+    if ((e.dashT ?? 0) <= 0) {
+      e.dashT = 0
+      e.dashHits = undefined
+      ctx.shake = 5
+    }
+    return
+  }
+  // --- Замах рывка: стоим, направление заперто, телеграф-коридор уже на земле ---
+  if ((e.chargeT ?? 0) > 0) {
+    e.chargeT = (e.chargeT ?? 0) - dt
+    e.vel = { x: 0, y: 0 }
+    if ((e.chargeT ?? 0) <= 0) {
+      e.chargeT = 0
+      e.dashT = 0.5
+      e.dashDir = e.chargeDir ?? e.facing
+      e.dashHits = new Set()
+      ctx.shake = 7
+      sfx('boss')
+    }
+    return
+  }
+  // --- Замах слэма: телеграф-круг следует за боссом, удар по истечении ---
   if (e.slamT > 0) {
-    e.slamT -= 0.016
+    e.slamT -= dt
     if (e.slamT <= 0) {
       ring(ctx, e.pos, '#c94f3d', 170, 0.7, 'slam')
       ctx.shake = 10
@@ -443,6 +523,40 @@ export function bossLogic(ctx: EngineCtx, e: Entity, dist: number) {
     e.cds['slam'] = 7
     e.slamT = 0.9
     floater(ctx, e.pos, 'Буря близко!', '#a06bd9', 16)
+    spawnTelegraph(ctx, {
+      shape: 'circle',
+      x: e.pos.x,
+      y: e.pos.y,
+      facing: 0,
+      radius: 175,
+      width: 0,
+      life: 0.9,
+      maxLife: 0.9,
+      color: '#c94f3d',
+      followEid: e.eid,
+    })
+    return
+  }
+  // --- Фаза ярости (<66% HP): рывок с коридором-телеграфом ---
+  if (e.cds['charge'] === undefined) e.cds['charge'] = 6
+  const enraged = e.hp / e.maxHp < 0.66
+  if (enraged && e.cds['charge'] <= 0 && dist > 130 && dist < 520) {
+    e.cds['charge'] = 9
+    e.chargeDir = e.facing
+    e.chargeT = 0.85
+    floater(ctx, e.pos, 'Разлом несёт меня!', '#a06bd9', 16)
+    spawnTelegraph(ctx, {
+      shape: 'line',
+      x: e.pos.x,
+      y: e.pos.y,
+      facing: e.facing,
+      radius: Math.min(520, dist + 150),
+      width: 54,
+      life: 0.85,
+      maxLife: 0.85,
+      color: '#c94f3d',
+      followEid: e.eid,
+    })
     return
   }
   const ratio = e.hp / e.maxHp

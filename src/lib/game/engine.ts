@@ -18,6 +18,7 @@ import {
   SaveData,
   SignId,
   Stance,
+  Telegraph,
   Vec,
 } from './types'
 import { LAKE, PLAYER_SPAWN, PROPS } from './data/world'
@@ -97,6 +98,7 @@ export class GameEngine implements EngineCtx {
   entities: Entity[] = []
   particles: Particle[] = []
   floaters: Floater[] = []
+  telegraphs: Telegraph[] = []
   kb = new Map<number, Vec>()
 
   player!: Entity
@@ -445,6 +447,7 @@ export class GameEngine implements EngineCtx {
         entities: this.entities,
         particles: this.particles,
         floaters: this.floaters,
+        telegraphs: this.telegraphs,
         targetEid: this.targetEid,
         removedProps: this.removedProps,
       })
@@ -466,6 +469,7 @@ export class GameEngine implements EngineCtx {
       targetEid: this.targetEid,
       particles: this.particles,
       floaters: this.floaters,
+      telegraphs: this.telegraphs,
       playerAlive: this.player.alive,
     })
   }

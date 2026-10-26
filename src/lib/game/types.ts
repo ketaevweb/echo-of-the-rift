@@ -258,6 +258,32 @@ export interface Entity {
   dest: Vec | null // приказ движения
   stance?: Stance // приказ спутнику
   zoneId?: string // зона респавна для врага
+  // --- Фаза 2: рывок босса (транзитные, в сейв не пишутся) ---
+  chargeT?: number // замах рывка (телеграф-коридор)
+  chargeDir?: number // зафиксированное направление рывка
+  dashT?: number // активный рывок
+  dashDir?: number
+  dashHits?: Set<number> // кого уже задел текущий рывок
+}
+
+// ---------------- Телеграфы АоЕ (Фаза 2) ----------------
+
+export type TelegraphShape = 'circle' | 'cone' | 'line'
+
+/** Зона опасности на земле: подсвечивается до срабатывания удара.
+ *  Чисто визуал — урон наносит логика боя, телеграф только показывает.
+ *  followEid — телеграф ездит за сущностью (босс не замирает при замахе). */
+export interface Telegraph {
+  shape: TelegraphShape
+  x: number
+  y: number
+  facing: number // направление для cone/line
+  radius: number // circle: радиус; cone: дальность; line: длина
+  width: number // cone: полуугол (рад); line: полуширина
+  life: number
+  maxLife: number
+  color: string
+  followEid?: number
 }
 
 export interface Particle {
@@ -269,7 +295,7 @@ export interface Particle {
   maxLife: number
   size: number
   color: string
-  kind: 'spark' | 'ring' | 'fire' | 'frost' | 'heal' | 'dust' | 'ember' | 'rune' | 'slam'
+  kind: 'spark' | 'ring' | 'fire' | 'frost' | 'heal' | 'dust' | 'ember' | 'rune' | 'slam' | 'telegraph'
   vx0?: number
   vy0?: number
 }

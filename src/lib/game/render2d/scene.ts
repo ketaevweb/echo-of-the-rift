@@ -7,7 +7,7 @@
 // ============================================================
 
 import { INTERACTABLES } from '../data/world'
-import { Entity, Floater, Particle, PropDef, Vec } from '../types'
+import { Entity, Floater, Particle, PropDef, Telegraph, Vec } from '../types'
 import { rndRange } from '../core/util'
 import { IRenderer } from './types'
 
@@ -27,6 +27,7 @@ export interface SceneView {
   targetEid: number | null
   particles: Particle[]
   floaters: Floater[]
+  telegraphs: Telegraph[]
   playerAlive: boolean
 }
 
@@ -65,15 +66,34 @@ export function drawScene(v: SceneView) {
     ctx.lineTo(it.pos.x + 5, it.pos.y - 11)
     ctx.stroke()
   }
-  const boss = v.entities.find((e) => e.enemyType === 'boss' && e.alive)
-  if (boss && boss.slamT > 0) {
-    ctx.strokeStyle = `rgba(201,79,61,${0.4 + 0.4 * Math.sin(v.time * 20)})`
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.arc(boss.pos.x, boss.pos.y, 175, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(201,79,61,0.08)'
-    ctx.fill()
+  // Телеграфы АоЕ (Фаза 2): круг/конус/коридор с пульсацией
+  for (const t of v.telegraphs) {
+    const a = 0.1 + 0.12 * (0.5 + 0.5 * Math.sin(v.time * 13))
+    ctx.fillStyle = t.color
+    ctx.globalAlpha = a
+    if (t.shape === 'circle') {
+      const r = t.radius * (1.06 - (1 - t.life / t.maxLife) * 0.06)
+      ctx.beginPath()
+      ctx.arc(t.x, t.y, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = Math.min(1, a + 0.25)
+      ctx.strokeStyle = t.color
+      ctx.lineWidth = 3
+      ctx.stroke()
+    } else if (t.shape === 'cone') {
+      ctx.beginPath()
+      ctx.moveTo(t.x, t.y)
+      ctx.arc(t.x, t.y, t.radius, t.facing - t.width, t.facing + t.width)
+      ctx.closePath()
+      ctx.fill()
+    } else {
+      ctx.save()
+      ctx.translate(t.x, t.y)
+      ctx.rotate(t.facing)
+      ctx.fillRect(0, -t.width, t.radius, t.width * 2)
+      ctx.restore()
+    }
+    ctx.globalAlpha = 1
   }
   const sorted = [...v.entities].sort((a, b) => a.pos.y - b.pos.y)
   for (const e of sorted) {

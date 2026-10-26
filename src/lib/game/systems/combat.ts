@@ -10,28 +10,39 @@ import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from '../data/abilitie
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
-import { Entity, Particle, SignId, Vec } from '../types'
+import { Entity, Particle, SignId, Telegraph, Vec } from '../types'
 import { useGame } from '../store'
 import { sfx } from '../sfx'
 import { angleDiff, d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
+import { heightAt } from '../render3d/heightmap'
 import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, signPower } from './progression'
 import { advanceQuest, checkProof } from './quest'
 
 // ---------------- Атаки ----------------
 
+/** Высотный бонус (Фаза 2): атакующий заметно выше цели — +2 к броску и
+ *  +15% урона (как «высокая земля» в тактиках), ниже — −2 к броску. */
+function heightMod(a: Entity, t: Entity): number {
+  const dh = heightAt(a.pos.x, a.pos.y) - heightAt(t.pos.x, t.pos.y)
+  if (dh > 12) return 2
+  if (dh < -12) return -2
+  return 0
+}
+
 export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   a.cds['atk'] = a.attackCd
   a.attackT = 0.28
   sfx('swing')
   const buff = a.team === 'party' && ctx.buffT > 0 ? 2 : 0
+  const hMod = heightMod(a, t)
   const roll = d(20)
-  const total = roll + a.atkBonus + buff
+  const total = roll + a.atkBonus + buff + hMod
   if (roll === 20 || (roll !== 1 && total >= t.ac)) {
     const crit = roll === 20
-    const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+    const dmg = Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod)
     damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
     if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
   } else {
@@ -43,11 +54,12 @@ export function rangedAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   a.cds['atk'] = a.attackCd
   a.attackT = 0.25
   const buff = a.team === 'party' && ctx.buffT > 0 ? 2 : 0
+  const hMod = heightMod(a, t)
   const roll = d(20)
-  const total = roll + a.atkBonus + buff
+  const total = roll + a.atkBonus + buff + hMod
   if (roll === 20 || (roll !== 1 && total >= t.ac)) {
     const crit = roll === 20
-    const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+    const dmg = Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod)
     damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
     beam(ctx, a.pos, t.pos, a.team === 'party' ? '#bfe3ea' : '#d9c04f')
     if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
@@ -229,6 +241,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
     if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
     sfx('fire')
     coneParticles(ctx, ctx.player.pos, ctx.player.facing, 150, '#e08a3a')
+    spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 150, width: 0.62, life: 0.3, maxLife: 0.3, color: '#e08a3a' })
     for (const e of enemiesInCone(ctx, 150, 0.62)) {
       const weak = FIRE_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
       damage(ctx, e, Math.round(d(6) * 2 * power * weak), { color: '#e08a3a' })
@@ -239,6 +252,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
     if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
     sfx('shield')
     coneParticles(ctx, ctx.player.pos, ctx.player.facing, 160, '#d9e3ea')
+    spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 160, width: 0.95, life: 0.3, maxLife: 0.3, color: '#d9e3ea' })
     for (const e of enemiesInCone(ctx, 160, 0.95)) {
       damage(ctx, e, Math.round(d(4) * power), { color: '#d9e3ea' })
       e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
@@ -269,6 +283,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
     sfx('shout')
     ctx.shake = 12
     ring(ctx, ctx.player.pos, '#f5c96b', 210, 0.8)
+    spawnTelegraph(ctx, { shape: 'circle', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: 0, radius: 210, width: 0, life: 0.35, maxLife: 0.35, color: '#f5c96b' })
     for (const e of ctx.entities) {
       if (e.kind !== 'enemy' || !e.alive) continue
       if (Math.hypot(e.pos.x - ctx.player.pos.x, e.pos.y - ctx.player.pos.y) < 210) {
@@ -290,6 +305,32 @@ export function enemiesInCone(ctx: EngineCtx, range: number, halfAngle: number):
     const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
     return angleDiff(a, ctx.player.facing) < halfAngle
   })
+}
+
+// ---------------- Телеграфы АоЕ (Фаза 2) ----------------
+
+/** Ставит зону опасности на землю. Чисто визуал: урон наносит боевая логика.
+ *  followEid — телеграф следует за сущностью (босс может двигаться при замахе). */
+export function spawnTelegraph(ctx: EngineCtx, t: Telegraph) {
+  ctx.telegraphs.push(t)
+  if (ctx.telegraphs.length > 24) ctx.telegraphs.shift()
+}
+
+/** Тик телеграфов: жизнь + слежение за сущностью. Вызывается из stepWorld. */
+export function updateTelegraphs(ctx: EngineCtx, dt: number) {
+  if (ctx.telegraphs.length === 0) return
+  for (const t of ctx.telegraphs) {
+    t.life -= dt
+    if (t.followEid !== undefined) {
+      const src = ctx.entities.find((x) => x.eid === t.followEid)
+      if (src) {
+        t.x = src.pos.x
+        t.y = src.pos.y
+        t.facing = src.facing
+      }
+    }
+  }
+  ctx.telegraphs = ctx.telegraphs.filter((t) => t.life > 0)
 }
 
 // ---------------- Статусы ----------------

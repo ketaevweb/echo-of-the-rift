@@ -360,11 +360,13 @@ export class Avatar {
     while (dr < -Math.PI) dr += Math.PI * 2
     this.group.rotation.y += dr * Math.min(1, dt10())
 
-    // Смерть: заваливание набок
+    // Смерть: заваливание набок + оглушение-дёргание + наклон рывка (Фаза 2)
     const tiltTarget = e.alive ? 0 : 1.45
     this.deadTilt += (tiltTarget - this.deadTilt) * 0.08
-    this.group.rotation.z = this.deadTilt * 0.5
-    this.group.rotation.x = -this.deadTilt * 0.2
+    const stunned = e.alive && e.stunT > 0
+    const dashing = e.alive && (e.dashT ?? 0) > 0
+    this.group.rotation.z = this.deadTilt * 0.5 + (stunned ? Math.sin(time * 14) * 0.05 : 0)
+    this.group.rotation.x = -this.deadTilt * 0.2 + (dashing ? -0.3 : 0)
 
     // Шаг
     const swing = moving ? Math.sin(e.walkPhase * 7) * 0.55 : Math.sin(time * 1.6) * 0.05
@@ -373,21 +375,36 @@ export class Avatar {
       this.refs.legs.forEach((leg, i) => {
         leg.rotation.z = moving ? Math.sin(e.walkPhase * 9 + (i % 2 ? Math.PI : 0)) * 0.6 : 0
       })
-      if (this.refs.body) this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 9)) * 1.1 : 0
+      if (this.refs.body) {
+        this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 9)) * 1.1 : 0
+        // Прыжок-выпад зверя при атаке (вперёд по локальной +X)
+        this.refs.body.position.x = e.attackT > 0 ? Math.sin((1 - e.attackT / 0.28) * Math.PI) * 7 : 0
+      }
     } else if (this.refs.legL && this.refs.legR) {
       this.refs.legL.rotation.x = swing
       this.refs.legR.rotation.x = -swing
       if (this.refs.torso) {
         this.refs.torso.position.y = 14 + (moving ? Math.abs(Math.sin(e.walkPhase * 7)) * 1.4 : Math.sin(time * 1.6) * 0.4)
+        // Выпад атаки корпусом вперёд (humanoid смотрит по локальной +Z)
+        this.refs.torso.position.z = e.attackT > 0 ? Math.sin((1 - e.attackT / 0.28) * Math.PI) * 6 : 0
+        const windingSlam = e.alive && e.slamT > 0
+        const windingCharge = e.alive && (e.chargeT ?? 0) > 0
+        this.refs.torso.rotation.x = windingCharge ? -0.14 : windingSlam ? 0.12 : 0
       }
     }
 
-    // Выпад атаки / каст
+    // Выпад атаки / каст / телеграфные позы босса (Фаза 2)
     if (this.refs.armR) {
-      if (e.castT > 0) {
+      if (e.alive && e.slamT > 0) {
+        // Замах слэма: клинок вскинут над головой и дрожит — читается издалека
+        this.refs.armR.rotation.x = -2.5 + Math.sin(time * 30) * 0.06
+      } else if (e.alive && (e.chargeT ?? 0) > 0) {
+        // Замах рывка: занос назад, корпус сжался
+        this.refs.armR.rotation.x = 1.15
+      } else if (e.castT > 0) {
         this.refs.armR.rotation.x = -2.2
       } else if (e.attackT > 0) {
-        this.refs.armR.rotation.x = -1.4 + (0.25 - e.attackT) * 12
+        this.refs.armR.rotation.x = -1.4 + (0.28 - e.attackT) * 12
       } else {
         this.refs.armR.rotation.x = moving ? Math.sin(e.walkPhase * 7 + Math.PI) * 0.4 : 0
       }

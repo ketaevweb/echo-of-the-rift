@@ -25,6 +25,7 @@ export interface SceneView3d {
   entities: Entity[]
   particles: import('../types').Particle[]
   floaters: import('../types').Floater[]
+  telegraphs: import('../types').Telegraph[]
   targetEid: number | null
   removedProps: Set<string>
 }
@@ -319,7 +320,7 @@ export class Renderer3d {
     this.terrain.update(view.time)
     this.props.update(view.time, view.removedProps)
     const target = view.targetEid ? view.entities.find((x) => x.eid === view.targetEid) ?? null : null
-    this.fx.update(view.particles, view.floaters, target, view.time)
+    this.fx.update(view.particles, view.floaters, view.telegraphs, target, view.time)
 
     this.updateCamera(view)
     this.renderer.render(this.scene, this.camera)

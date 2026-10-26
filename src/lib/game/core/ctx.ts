@@ -6,7 +6,7 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, DialogueChoice, Entity, Faction, Floater, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Vec } from '../types'
+import { Attributes, DialogueChoice, Entity, Faction, Floater, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
 import { Collider } from './util'
 import type { PanelId } from '../store'
 
@@ -23,6 +23,7 @@ export interface View3dSnapshot {
   entities: Entity[]
   particles: Particle[]
   floaters: Floater[]
+  telegraphs: Telegraph[]
   targetEid: number | null
   removedProps: Set<string>
 }
@@ -82,6 +83,7 @@ export interface EngineCtx {
   entities: Entity[]
   particles: Particle[]
   floaters: Floater[]
+  telegraphs: Telegraph[]
   kb: Map<number, Vec>
 
   // --- Рендер/ввод/цикл ---

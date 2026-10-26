@@ -7,7 +7,7 @@
 // ============================================================
 
 import { WORLD } from '../data/world'
-import { tickCds } from '../systems/combat'
+import { tickCds, updateTelegraphs } from '../systems/combat'
 import { updateCompanion, updateEnemy } from '../systems/ai'
 import { updateStatuses } from '../systems/combat'
 import { separate, updatePlayer } from '../systems/movement'
@@ -29,6 +29,7 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
     tickCds(e, dt)
   }
   separate(ctx)
+  updateTelegraphs(ctx, dt)
   updateParticles(ctx, dt)
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
