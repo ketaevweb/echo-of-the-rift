@@ -52,3 +52,13 @@ prompt
 server.log
 # Skills directory
 /skills/
+# sandbox-only folders (not part of the game project)
+/examples
+/skills
+/tests
+/download
+/agent-ctx
+dev.log
+server.log
+/db
+*.db

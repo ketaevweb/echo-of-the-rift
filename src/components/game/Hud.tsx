@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Heart, Map, ScrollText, Shield, User, Volume2, VolumeX, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
@@ -94,9 +94,8 @@ export default function Hud() {
   const bossBar = useGame((s) => s.bossBar)
   const paused = useGame((s) => s.paused)
   const interactHint = useGame((s) => s.interactHint)
-  const openPanel = useGame((s) => s.openPanel)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
-  const mutedRef = useRef(false)
+  const [muted, setMutedUi] = useState(false)
 
   useEffect(() => {
     const engine = getEngine()
@@ -135,7 +134,7 @@ export default function Hud() {
           <div className="mt-1 flex items-center justify-between px-1 pb-0.5">
             <span className="text-[10px] tracking-widest text-[#8a8068]">ХЕЙМХОЛЛ И ОКРЕСТНОСТИ</span>
             <button
-              onClick={() => openPanel('map')}
+              onClick={() => getEngine()?.openPanel('map')}
               className="text-[#9a8f78] transition hover:text-[#d9a441]"
               title="Полная карта [M]"
             >
@@ -243,7 +242,7 @@ export default function Hud() {
           ].map((b) => (
             <button
               key={b.id}
-              onClick={() => openPanel(b.id as 'char')}
+              onClick={() => getEngine()?.openPanel(b.id as 'char')}
               title={b.title}
               className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             >
@@ -252,7 +251,7 @@ export default function Hud() {
             </button>
           ))}
           <button
-            onClick={() => openPanel('pause')}
+            onClick={() => getEngine()?.openPanel('pause')}
             title="Меню [Esc]"
             className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
           >
@@ -261,13 +260,14 @@ export default function Hud() {
           </button>
           <button
             onClick={() => {
-              mutedRef.current = !mutedRef.current
-              setMuted(mutedRef.current)
+              const next = !muted
+              setMuted(next)
+              setMutedUi(next)
             }}
             title="Звук"
             className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441]"
           >
-            {isMuted() ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             <span className="sr-only">Звук</span>
           </button>
         </div>
