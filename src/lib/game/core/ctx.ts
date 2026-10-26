@@ -6,7 +6,8 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, Entity, Faction, InventoryEntry, QuestState, SignId, SkillRanks, Vec } from '../types'
+import { Attributes, DialogueChoice, Entity, Faction, Floater, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Vec } from '../types'
+import { Collider } from './util'
 
 export type ToastKind = 'info' | 'quest' | 'level' | 'warn' | 'loot'
 
@@ -39,8 +40,36 @@ export interface EngineCtx {
   bestiary: Set<string>
   player: Entity
 
+  // --- Сущности и эффекты ---
+  eidSeq: number
+  entities: Entity[]
+  particles: Particle[]
+  floaters: Floater[]
+  kb: Map<number, Vec>
+
+  // --- Рендер/ввод/цикл ---
+  canvas: HTMLCanvasElement
+  baked: HTMLCanvasElement
+  colliders: Collider[]
+  props: PropDef[]
+  removedProps: Set<string>
+  keys: Set<string>
+  camera: Vec
+  shake: number
+  tacticalPaused: boolean
+  dialogueTree: string | null
+  dlgChoices: DialogueChoice[]
+  targetEid: number | null
+  time: number
+  currentArea: string
+  endingAt: number | null
+  buffT: number
+  destroyed: boolean
+
   // --- Хуки, реализуемые движком (делегируют в системы/инициализацию) ---
   toast(text: string, kind?: ToastKind): void
   createPlayer(pos: Vec): void
   spawnWorld(): void
+  syncUi(): void
+  castAbility(id: string): void
 }

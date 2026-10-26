@@ -50,6 +50,36 @@ import { ABILITY_BAR_IDS, ATTR_NAMES, BESTIARY_INFO, ENEMY_NAME } from './data/t
 import { angleDiff, Collider, d, rndRange } from './core/util'
 import { EngineCtx, ToastKind } from './core/ctx'
 import { applySave, saveGame as saveGameSys, toTitle as toTitleSys } from './systems/save'
+import {
+  addItem as addItemSys,
+  buyItem as buyItemSys,
+  countItem as countItemSys,
+  equipItem as equipItemSys,
+  removeItem as removeItemSys,
+  sellItem as sellItemSys,
+  unequipItem as unequipItemSys,
+  useItem as applyUseItem,
+} from './systems/inventory'
+import {
+  gainXp as gainXpSys,
+  openShop as openShopSys,
+  openTrainer as openTrainerSys,
+  playerAc as playerAcSys,
+  playerAtk as playerAtkSys,
+  recalcStats as recalcStatsSys,
+  signPower as signPowerSys,
+  spendLp as spendLpSys,
+  trainOption as trainOptionSys,
+  xpNext as xpNextSys,
+} from './systems/progression'
+import {
+  beam as beamSys,
+  coneParticles as coneParticlesSys,
+  floater as floaterSys,
+  ring as ringSys,
+  tickCds,
+  updateParticles as updateParticlesSys,
+} from './systems/combat'
 
 export { BESTIARY_INFO } from './data/tables'
 
@@ -66,18 +96,18 @@ export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null) {
 }
 
 export class GameEngine implements EngineCtx {
-  private canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private mini: HTMLCanvasElement | null = null
-  private baked: HTMLCanvasElement
-  private colliders: Collider[] = []
-  private props = [...PROPS].sort((a, b) => a.pos.y - b.pos.y)
+  baked: HTMLCanvasElement
+  colliders: Collider[] = []
+  props = [...PROPS].sort((a, b) => a.pos.y - b.pos.y)
 
-  private eidSeq = 1
-  private entities: Entity[] = []
-  private particles: Particle[] = []
-  private floaters: Floater[] = []
-  private kb = new Map<number, Vec>()
+  eidSeq = 1
+  entities: Entity[] = []
+  particles: Particle[] = []
+  floaters: Floater[] = []
+  kb = new Map<number, Vec>()
 
   player!: Entity
   companionIds = { kaya: false, torvald: false }
@@ -107,26 +137,26 @@ export class GameEngine implements EngineCtx {
   quests: Record<string, QuestState> = {}
   flags: Record<string, boolean> = {}
   bestiary = new Set<string>()
-  private removedProps = new Set<string>()
+  removedProps = new Set<string>()
   kills = 0
   playtime = 0
 
-  private keys = new Set<string>()
-  private camera: Vec = { ...PLAYER_SPAWN }
-  private shake = 0
-  private tacticalPaused = false
-  private dialogueTree: string | null = null
-  private dlgChoices: DialogueChoice[] = []
-  private targetEid: number | null = null
-  private time = 0
+  keys = new Set<string>()
+  camera: Vec = { ...PLAYER_SPAWN }
+  shake = 0
+  tacticalPaused = false
+  dialogueTree: string | null = null
+  dlgChoices: DialogueChoice[] = []
+  targetEid: number | null = null
+  time = 0
   private raf = 0
   private lastT = 0
   private syncT = 0
   private autosaveT = 0
-  private endingAt: number | null = null
-  private currentArea = ''
-  private destroyed = false
-  private buffT = 0
+  endingAt: number | null = null
+  currentArea = ''
+  destroyed = false
+  buffT = 0
   private dpr = 1
 
   constructor(canvas: HTMLCanvasElement, save: SaveData | null) {
@@ -168,55 +198,11 @@ export class GameEngine implements EngineCtx {
       { item: 'potion_heal', qty: 3 },
       { item: 'potion_stam', qty: 2 },
     ]
-    this.recalcStats(true)
+    recalcStatsSys(this, true)
     this.hp = this.maxHp
     this.stamina = this.maxStamina
     this.createPlayer({ ...PLAYER_SPAWN })
     this.spawnWorld()
-  }
-
-  private recalcStats(full = false) {
-    const newMaxHp = 80 + this.attributes.vigor * 8 + this.skills.vitality * 15 + (this.level - 1) * 8
-    if (full) this.maxHp = newMaxHp
-    else if (newMaxHp !== this.maxHp) {
-      const ratio = this.hp / this.maxHp
-      this.maxHp = newMaxHp
-      this.hp = Math.min(this.maxHp, Math.max(1, Math.round(ratio * this.maxHp)))
-    }
-    this.maxStamina = 70 + this.attributes.vigor * 3 + (this.level - 1) * 4
-    this.stamina = Math.min(this.stamina, this.maxStamina)
-    this.refreshPlayerStats()
-  }
-
-  private refreshPlayerStats() {
-    if (!this.player) return
-    this.player.maxHp = this.maxHp
-    this.player.hp = Math.max(0, Math.min(this.player.hp, this.maxHp))
-    this.player.atkBonus = this.playerAtk().atkBonus
-    this.player.ac = this.playerAc()
-    this.player.dmgMod = this.playerAtk().mod
-  }
-
-  private playerAtk() {
-    const w = this.weapon ? ITEMS[this.weapon] : null
-    return {
-      atkBonus: 2 + Math.floor(this.level / 2) + Math.floor(this.attributes.might / 2) + this.skills.blade,
-      mod: (w?.damage ?? 2) + Math.floor(this.attributes.might / 2),
-    }
-  }
-
-  private playerAc() {
-    const a = this.armor ? ITEMS[this.armor] : null
-    return 10 + (a?.ac ?? 0) + Math.floor(this.attributes.vigor / 2)
-  }
-
-  private signPower() {
-    const robe = this.armor === 'armor_robe' ? 0.1 : 0
-    return 1 + this.skills.signs * 0.15 + (this.attributes.intellect - 3) * 0.08 + robe
-  }
-
-  private xpNext() {
-    return 100 + (this.level - 1) * 60
   }
 
   private makeEntity(base: Partial<Entity>): Entity {
@@ -285,11 +271,11 @@ export class GameEngine implements EngineCtx {
       maxHp: this.maxHp,
       team: 'party',
       speed: 160,
-      atkBonus: this.playerAtk().atkBonus,
-      ac: this.playerAc(),
+      atkBonus: playerAtkSys(this).atkBonus,
+      ac: playerAcSys(this),
       dmgDice: 1,
       dmgSides: 6,
-      dmgMod: this.playerAtk().mod,
+      dmgMod: playerAtkSys(this).mod,
       attackCd: 0.9,
       attackRange: 52,
       aggroR: 0,
@@ -605,10 +591,10 @@ export class GameEngine implements EngineCtx {
       else if (e.kind === 'enemy') this.updateEnemy(e, dt)
       else if (e.kind === 'npc') e.walkPhase += dt * 0.5
       this.updateStatuses(e, dt)
-      this.tickCds(e, dt)
+      tickCds(e, dt)
     }
     this.separate()
-    this.updateParticles(dt)
+    updateParticlesSys(this, dt)
     this.buffT = Math.max(0, this.buffT - dt)
     this.shake = Math.max(0, this.shake - dt * 26)
     this.updateArea()
@@ -623,15 +609,6 @@ export class GameEngine implements EngineCtx {
     this.camera.y = Math.max(Math.min(vh / 2, WORLD.h / 2), Math.min(this.camera.y, WORLD.h - vh / 2))
   }
 
-  private tickCds(e: Entity, dt: number) {
-    for (const k of Object.keys(e.cds)) {
-      if (e.cds[k] > 0) e.cds[k] = Math.max(0, e.cds[k] - dt)
-    }
-    e.attackT = Math.max(0, e.attackT - dt)
-    e.hitT = Math.max(0, e.hitT - dt)
-    e.castT = Math.max(0, e.castT - dt)
-  }
-
   private updateStatuses(e: Entity, dt: number) {
     if (!e.alive) return
     if (e.stunT > 0) e.stunT -= dt
@@ -641,7 +618,7 @@ export class GameEngine implements EngineCtx {
       e.burnTick -= dt
       if (e.burnTick <= 0) {
         e.burnTick = 0.5
-        this.damage(e, Math.max(1, Math.round(2 * this.signPower())), {
+        this.damage(e, Math.max(1, Math.round(2 * signPowerSys(this))), {
           silent: true,
           color: '#e08a3a',
         })
@@ -1160,7 +1137,7 @@ export class GameEngine implements EngineCtx {
       if (z) e.respawnAt = this.time + z.respawnSec
     }
     const st = ENEMY_STATS[type]
-    this.gainXp(st.xp)
+    gainXpSys(this, st.xp)
     let goldLoot = 0
     if (type === 'wolf') {
       if (Math.random() < 0.6) this.addItem('wolf_pelt', 1)
@@ -1240,25 +1217,6 @@ export class GameEngine implements EngineCtx {
     }, 1800)
   }
 
-  private gainXp(n: number) {
-    this.xp += n
-    this.floater(this.player.pos, '+' + n + ' опыта', '#c9b06b', 12)
-    let next = this.xpNext()
-    while (this.xp >= next) {
-      this.xp -= next
-      this.level++
-      this.lp += 5
-      this.recalcStats()
-      this.hp = this.maxHp
-      this.player.hp = this.maxHp
-      this.stamina = this.maxStamina
-      this.toast(`Уровень ${this.level}! +5 очков обучения`, 'level')
-      sfx('level')
-      this.ring(this.player.pos, '#f5c96b', 60, 0.9)
-      next = this.xpNext()
-    }
-  }
-
   // ---------------- Способности игрока ----------------
 
   castAbility(id: string) {
@@ -1299,7 +1257,7 @@ export class GameEngine implements EngineCtx {
     this.player.cds[id] = ab.cooldown
     this.player.castT = 0.25
     const signLevel = this.signs[id as SignId]?.level ?? 1
-    const power = this.signPower()
+    const power = signPowerSys(this)
     const target = this.targetEid ? this.entities.find((e) => e.eid === this.targetEid) : null
 
     if (id === 'igni') {
@@ -1369,78 +1327,22 @@ export class GameEngine implements EngineCtx {
     })
   }
 
-  // ---------------- Эффекты ----------------
+  // ---------------- Эффекты (делегаты systems/combat) ----------------
 
   private floater(pos: Vec, text: string, color: string, size: number) {
-    this.floaters.push({
-      x: pos.x + rndRange(-6, 6),
-      y: pos.y - 18,
-      text,
-      color,
-      life: 1.1,
-      maxLife: 1.1,
-      size,
-      vy: -34,
-    })
-    if (this.floaters.length > 40) this.floaters.shift()
+    floaterSys(this, pos, text, color, size)
   }
 
   private ring(pos: Vec, color: string, size: number, life: number, kind: Particle['kind'] = 'ring') {
-    this.particles.push({ x: pos.x, y: pos.y, vx: 0, vy: 0, life, maxLife: life, size, color, kind })
+    ringSys(this, pos, color, size, life, kind)
   }
 
   private beam(a: Vec, b: Vec, color: string) {
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8
-      this.particles.push({
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-        vx: rndRange(-10, 10),
-        vy: rndRange(-10, 10),
-        life: 0.25,
-        maxLife: 0.25,
-        size: 2.4,
-        color,
-        kind: 'spark',
-      })
-    }
+    beamSys(this, a, b, color)
   }
 
   private coneParticles(pos: Vec, facing: number, range: number, color: string) {
-    for (let i = 0; i < 26; i++) {
-      const a = facing + rndRange(-0.55, 0.55)
-      const dist = rndRange(20, range)
-      this.particles.push({
-        x: pos.x + Math.cos(a) * dist * 0.3,
-        y: pos.y + Math.sin(a) * dist * 0.3 - 6,
-        vx: Math.cos(a) * dist * 2.4,
-        vy: Math.sin(a) * dist * 2.4,
-        life: rndRange(0.2, 0.42),
-        maxLife: 0.42,
-        size: rndRange(2.5, 5),
-        color,
-        kind: 'fire',
-      })
-    }
-  }
-
-  private updateParticles(dt: number) {
-    for (const p of this.particles) {
-      p.life -= dt
-      p.x += p.vx * dt
-      p.y += p.vy * dt
-      if (p.kind === 'fire' || p.kind === 'spark') {
-        p.vx *= 0.92
-        p.vy *= 0.92
-      }
-    }
-    this.particles = this.particles.filter((p) => p.life > 0)
-    for (const f of this.floaters) {
-      f.life -= dt
-      f.y += f.vy * dt
-      f.vy *= 0.95
-    }
-    this.floaters = this.floaters.filter((f) => f.life > 0)
+    coneParticlesSys(this, pos, facing, range, color)
   }
 
   // ---------------- Диалоги ----------------
@@ -1586,15 +1488,15 @@ export class GameEngine implements EngineCtx {
           break
         }
         case 'xp':
-          this.gainXp(parseInt(arg1, 10))
+          gainXpSys(this, parseInt(arg1, 10))
           break
         case 'lp':
           this.lp = Math.max(0, this.lp + parseInt(arg1, 10))
           break
         case 'open':
           this.closeDialogue()
-          if (arg1 === 'shop') this.openShop()
-          if (arg1 === 'trainer') this.openTrainer()
+          if (arg1 === 'shop') openShopSys(this)
+          if (arg1 === 'trainer') openTrainerSys(this)
           break
         case 'join':
           if (arg1 === 'kaya' || arg1 === 'torvald') {
@@ -1828,218 +1730,52 @@ export class GameEngine implements EngineCtx {
     useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
   }
 
-  // ---------------- Предметы ----------------
+  // ---------------- Предметы (делегаты systems/inventory) ----------------
 
   private addItem(id: string, qty: number) {
-    const def = ITEMS[id]
-    if (!def) return
-    const ex = this.inventory.find((i) => i.item === id)
-    if (ex) ex.qty += qty
-    else this.inventory.push({ item: id, qty })
-    this.toast('Получено: ' + def.name + (qty > 1 ? ` ×${qty}` : ''), 'loot')
-    this.syncUi()
+    addItemSys(this, id, qty)
   }
 
   private removeItem(id: string, qty: number) {
-    const ex = this.inventory.find((i) => i.item === id)
-    if (!ex) return
-    ex.qty -= qty
-    if (ex.qty <= 0) this.inventory = this.inventory.filter((i) => i !== ex)
-    this.syncUi()
+    removeItemSys(this, id, qty)
   }
 
   private countItem(id: string) {
-    return this.inventory.find((i) => i.item === id)?.qty ?? 0
+    return countItemSys(this, id)
   }
 
   buyItem(id: string) {
-    const def = ITEMS[id]
-    if (!def) return
-    if (this.gold < def.price) {
-      this.toast('Не хватает золота.', 'warn')
-      return
-    }
-    this.gold -= def.price
-    this.addItem(id, 1)
-    sfx('coin')
+    buyItemSys(this, id)
   }
 
   sellItem(id: string) {
-    const def = ITEMS[id]
-    if (!def || def.type === 'quest') return
-    if (this.countItem(id) <= 0) return
-    const val = Math.floor(def.price * SELL_RATE)
-    this.removeItem(id, 1)
-    this.gold += val
-    this.toast(`Продано: ${def.name} (+${val} зол.)`, 'info')
-    sfx('coin')
+    sellItemSys(this, id)
   }
 
   equipItem(id: string) {
-    const def = ITEMS[id]
-    if (!def) return
-    if (def.type === 'weapon') {
-      if (this.weapon) this.addItem(this.weapon, 1)
-      this.weapon = id
-      this.removeItem(id, 1)
-    } else if (def.type === 'armor') {
-      if (this.armor) this.addItem(this.armor, 1)
-      this.armor = id
-      this.removeItem(id, 1)
-    } else return
-    this.recalcStats()
-    sfx('click')
-    this.syncUi()
+    equipItemSys(this, id)
   }
 
   unequipItem(slot: 'weapon' | 'armor') {
-    const cur = slot === 'weapon' ? this.weapon : this.armor
-    if (!cur) return
-    if (slot === 'weapon') this.weapon = null
-    else this.armor = null
-    this.addItem(cur, 1)
-    this.recalcStats()
-    sfx('click')
+    unequipItemSys(this, slot)
   }
 
   useItem(id: string) {
-    const def = ITEMS[id]
-    if (def?.type === 'potion') this.castAbility(id)
+    applyUseItem(this, id)
   }
 
   spendLp(attr: 'might' | 'vigor' | 'intellect' | 'charisma') {
-    if (this.lp < 3) {
-      this.toast('Нужно 3 очка обучения.', 'warn')
-      return
-    }
-    this.lp -= 3
-    this.attributes[attr]++
-    this.recalcStats()
-    this.toast(`${ATTR_NAMES[attr]} повышена!`, 'level')
-    sfx('level')
-    this.syncUi()
-  }
-
-  // ---------------- Магазин и тренер ----------------
-
-  private openShop() {
-    useGame.getState().patch({ shop: { merchantName: 'Грим', stock: [...MERCHANT_STOCK] }, panel: 'shop' })
-  }
-
-  private buildTrainerOptions(): TrainerHudState {
-    const opts: TrainerHudState['options'] = []
-    const skillDefs: Array<{ key: 'blade' | 'vitality' | 'signs' | 'speech'; name: string; desc: string }> = [
-      { key: 'blade', name: 'Владение клинком', desc: '+1 к атаке за ранг.' },
-      { key: 'vitality', name: 'Живучесть', desc: '+15 к макс. здоровью за ранг.' },
-      { key: 'signs', name: 'Ловкость знаков', desc: '+15% к силе знаков за ранг.' },
-      { key: 'speech', name: 'Красноречие', desc: '+1 к проверкам убеждения за ранг.' },
-    ]
-    for (const sd of skillDefs) {
-      const r = this.skills[sd.key]
-      const maxed = r >= 5
-      const lpCost = sd.key === 'speech' ? 3 : 2
-      const goldCost = sd.key === 'speech' ? 60 : 40 + r * 20
-      opts.push({
-        id: 'skill:' + sd.key,
-        name: `${sd.name} (${r}/5)`,
-        desc: sd.desc,
-        kind: 'skill',
-        cost: `${lpCost} ОН + ${goldCost} зол.`,
-        maxed,
-        affordable: !maxed && this.lp >= lpCost && this.gold >= goldCost,
-      })
-    }
-    const signDefs: Array<{ id: SignId; name: string }> = [
-      { id: 'aard', name: 'Аард' },
-      { id: 'quen', name: 'Квен' },
-      { id: 'axii', name: 'Аксий' },
-    ]
-    for (const sd of signDefs) {
-      const st = this.signs[sd.id]
-      if (!st.unlocked) {
-        const lpCost = sd.id === 'axii' ? 3 : 2
-        const goldCost = sd.id === 'axii' ? 90 : 60
-        opts.push({
-          id: 'sign:' + sd.id,
-          name: `Изучить знак: ${sd.name}`,
-          desc: ABILITY_MAP[sd.id].desc,
-          kind: 'sign',
-          cost: `${lpCost} ОН + ${goldCost} зол.`,
-          maxed: false,
-          affordable: this.lp >= lpCost && this.gold >= goldCost,
-        })
-      } else if (st.level < 3) {
-        opts.push({
-          id: 'signup:' + sd.id,
-          name: `${sd.name} → уровень ${st.level + 1}`,
-          desc: 'Усилить знак: больше урона и длительности.',
-          kind: 'sign',
-          cost: '2 ОН + 80 зол.',
-          maxed: false,
-          affordable: this.lp >= 2 && this.gold >= 80,
-        })
-      }
-    }
-    return { options: opts }
-  }
-
-  private openTrainer() {
-    useGame.getState().patch({ trainer: this.buildTrainerOptions(), panel: 'trainer' })
+    spendLpSys(this, attr)
   }
 
   trainOption(id: string) {
-    const [kind, key] = id.split(':')
-    if (kind === 'skill') {
-      const sk = key as 'blade' | 'vitality' | 'signs' | 'speech'
-      if (this.skills[sk] >= 5) return
-      const lpCost = sk === 'speech' ? 3 : 2
-      const goldCost = sk === 'speech' ? 60 : 40 + this.skills[sk] * 20
-      if (this.lp < lpCost || this.gold < goldCost) {
-        this.toast('Не хватает ОН или золота.', 'warn')
-        return
-      }
-      this.lp -= lpCost
-      this.gold -= goldCost
-      this.skills[sk]++
-      this.recalcStats()
-      this.toast('Тренировка завершена!', 'level')
-      sfx('level')
-    } else if (kind === 'sign') {
-      const signId = key as SignId
-      const st = this.signs[signId]
-      if (!st.unlocked) {
-        const lpCost = signId === 'axii' ? 3 : 2
-        const goldCost = signId === 'axii' ? 90 : 60
-        if (this.lp < lpCost || this.gold < goldCost) {
-          this.toast('Не хватает ОН или золота.', 'warn')
-          return
-        }
-        this.lp -= lpCost
-        this.gold -= goldCost
-        st.unlocked = true
-        st.level = 1
-        this.toast(`Знак изучен: ${ABILITY_MAP[signId].name}!`, 'level')
-        sfx('level')
-      } else if (st.level < 3) {
-        if (this.lp < 2 || this.gold < 80) {
-          this.toast('Не хватает ОН или золота.', 'warn')
-          return
-        }
-        this.lp -= 2
-        this.gold -= 80
-        st.level++
-        this.toast(`${ABILITY_MAP[signId].name} усилен до уровня ${st.level}!`, 'level')
-        sfx('level')
-      }
-    }
-    useGame.getState().patch({ trainer: this.buildTrainerOptions() })
-    this.syncUi()
+    trainOptionSys(this, id)
   }
 
   // ---------------- Панели / приказы / сейвы ----------------
 
   openPanel(p: PanelId) {
-    if (p === 'trainer') this.openTrainer()
+    if (p === 'trainer') openTrainerSys(this)
     else useGame.getState().setPanel(p)
     sfx('click')
   }
@@ -2081,7 +1817,7 @@ export class GameEngine implements EngineCtx {
     useGame.getState().pushToast(text, kind)
   }
 
-  private syncUi() {
+  syncUi() {
     const st = useGame.getState()
     const party: PartyHud[] = [
       {
@@ -2159,7 +1895,7 @@ export class GameEngine implements EngineCtx {
       player: {
         level: this.level,
         xp: this.xp,
-        xpNext: this.xpNext(),
+        xpNext: xpNextSys(this),
         hp: Math.max(0, Math.round(this.hp)),
         maxHp: this.maxHp,
         stamina: Math.round(this.stamina),
