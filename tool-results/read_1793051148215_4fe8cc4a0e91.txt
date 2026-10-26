@@ -1,0 +1,1084 @@
+     1→import { Entity, Floater, Particle, PropDef, Vec } from '../types'
+     2→import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD } from '../data/world'
+     3→
+     4→// ---------------- Терен (запекается один раз) ----------------
+     5→
+     6→export function bakeTerrain(): HTMLCanvasElement {
+     7→  const c = document.createElement('canvas')
+     8→  c.width = WORLD.w
+     9→  c.height = WORLD.h
+    10→  const ctx = c.getContext('2d') as CanvasRenderingContext2D
+    11→
+    12→  // База — тёмная северная тайга
+    13→  ctx.fillStyle = '#39472c'
+    14→  ctx.fillRect(0, 0, WORLD.w, WORLD.h)
+    15→
+    16→  // Шумовые пятна
+    17→  let seed = 99
+    18→  const rnd = () => {
+    19→    seed = (seed * 16807) % 2147483647
+    20→    return seed / 2147483647
+    21→  }
+    22→  for (let i = 0; i < 2600; i++) {
+    23→    const x = rnd() * WORLD.w
+    24→    const y = rnd() * WORLD.h
+    25→    const r = 14 + rnd() * 60
+    26→    ctx.fillStyle = rnd() > 0.5 ? 'rgba(47,58,36,0.35)' : 'rgba(72,88,48,0.25)'
+    27→    ctx.beginPath()
+    28→    ctx.arc(x, y, r, 0, Math.PI * 2)
+    29→    ctx.fill()
+    30→  }
+    31→  // Снежная дымка на севере
+    32→  for (let i = 0; i < 500; i++) {
+    33→    const x = rnd() * WORLD.w
+    34→    const y = rnd() * 700
+    35→    ctx.fillStyle = 'rgba(220,225,215,0.05)'
+    36→    ctx.beginPath()
+    37→    ctx.arc(x, y, 20 + rnd() * 70, 0, Math.PI * 2)
+    38→    ctx.fill()
+    39→  }
+    40→
+    41→  // Зона Разлома — пепел и трещины
+    42→  const rg = ctx.createRadialGradient(2950, 280, 60, 2950, 280, 420)
+    43→  rg.addColorStop(0, 'rgba(74,58,80,0.95)')
+    44→  rg.addColorStop(0.6, 'rgba(64,50,70,0.6)')
+    45→  rg.addColorStop(1, 'rgba(64,50,70,0)')
+    46→  ctx.fillStyle = rg
+    47→  ctx.fillRect(2500, -140, 800, 840)
+    48→  for (let i = 0; i < 26; i++) {
+    49→    const x = 2720 + rnd() * 480
+    50→    const y = 100 + rnd() * 420
+    51→    ctx.strokeStyle = 'rgba(150,100,190,0.30)'
+    52→    ctx.lineWidth = 1 + rnd() * 2
+    53→    ctx.beginPath()
+    54→    ctx.moveTo(x, y)
+    55→    ctx.lineTo(x + (rnd() - 0.5) * 70, y + (rnd() - 0.5) * 70)
+    56→    ctx.lineTo(x + (rnd() - 0.5) * 110, y + (rnd() - 0.5) * 110)
+    57→    ctx.stroke()
+    58→  }
+    59→
+    60→  // Дороги
+    61→  const drawRoad = (pts: { x: number; y: number }[], w1: number, color: string) => {
+    62→    ctx.strokeStyle = color
+    63→    ctx.lineWidth = w1
+    64→    ctx.lineCap = 'round'
+    65→    ctx.lineJoin = 'round'
+    66→    ctx.beginPath()
+    67→    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)))
+    68→    ctx.stroke()
+    69→  }
+    70→  for (const road of ROADS) drawRoad(road, 40, 'rgba(96,78,52,0.85)')
+    71→  for (const road of ROADS) drawRoad(road, 26, 'rgba(122,101,68,0.9)')
+    72→
+    73→  // Площадь деревни
+    74→  ctx.fillStyle = 'rgba(110,90,60,0.85)'
+    75→  ctx.beginPath()
+    76→  ctx.ellipse(960, 1560, 190, 130, 0, 0, Math.PI * 2)
+    77→  ctx.fill()
+    78→  ctx.fillStyle = 'rgba(130,108,72,0.9)'
+    79→  ctx.beginPath()
+    80→  ctx.ellipse(960, 1560, 120, 84, 0, 0, Math.PI * 2)
+    81→  ctx.fill()
+    82→
+    83→  // Пятно лагеря
+    84→  ctx.fillStyle = 'rgba(96,78,52,0.8)'
+    85→  ctx.beginPath()
+    86→  ctx.ellipse(2590, 1650, 130, 95, 0, 0, Math.PI * 2)
+    87→  ctx.fill()
+    88→
+    89→  // Круг Камней Древних
+    90→  ctx.fillStyle = 'rgba(105,88,60,0.8)'
+    91→  ctx.beginPath()
+    92→  ctx.ellipse(2200, 660, 120, 95, 0, 0, Math.PI * 2)
+    93→  ctx.fill()
+    94→  ctx.strokeStyle = 'rgba(217,164,65,0.30)'
+    95→  ctx.lineWidth = 3
+    96→  ctx.beginPath()
+    97→  ctx.ellipse(2200, 660, 92, 74, 0, 0, Math.PI * 2)
+    98→  ctx.stroke()
+    99→
+   100→  // Озеро Лун
+   101→  ctx.fillStyle = 'rgba(138,122,84,0.55)'
+   102→  ctx.beginPath()
+   103→  ctx.arc(LAKE.x, LAKE.y, LAKE.r + 30, 0, Math.PI * 2)
+   104→  ctx.fill()
+   105→  ctx.fillStyle = '#1d3d42'
+   106→  ctx.beginPath()
+   107→  ctx.arc(LAKE.x, LAKE.y, LAKE.r, 0, Math.PI * 2)
+   108→  ctx.fill()
+   109→  ctx.fillStyle = 'rgba(23,51,58,0.9)'
+   110→  ctx.beginPath()
+   111→  ctx.arc(LAKE.x, LAKE.y, LAKE.r - 34, 0, Math.PI * 2)
+   112→  ctx.fill()
+   113→  for (let i = 0; i < 12; i++) {
+   114→    const a = rnd() * Math.PI * 2
+   115→    const rr = 40 + rnd() * (LAKE.r - 60)
+   116→    ctx.strokeStyle = 'rgba(190,220,210,0.14)'
+   117→    ctx.lineWidth = 2
+   118→    ctx.beginPath()
+   119→    ctx.arc(LAKE.x + Math.cos(a) * rr, LAKE.y + Math.sin(a) * rr, 14 + rnd() * 20, 0, Math.PI)
+   120→    ctx.stroke()
+   121→  }
+   122→
+   123→  // --- Фаза 3: Хребет и Вельд ---
+   124→  // Хребет — серая полоса гор
+   125→  const mg = ctx.createLinearGradient(0, RIDGE.y - 200, 0, RIDGE.y + 200)
+   126→  mg.addColorStop(0, 'rgba(74,72,62,0)')
+   127→  mg.addColorStop(0.5, 'rgba(86,84,72,0.95)')
+   128→  mg.addColorStop(1, 'rgba(74,76,58,0)')
+   129→  ctx.fillStyle = mg
+   130→  ctx.fillRect(0, RIDGE.y - 200, WORLD.w, 400)
+   131→  // Болота — тёмно-торфяная база + пятна тины
+   132→  const vg = ctx.createLinearGradient(0, RIDGE.y + 120, 0, WORLD.h)
+   133→  vg.addColorStop(0, 'rgba(58,64,42,0.55)')
+   134→  vg.addColorStop(1, 'rgba(42,48,32,0.85)')
+   135→  ctx.fillStyle = vg
+   136→  ctx.fillRect(0, RIDGE.y + 120, WORLD.w, WORLD.h - RIDGE.y - 120)
+   137→  for (let i = 0; i < 500; i++) {
+   138→    const x = rnd() * WORLD.w
+   139→    const y = RIDGE.y + 200 + rnd() * (WORLD.h - RIDGE.y - 260)
+   140→    ctx.fillStyle = rnd() > 0.5 ? 'rgba(52,62,38,0.3)' : 'rgba(38,44,30,0.35)'
+   141→    ctx.beginPath()
+   142→    ctx.arc(x, y, 16 + rnd() * 50, 0, Math.PI * 2)
+   143→    ctx.fill()
+   144→  }
+   145→  // Омуты Топей
+   146→  for (const p of POOLS) {
+   147→    ctx.fillStyle = 'rgba(40,44,28,0.6)'
+   148→    ctx.beginPath()
+   149→    ctx.arc(p.x, p.y, p.r + 12, 0, Math.PI * 2)
+   150→    ctx.fill()
+   151→    ctx.fillStyle = '#242c1c'
+   152→    ctx.beginPath()
+   153→    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+   154→    ctx.fill()
+   155→    ctx.fillStyle = 'rgba(76,88,52,0.5)'
+   156→    ctx.beginPath()
+   157→    ctx.arc(p.x - p.r * 0.2, p.y - p.r * 0.15, p.r * 0.55, 0, Math.PI * 2)
+   158→    ctx.fill()
+   159→  }
+   160→
+   161→  // Тёмная рамка мира
+   162→  const edge = 90
+   163→  const eg = ctx.createLinearGradient(0, 0, edge, 0)
+   164→  eg.addColorStop(0, 'rgba(20,26,16,0.9)')
+   165→  eg.addColorStop(1, 'rgba(20,26,16,0)')
+   166→  ctx.fillStyle = eg
+   167→  ctx.fillRect(0, 0, edge, WORLD.h)
+   168→  ctx.save()
+   169→  ctx.translate(WORLD.w, 0)
+   170→  ctx.scale(-1, 1)
+   171→  ctx.fillStyle = eg
+   172→  ctx.fillRect(0, 0, edge, WORLD.h)
+   173→  ctx.restore()
+   174→  const eg2 = ctx.createLinearGradient(0, 0, 0, edge)
+   175→  eg2.addColorStop(0, 'rgba(20,26,16,0.9)')
+   176→  eg2.addColorStop(1, 'rgba(20,26,16,0)')
+   177→  ctx.fillStyle = eg2
+   178→  ctx.fillRect(0, 0, WORLD.w, edge)
+   179→  ctx.save()
+   180→  ctx.translate(0, WORLD.h)
+   181→  ctx.scale(1, -1)
+   182→  ctx.fillStyle = eg2
+   183→  ctx.fillRect(0, 0, WORLD.w, edge)
+   184→  ctx.restore()
+   185→
+   186→  return c
+   187→}
+   188→
+   189→// ---------------- Пропсы ----------------
+   190→
+   191→export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
+   192→  const { pos } = p
+   193→  switch (p.kind) {
+   194→    case 'tree': {
+   195→      const s = 0.85 + ((p.seed ?? 0) % 30) / 100
+   196→      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+   197→      ctx.beginPath()
+   198→      ctx.ellipse(pos.x, pos.y + 4, 16 * s, 6 * s, 0, 0, Math.PI * 2)
+   199→      ctx.fill()
+   200→      ctx.fillStyle = '#4a3628'
+   201→      ctx.fillRect(pos.x - 3, pos.y - 12, 6, 14)
+   202→      const layers = [
+   203→        { w: 30, h: 34, y: -22 },
+   204→        { w: 24, h: 30, y: -44 },
+   205→        { w: 17, h: 26, y: -64 },
+   206→      ]
+   207→      layers.forEach((L, i) => {
+   208→        ctx.fillStyle = i === 2 ? '#31523a' : '#26402c'
+   209→        ctx.beginPath()
+   210→        ctx.moveTo(pos.x - L.w * s, pos.y + L.y * s)
+   211→        ctx.lineTo(pos.x + L.w * s, pos.y + L.y * s)
+   212→        ctx.lineTo(pos.x, pos.y + (L.y - L.h) * s)
+   213→        ctx.closePath()
+   214→        ctx.fill()
+   215→      })
+   216→      // снежная шапка
+   217→      ctx.fillStyle = 'rgba(225,230,220,0.5)'
+   218→      ctx.beginPath()
+   219→      ctx.moveTo(pos.x - 8 * s, pos.y - 74 * s)
+   220→      ctx.lineTo(pos.x + 8 * s, pos.y - 74 * s)
+   221→      ctx.lineTo(pos.x, pos.y - 88 * s)
+   222→      ctx.closePath()
+   223→      ctx.fill()
+   224→      break
+   225→    }
+   226→    case 'rock': {
+   227→      const r = p.r ?? 10
+   228→      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+   229→      ctx.beginPath()
+   230→      ctx.ellipse(pos.x, pos.y + 3, r * 1.2, r * 0.5, 0, 0, Math.PI * 2)
+   231→      ctx.fill()
+   232→      ctx.fillStyle = '#6a6a62'
+   233→      ctx.beginPath()
+   234→      ctx.moveTo(pos.x - r, pos.y + 2)
+   235→      ctx.lineTo(pos.x - r * 0.5, pos.y - r * 1.1)
+   236→      ctx.lineTo(pos.x + r * 0.6, pos.y - r * 0.9)
+   237→      ctx.lineTo(pos.x + r, pos.y + 2)
+   238→      ctx.closePath()
+   239→      ctx.fill()
+   240→      ctx.fillStyle = 'rgba(230,230,225,0.35)'
+   241→      ctx.beginPath()
+   242→      ctx.moveTo(pos.x - r * 0.5, pos.y - r * 1.1)
+   243→      ctx.lineTo(pos.x + r * 0.2, pos.y - r * 0.4)
+   244→      ctx.lineTo(pos.x - r * 0.2, pos.y - r * 0.2)
+   245→      ctx.closePath()
+   246→      ctx.fill()
+   247→      break
+   248→    }
+   249→    case 'house': {
+   250→      const w = p.w ?? 120
+   251→      const h = p.h ?? 70
+   252→      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+   253→      ctx.beginPath()
+   254→      ctx.ellipse(pos.x, pos.y + h * 0.45, w * 0.6, 14, 0, 0, Math.PI * 2)
+   255→      ctx.fill()
+   256→      ctx.fillStyle = '#5a4632'
+   257→      ctx.fillRect(pos.x - w / 2, pos.y - h / 2, w, h)
+   258→      ctx.fillStyle = '#4a3826'
+   259→      ctx.fillRect(pos.x - w / 2, pos.y - h / 2, w, 6)
+   260→      ctx.fillStyle = '#7a3b2e'
+   261→      ctx.beginPath()
+   262→      ctx.moveTo(pos.x - w / 2 - 10, pos.y - h / 2)
+   263→      ctx.lineTo(pos.x + w / 2 + 10, pos.y - h / 2)
+   264→      ctx.lineTo(pos.x + w * 0.2, pos.y - h / 2 - 34)
+   265→      ctx.lineTo(pos.x - w * 0.2, pos.y - h / 2 - 34)
+   266→      ctx.closePath()
+   267→      ctx.fill()
+   268→      ctx.strokeStyle = 'rgba(0,0,0,0.25)'
+   269→      ctx.lineWidth = 2
+   270→      ctx.stroke()
+   271→      ctx.fillStyle = '#3a2c1c'
+   272→      ctx.fillRect(pos.x - 10, pos.y + h / 2 - 26, 20, 26)
+   273→      ctx.fillStyle = '#d9a441'
+   274→      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 2 + pos.x)
+   275→      ctx.fillRect(pos.x + w / 2 - 22, pos.y - 8, 10, 10)
+   276→      ctx.globalAlpha = 1
+   277→      break
+   278→    }
+   279→    case 'tent': {
+   280→      const w = p.w ?? 60
+   281→      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+   282→      ctx.beginPath()
+   283→      ctx.ellipse(pos.x, pos.y + 12, w * 0.55, 9, 0, 0, Math.PI * 2)
+   284→      ctx.fill()
+   285→      ctx.fillStyle = '#6d5636'
+   286→      ctx.beginPath()
+   287→      ctx.moveTo(pos.x - w / 2, pos.y + 12)
+   288→      ctx.lineTo(pos.x + w / 2, pos.y + 12)
+   289→      ctx.lineTo(pos.x, pos.y - 34)
+   290→      ctx.closePath()
+   291→      ctx.fill()
+   292→      ctx.fillStyle = '#59452a'
+   293→      ctx.beginPath()
+   294→      ctx.moveTo(pos.x, pos.y + 12)
+   295→      ctx.lineTo(pos.x + w / 2, pos.y + 12)
+   296→      ctx.lineTo(pos.x, pos.y - 34)
+   297→      ctx.closePath()
+   298→      ctx.fill()
+   299→      break
+   300→    }
+   301→    case 'stone': {
+   302→      const r = p.r ?? 12
+   303→      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+   304→      ctx.beginPath()
+   305→      ctx.ellipse(pos.x, pos.y + 3, r * 1.1, r * 0.45, 0, 0, Math.PI * 2)
+   306→      ctx.fill()
+   307→      ctx.fillStyle = '#70706a'
+   308→      ctx.fillRect(pos.x - r * 0.7, pos.y - r * 2.6, r * 1.4, r * 2.6)
+   309→      ctx.fillStyle = '#5a5a54'
+   310→      ctx.fillRect(pos.x + r * 0.2, pos.y - r * 2.6, r * 0.5, r * 2.6)
+   311→      ctx.fillStyle = `rgba(217,164,65,${0.45 + 0.25 * Math.sin(t * 2 + pos.x)})`
+   312→      ctx.fillRect(pos.x - 2, pos.y - r * 2.1, 4, 10)
+   313→      break
+   314→    }
+   315→    case 'fire': {
+   316→      const flick = Math.sin(t * 9 + pos.x) * 0.5 + 0.5
+   317→      const g = ctx.createRadialGradient(pos.x, pos.y, 4, pos.x, pos.y, 70)
+   318→      g.addColorStop(0, `rgba(230,150,60,${0.35 + flick * 0.12})`)
+   319→      g.addColorStop(1, 'rgba(230,150,60,0)')
+   320→      ctx.fillStyle = g
+   321→      ctx.fillRect(pos.x - 70, pos.y - 70, 140, 140)
+   322→      ctx.fillStyle = '#4a3628'
+   323→      ctx.beginPath()
+   324→      ctx.ellipse(pos.x, pos.y + 3, 12, 5, 0, 0, Math.PI * 2)
+   325→      ctx.fill()
+   326→      ctx.fillStyle = '#e08a3a'
+   327→      ctx.beginPath()
+   328→      ctx.moveTo(pos.x - 7, pos.y)
+   329→      ctx.quadraticCurveTo(pos.x, pos.y - 22 - flick * 8, pos.x + 7, pos.y)
+   330→      ctx.closePath()
+   331→      ctx.fill()
+   332→      ctx.fillStyle = '#f5c96b'
+   333→      ctx.beginPath()
+   334→      ctx.moveTo(pos.x - 4, pos.y)
+   335→      ctx.quadraticCurveTo(pos.x, pos.y - 13 - flick * 5, pos.x + 4, pos.y)
+   336→      ctx.closePath()
+   337→      ctx.fill()
+   338→      break
+   339→    }
+   340→    case 'fence': {
+   341→      const w = p.w ?? 80
+   342→      ctx.strokeStyle = '#5a4632'
+   343→      ctx.lineWidth = 4
+   344→      ctx.beginPath()
+   345→      ctx.moveTo(pos.x - w / 2, pos.y - 10)
+   346→      ctx.lineTo(pos.x + w / 2, pos.y - 10)
+   347→      ctx.moveTo(pos.x - w / 2, pos.y)
+   348→      ctx.lineTo(pos.x + w / 2, pos.y)
+   349→      ctx.stroke()
+   350→      const posts = Math.floor(w / 26)
+   351→      for (let i = 0; i <= posts; i++) {
+   352→        const px = pos.x - w / 2 + (w / posts) * i
+   353→        ctx.fillStyle = '#4a3826'
+   354→        ctx.fillRect(px - 2, pos.y - 16, 4, 20)
+   355→      }
+   356→      break
+   357→    }
+   358→    case 'dummy': {
+   359→      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+   360→      ctx.beginPath()
+   361→      ctx.ellipse(pos.x, pos.y + 4, 12, 5, 0, 0, Math.PI * 2)
+   362→      ctx.fill()
+   363→      ctx.fillStyle = '#7a6544'
+   364→      ctx.fillRect(pos.x - 3, pos.y - 30, 6, 34)
+   365→      ctx.fillStyle = '#8a7a54'
+   366→      ctx.beginPath()
+   367→      ctx.arc(pos.x, pos.y - 36, 8, 0, Math.PI * 2)
+   368→      ctx.fill()
+   369→      ctx.strokeStyle = '#7a6544'
+   370→      ctx.lineWidth = 4
+   371→      ctx.beginPath()
+   372→      ctx.moveTo(pos.x - 14, pos.y - 26)
+   373→      ctx.lineTo(pos.x + 14, pos.y - 26)
+   374→      ctx.stroke()
+   375→      break
+   376→    }
+   377→    case 'stall': {
+   378→      const w = p.w ?? 70
+   379→      ctx.fillStyle = '#5a4632'
+   380→      ctx.fillRect(pos.x - w / 2, pos.y - 14, w, 22)
+   381→      ctx.fillStyle = '#d9a441'
+   382→      ctx.beginPath()
+   383→      ctx.moveTo(pos.x - w / 2 - 6, pos.y - 14)
+   384→      ctx.lineTo(pos.x + w / 2 + 6, pos.y - 14)
+   385→      ctx.lineTo(pos.x + w / 2 - 2, pos.y - 34)
+   386→      ctx.lineTo(pos.x - w / 2 + 2, pos.y - 34)
+   387→      ctx.closePath()
+   388→      ctx.fill()
+   389→      ctx.fillStyle = '#b03a2e'
+   390→      for (let i = 0; i < 4; i++) {
+   391→        ctx.fillRect(pos.x - w / 2 + 2 + i * (w / 4), pos.y - 33, w / 8, 18)
+   392→      }
+   393→      break
+   394→    }
+   395→    case 'carcass': {
+   396→      ctx.fillStyle = '#8a8078'
+   397→      ctx.beginPath()
+   398→      ctx.ellipse(pos.x, pos.y, (p.r ?? 14) * 1.2, (p.r ?? 14) * 0.6, 0.4, 0, Math.PI * 2)
+   399→      ctx.fill()
+   400→      ctx.strokeStyle = '#c9c4bc'
+   401→      ctx.lineWidth = 3
+   402→      ctx.beginPath()
+   403→      ctx.moveTo(pos.x - 8, pos.y - 4)
+   404→      ctx.lineTo(pos.x - 16, pos.y - 14)
+   405→      ctx.moveTo(pos.x + 6, pos.y - 6)
+   406→      ctx.lineTo(pos.x + 14, pos.y - 16)
+   407→      ctx.stroke()
+   408→      break
+   409→    }
+   410→    case 'altar': {
+   411→      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4)
+   412→      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+   413→      ctx.beginPath()
+   414→      ctx.ellipse(pos.x, pos.y + 6, 20, 8, 0, 0, Math.PI * 2)
+   415→      ctx.fill()
+   416→      const g = ctx.createRadialGradient(pos.x, pos.y - 8, 2, pos.x, pos.y - 8, 46)
+   417→      g.addColorStop(0, `rgba(217,164,65,${0.3 + pulse * 0.2})`)
+   418→      g.addColorStop(1, 'rgba(217,164,65,0)')
+   419→      ctx.fillStyle = g
+   420→      ctx.fillRect(pos.x - 46, pos.y - 54, 92, 92)
+   421→      ctx.fillStyle = '#70706a'
+   422→      ctx.fillRect(pos.x - 14, pos.y - 10, 28, 14)
+   423→      ctx.fillStyle = '#8a8a82'
+   424→      ctx.fillRect(pos.x - 18, pos.y - 18, 36, 10)
+   425→      ctx.fillStyle = `rgba(245,201,107,${0.7 + pulse * 0.3})`
+   426→      ctx.beginPath()
+   427→      ctx.arc(pos.x, pos.y - 22, 4 + pulse * 2, 0, Math.PI * 2)
+   428→      ctx.fill()
+   429→      break
+   430→    }
+   431→    case 'rift': {
+   432→      const rot = t * 0.8
+   433→      ctx.save()
+   434→      ctx.translate(pos.x, pos.y)
+   435→      const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 120)
+   436→      g.addColorStop(0, 'rgba(150,90,200,0.5)')
+   437→      g.addColorStop(0.5, 'rgba(110,60,150,0.25)')
+   438→      g.addColorStop(1, 'rgba(110,60,150,0)')
+   439→      ctx.fillStyle = g
+   440→      ctx.fillRect(-120, -120, 240, 240)
+   441→      ctx.fillStyle = '#1d1428'
+   442→      ctx.beginPath()
+   443→      ctx.ellipse(0, -20, 52, 78, 0, 0, Math.PI * 2)
+   444→      ctx.fill()
+   445→      for (let i = 0; i < 3; i++) {
+   446→        ctx.strokeStyle = i % 2 ? 'rgba(217,120,65,0.8)' : 'rgba(170,110,220,0.8)'
+   447→        ctx.lineWidth = 3
+   448→        ctx.beginPath()
+   449→        ctx.ellipse(0, -20, 30 + i * 14, 56 + i * 16, rot + i * 0.9, 0, Math.PI * 1.4)
+   450→        ctx.stroke()
+   451→      }
+   452→      ctx.restore()
+   453→      break
+   454→    }
+   455→    case 'barrier': {
+   456→      const pulse = 0.5 + 0.5 * Math.sin(t * 3 + pos.x)
+   457→      ctx.fillStyle = `rgba(150,100,190,${0.25 + pulse * 0.15})`
+   458→      ctx.beginPath()
+   459→      ctx.arc(pos.x, pos.y, (p.r ?? 20) + 6, 0, Math.PI * 2)
+   460→      ctx.fill()
+   461→      ctx.fillStyle = '#4a3a55'
+   462→      ctx.beginPath()
+   463→      ctx.arc(pos.x, pos.y, p.r ?? 20, 0, Math.PI * 2)
+   464→      ctx.fill()
+   465→      ctx.strokeStyle = `rgba(200,150,240,${0.5 + pulse * 0.4})`
+   466→      ctx.lineWidth = 2
+   467→      ctx.beginPath()
+   468→      ctx.arc(pos.x, pos.y, (p.r ?? 20) + 2, 0, Math.PI * 2)
+   469→      ctx.stroke()
+   470→      break
+   471→    }
+   472→    case 'shrub': {
+   473→      ctx.fillStyle = '#2f4a2c'
+   474→      ctx.beginPath()
+   475→      ctx.arc(pos.x, pos.y, 7, 0, Math.PI * 2)
+   476→      ctx.arc(pos.x + 6, pos.y + 2, 5, 0, Math.PI * 2)
+   477→      ctx.arc(pos.x - 6, pos.y + 2, 5, 0, Math.PI * 2)
+   478→      ctx.fill()
+   479→      break
+   480→    }
+   481→    case 'flower': {
+   482→      ctx.fillStyle = '#3f5a32'
+   483→      ctx.fillRect(pos.x - 1, pos.y - 6, 2, 7)
+   484→      ctx.fillStyle = (p.seed ?? 0) % 2 ? '#d9c04f' : '#c97a9a'
+   485→      ctx.beginPath()
+   486→      ctx.arc(pos.x, pos.y - 8, 3, 0, Math.PI * 2)
+   487→      ctx.fill()
+   488→      break
+   489→    }
+   490→    // --- Фаза 3: Вельд ---
+   491→    case 'deadtree': {
+   492→      const s = 0.85 + ((p.seed ?? 0) % 30) / 100
+   493→      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+   494→      ctx.beginPath()
+   495→      ctx.ellipse(pos.x, pos.y + 3, 12 * s, 5 * s, 0, 0, Math.PI * 2)
+   496→      ctx.fill()
+   497→      ctx.strokeStyle = '#3a322a'
+   498→      ctx.lineWidth = 4 * s
+   499→      ctx.lineCap = 'round'
+   500→      ctx.beginPath()
+   501→      ctx.moveTo(pos.x, pos.y)
+   502→      ctx.lineTo(pos.x + 2, pos.y - 26 * s)
+   503→      ctx.stroke()
+   504→      ctx.lineWidth = 2 * s
+   505→      ctx.beginPath()
+   506→      ctx.moveTo(pos.x, pos.y - 12 * s)
+   507→      ctx.lineTo(pos.x - 9 * s, pos.y - 20 * s)
+   508→      ctx.moveTo(pos.x + 1, pos.y - 17 * s)
+   509→      ctx.lineTo(pos.x + 10 * s, pos.y - 26 * s)
+   510→      ctx.stroke()
+   511→      break
+   512→    }
+   513→    case 'reed': {
+   514→      const sway = Math.sin(t * 1.6 + pos.x * 0.1) * 2.4
+   515→      ctx.strokeStyle = '#4a5530'
+   516→      ctx.lineWidth = 1.6
+   517→      ctx.beginPath()
+   518→      ctx.moveTo(pos.x - 4, pos.y)
+   519→      ctx.quadraticCurveTo(pos.x - 4 + sway * 0.5, pos.y - 5, pos.x - 4 + sway, pos.y - 10)
+   520→      ctx.moveTo(pos.x, pos.y)
+   521→      ctx.quadraticCurveTo(pos.x + sway * 0.5, pos.y - 6, pos.x + sway, pos.y - 13)
+   522→      ctx.moveTo(pos.x + 4, pos.y)
+   523→      ctx.quadraticCurveTo(pos.x + 4 + sway * 0.5, pos.y - 4, pos.x + 4 + sway, pos.y - 9)
+   524→      ctx.stroke()
+   525→      break
+   526→    }
+   527→    case 'stump': {
+   528→      ctx.fillStyle = 'rgba(0,0,0,0.2)'
+   529→      ctx.beginPath()
+   530→      ctx.ellipse(pos.x, pos.y + 2, 8, 3.4, 0, 0, Math.PI * 2)
+   531→      ctx.fill()
+   532→      ctx.fillStyle = '#4a3a28'
+   533→      ctx.beginPath()
+   534→      ctx.arc(pos.x, pos.y, 6.5, 0, Math.PI * 2)
+   535→      ctx.fill()
+   536→      ctx.fillStyle = '#6a5a40'
+   537→      ctx.beginPath()
+   538→      ctx.arc(pos.x, pos.y - 1.5, 5, 0, Math.PI * 2)
+   539→      ctx.fill()
+   540→      break
+   541→    }
+   542→    case 'board': {
+   543→      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+   544→      ctx.beginPath()
+   545→      ctx.ellipse(pos.x, pos.y + 2, 18, 6, 0, 0, Math.PI * 2)
+   546→      ctx.fill()
+   547→      ctx.fillStyle = '#4a3626'
+   548→      ctx.fillRect(pos.x - 14, pos.y - 24, 4, 26)
+   549→      ctx.fillRect(pos.x + 10, pos.y - 24, 4, 26)
+   550→      ctx.fillStyle = '#5c4630'
+   551→      ctx.fillRect(pos.x - 19, pos.y - 34, 38, 22)
+   552→      ctx.fillStyle = '#d8cfb4'
+   553→      ctx.fillRect(pos.x - 13, pos.y - 31, 9, 12)
+   554→      ctx.fillRect(pos.x - 1, pos.y - 28, 9, 12)
+   555→      ctx.fillRect(pos.x + 10, pos.y - 30, 7, 10)
+   556→      break
+   557→    }
+   558→    case 'portal': {
+   559→      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2)
+   560→      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+   561→      ctx.beginPath()
+   562→      ctx.ellipse(pos.x, pos.y + 2, 30, 9, 0, 0, Math.PI * 2)
+   563→      ctx.fill()
+   564→      ctx.fillStyle = '#6a6a62'
+   565→      ctx.fillRect(pos.x - 27, pos.y - 46, 8, 46)
+   566→      ctx.fillRect(pos.x + 19, pos.y - 46, 8, 46)
+   567→      ctx.fillRect(pos.x - 30, pos.y - 52, 60, 8)
+   568→      ctx.fillStyle = `rgba(154,208,168,${0.18 + pulse * 0.2})`
+   569→      ctx.beginPath()
+   570→      ctx.arc(pos.x, pos.y - 22, 18, 0, Math.PI * 2)
+   571→      ctx.fill()
+   572→      ctx.strokeStyle = `rgba(217,232,192,${0.5 + pulse * 0.4})`
+   573→      ctx.lineWidth = 2
+   574→      ctx.beginPath()
+   575→      ctx.arc(pos.x, pos.y - 22, 10 + pulse * 2, 0, Math.PI * 2)
+   576→      ctx.stroke()
+   577→      break
+   578→    }
+   579→  }
+   580→}
+   581→
+   582→// ---------------- Сущности ----------------
+   583→
+   584→function shadowBlob(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+   585→  ctx.fillStyle = 'rgba(0,0,0,0.28)'
+   586→  ctx.beginPath()
+   587→  ctx.ellipse(x, y + r * 0.55, r * 1.1, r * 0.42, 0, 0, Math.PI * 2)
+   588→  ctx.fill()
+   589→}
+   590→
+   591→function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, ratio: number, color: string) {
+   592→  ctx.fillStyle = 'rgba(20,16,12,0.8)'
+   593→  ctx.fillRect(x - w / 2, y, w, 4)
+   594→  ctx.fillStyle = color
+   595→  ctx.fillRect(x - w / 2 + 1, y + 1, (w - 2) * Math.max(0, Math.min(1, ratio)), 2)
+   596→}
+   597→
+   598→function drawWeaponSwing(ctx: CanvasRenderingContext2D, e: Entity, color: string) {
+   599→  if (e.attackT <= 0) return
+   600→  const p = 1 - e.attackT / 0.28
+   601→  const a0 = e.facing - 1.1 + p * 2.2
+   602→  ctx.save()
+   603→  ctx.translate(e.pos.x, e.pos.y - 6)
+   604→  ctx.rotate(a0)
+   605→  ctx.strokeStyle = color
+   606→  ctx.lineWidth = 3.5
+   607→  ctx.lineCap = 'round'
+   608→  ctx.beginPath()
+   609→  ctx.moveTo(e.radius * 0.4, 0)
+   610→  ctx.lineTo(e.radius * 1.5, 0)
+   611→  ctx.stroke()
+   612→  ctx.restore()
+   613→  ctx.strokeStyle = `rgba(255,240,200,${0.35 * (1 - p)})`
+   614→  ctx.lineWidth = 2
+   615→  ctx.beginPath()
+   616→  ctx.arc(e.pos.x, e.pos.y - 6, e.radius * 1.35, e.facing - 0.7, e.facing + 0.7)
+   617→  ctx.stroke()
+   618→}
+   619→
+   620→function drawHumanoid(
+   621→  ctx: CanvasRenderingContext2D,
+   622→  e: Entity,
+   623→  t: number,
+   624→  cloak: string,
+   625→  weapon: 'sword' | 'staff' | 'shield' | 'bow' | 'none',
+   626→) {
+   627→  const bob = Math.sin(e.walkPhase * 10) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.6 : 0.4)
+   628→  shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+   629→  const bx = e.pos.x
+   630→  const by = e.pos.y - 8 + bob
+   631→  // тело-плащ
+   632→  ctx.fillStyle = e.hitT > 0 ? '#ffffff' : cloak
+   633→  ctx.beginPath()
+   634→  ctx.ellipse(bx, by, e.radius * 0.78, e.radius * 0.95, 0, 0, Math.PI * 2)
+   635→  ctx.fill()
+   636→  ctx.fillStyle = 'rgba(0,0,0,0.18)'
+   637→  ctx.beginPath()
+   638→  ctx.ellipse(bx - e.radius * 0.25, by + 3, e.radius * 0.4, e.radius * 0.7, 0, 0, Math.PI * 2)
+   639→  ctx.fill()
+   640→  // голова
+   641→  ctx.fillStyle = '#d8b088'
+   642→  ctx.beginPath()
+   643→  ctx.arc(bx, by - e.radius * 0.95, e.radius * 0.5, 0, Math.PI * 2)
+   644→  ctx.fill()
+   645→  ctx.fillStyle = '#3a2c1c'
+   646→  ctx.beginPath()
+   647→  ctx.arc(bx, by - e.radius * 1.15, e.radius * 0.42, Math.PI, Math.PI * 2)
+   648→  ctx.fill()
+   649→  // оружие
+   650→  const fx = Math.cos(e.facing)
+   651→  const fy = Math.sin(e.facing)
+   652→  if (weapon === 'shield') {
+   653→    ctx.fillStyle = '#7a8a4a'
+   654→    ctx.beginPath()
+   655→    ctx.ellipse(bx + fx * e.radius * 0.9 - fy * e.radius * 0.5, by + fy * e.radius * 0.9 + fx * e.radius * 0.5, e.radius * 0.45, e.radius * 0.6, e.facing, 0, Math.PI * 2)
+   656→    ctx.fill()
+   657→    ctx.strokeStyle = '#4a522c'
+   658→    ctx.lineWidth = 2
+   659→    ctx.stroke()
+   660→    drawWeaponSwing(ctx, e, '#c9c4bc')
+   661→  } else if (weapon === 'staff') {
+   662→    ctx.strokeStyle = '#6a5638'
+   663→    ctx.lineWidth = 3
+   664→    ctx.beginPath()
+   665→    ctx.moveTo(bx - fy * e.radius * 0.7, by + fx * e.radius * 0.7)
+   666→    ctx.lineTo(bx - fy * e.radius * 0.7 + fx * 6, by + fx * e.radius * 0.7 + fy * 6 - e.radius * 1.6)
+   667→    ctx.stroke()
+   668→    const glow = 0.6 + 0.4 * Math.sin(t * 4 + e.eid)
+   669→    ctx.fillStyle = `rgba(159,184,164,${glow})`
+   670→    ctx.beginPath()
+   671→    ctx.arc(bx - fy * e.radius * 0.7 + fx * 6, by + fx * e.radius * 0.7 + fy * 6 - e.radius * 1.7, 3.5, 0, Math.PI * 2)
+   672→    ctx.fill()
+   673→  } else if (weapon === 'bow') {
+   674→    ctx.strokeStyle = '#8a7a54'
+   675→    ctx.lineWidth = 2.5
+   676→    ctx.beginPath()
+   677→    ctx.arc(bx + fx * e.radius, by + fy * e.radius, e.radius * 0.8, e.facing - 1.2, e.facing + 1.2)
+   678→    ctx.stroke()
+   679→  } else if (weapon === 'sword') {
+   680→    drawWeaponSwing(ctx, e, '#c9c4bc')
+   681→  }
+   682→  // щит Квена
+   683→  if (e.shield > 0) {
+   684→    ctx.strokeStyle = `rgba(217,164,65,${0.5 + 0.3 * Math.sin(t * 6)})`
+   685→    ctx.lineWidth = 2.5
+   686→    ctx.beginPath()
+   687→    ctx.arc(bx, by - 4, e.radius + 7, 0, Math.PI * 2)
+   688→    ctx.stroke()
+   689→  }
+   690→}
+   691→
+   692→function drawWolf(ctx: CanvasRenderingContext2D, e: Entity, big: boolean) {
+   693→  const s = big ? 1.45 : 1
+   694→  const bob = Math.sin(e.walkPhase * 12) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.4 : 0.3)
+   695→  shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * s)
+   696→  const bx = e.pos.x
+   697→  const by = e.pos.y - 7 * s + bob
+   698→  ctx.save()
+   699→  ctx.translate(bx, by)
+   700→  ctx.rotate(e.facing)
+   701→  ctx.fillStyle = e.hitT > 0 ? '#ffffff' : big ? '#7d7466' : '#565a5c'
+   702→  ctx.beginPath()
+   703→  ctx.ellipse(0, 0, e.radius * 1.25 * s, e.radius * 0.72 * s, 0, 0, Math.PI * 2)
+   704→  ctx.fill()
+   705→  // голова
+   706→  ctx.beginPath()
+   707→  ctx.ellipse(e.radius * 1.05 * s, -2 * s, e.radius * 0.55 * s, e.radius * 0.45 * s, 0, 0, Math.PI * 2)
+   708→  ctx.fill()
+   709→  // уши
+   710→  ctx.fillStyle = '#3d3a36'
+   711→  ctx.beginPath()
+   712→  ctx.moveTo(e.radius * 0.9 * s, -e.radius * 0.5 * s)
+   713→  ctx.lineTo(e.radius * 1.1 * s, -e.radius * 1.0 * s)
+   714→  ctx.lineTo(e.radius * 1.25 * s, -e.radius * 0.4 * s)
+   715→  ctx.closePath()
+   716→  ctx.fill()
+   717→  // хвост
+   718→  ctx.strokeStyle = e.hitT > 0 ? '#ffffff' : big ? '#6d6455' : '#484c4e'
+   719→  ctx.lineWidth = 4 * s
+   720→  ctx.beginPath()
+   721→  ctx.moveTo(-e.radius * 1.1 * s, 0)
+   722→  ctx.quadraticCurveTo(-e.radius * 1.7 * s, Math.sin(e.walkPhase * 9) * 4, -e.radius * 2 * s, -4 * s)
+   723→  ctx.stroke()
+   724→  // глаза
+   725→  ctx.fillStyle = big ? '#e0653a' : '#d9a441'
+   726→  ctx.beginPath()
+   727→  ctx.arc(e.radius * 1.35 * s, -4 * s, 1.8 * s, 0, Math.PI * 2)
+   728→  ctx.arc(e.radius * 1.35 * s, 1 * s, 1.8 * s, 0, Math.PI * 2)
+   729→  ctx.fill()
+   730→  ctx.restore()
+   731→}
+   732→
+   733→function drawHorror(ctx: CanvasRenderingContext2D, e: Entity, t: number) {
+   734→  shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+   735→  const by = e.pos.y - 12 + Math.sin(t * 3 + e.eid) * 2
+   736→  ctx.fillStyle = e.hitT > 0 ? '#ffffff' : 'rgba(122,90,146,0.85)'
+   737→  ctx.beginPath()
+   738→  ctx.arc(e.pos.x, by, e.radius * 0.85, 0, Math.PI * 2)
+   739→  ctx.fill()
+   740→  ctx.fillStyle = 'rgba(40,25,55,0.9)'
+   741→  ctx.beginPath()
+   742→  ctx.arc(e.pos.x + 3, by - 2, e.radius * 0.4, 0, Math.PI * 2)
+   743→  ctx.fill()
+   744→  ctx.fillStyle = 'rgba(220,170,255,0.9)'
+   745→  ctx.beginPath()
+   746→  ctx.arc(e.pos.x + 4, by - 3, 2.2, 0, Math.PI * 2)
+   747→  ctx.fill()
+   748→  ctx.strokeStyle = 'rgba(122,90,146,0.7)'
+   749→  ctx.lineWidth = 2.5
+   750→  for (let i = 0; i < 4; i++) {
+   751→    const a = (i / 4) * Math.PI * 2 + t * 1.5
+   752→    ctx.beginPath()
+   753→    ctx.moveTo(e.pos.x, by)
+   754→    ctx.quadraticCurveTo(
+   755→      e.pos.x + Math.cos(a) * e.radius * 1.2, by + Math.sin(a) * e.radius * 0.8 + 4,
+   756→      e.pos.x + Math.cos(a) * e.radius * 1.5, e.pos.y + Math.sin(a) * e.radius * 0.5 + 8,
+   757→    )
+   758→    ctx.stroke()
+   759→  }
+   760→}
+   761→
+   762→function drawBoss(ctx: CanvasRenderingContext2D, e: Entity, t: number) {
+   763→  shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * 1.2)
+   764→  const by = e.pos.y - 16 + Math.sin(t * 2) * 2
+   765→  const pulse = 0.5 + 0.5 * Math.sin(t * 5)
+   766→  // аура
+   767→  const g = ctx.createRadialGradient(e.pos.x, by, 6, e.pos.x, by, e.radius * 2.4)
+   768→  g.addColorStop(0, `rgba(160,107,217,${0.25 + pulse * 0.12})`)
+   769→  g.addColorStop(1, 'rgba(160,107,217,0)')
+   770→  ctx.fillStyle = g
+   771→  ctx.fillRect(e.pos.x - e.radius * 2.4, by - e.radius * 2.4, e.radius * 4.8, e.radius * 4.8)
+   772→  // масса
+   773→  ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#3d2f4d'
+   774→  ctx.beginPath()
+   775→  ctx.ellipse(e.pos.x, by, e.radius * 1.05, e.radius * 1.25, 0, 0, Math.PI * 2)
+   776→  ctx.fill()
+   777→  // шипы-рога
+   778→  ctx.fillStyle = '#2a1f38'
+   779→  for (let i = -2; i <= 2; i++) {
+   780→    if (i === 0) continue
+   781→    ctx.beginPath()
+   782→    ctx.moveTo(e.pos.x + i * e.radius * 0.38, by - e.radius * 0.9)
+   783→    ctx.lineTo(e.pos.x + i * e.radius * 0.6, by - e.radius * 2.0)
+   784→    ctx.lineTo(e.pos.x + i * e.radius * 0.75, by - e.radius * 0.7)
+   785→    ctx.closePath()
+   786→    ctx.fill()
+   787→  }
+   788→  // ядро
+   789→  ctx.fillStyle = `rgba(208,138,58,${0.75 + pulse * 0.25})`
+   790→  ctx.beginPath()
+   791→  ctx.arc(e.pos.x, by, e.radius * 0.42 + pulse * 2, 0, Math.PI * 2)
+   792→  ctx.fill()
+   793→  // глаза
+   794→  ctx.fillStyle = '#d97a3a'
+   795→  ctx.beginPath()
+   796→  ctx.arc(e.pos.x - 8, by - e.radius * 0.5, 3, 0, Math.PI * 2)
+   797→  ctx.arc(e.pos.x + 8, by - e.radius * 0.5, 3, 0, Math.PI * 2)
+   798→  ctx.fill()
+   799→}
+   800→
+   801→export function drawEntity(
+   802→  ctx: CanvasRenderingContext2D,
+   803→  e: Entity,
+   804→  t: number,
+   805→  isTarget: boolean,
+   806→) {
+   807→  if (!e.alive) return
+   808→  if (isTarget) {
+   809→    ctx.strokeStyle = 'rgba(217,164,65,0.85)'
+   810→    ctx.lineWidth = 2
+   811→    ctx.setLineDash([6, 5])
+   812→    ctx.beginPath()
+   813→    ctx.ellipse(e.pos.x, e.pos.y + e.radius * 0.55, e.radius + 9, (e.radius + 9) * 0.45, 0, 0, Math.PI * 2)
+   814→    ctx.stroke()
+   815→    ctx.setLineDash([])
+   816→  }
+   817→  switch (e.enemyType) {
+   818→    case 'wolf':
+   819→      drawWolf(ctx, e, false)
+   820→      break
+   821→    case 'alpha':
+   822→      drawWolf(ctx, e, true)
+   823→      break
+   824→    case 'horror':
+   825→      drawHorror(ctx, e, t)
+   826→      break
+   827→    case 'bogling': {
+   828→      // Вельд 2D: присосистый ком тины
+   829→      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+   830→      const hop = Math.abs(Math.sin(e.walkPhase * 10)) * 3
+   831→      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a5230'
+   832→      ctx.beginPath()
+   833→      ctx.ellipse(e.pos.x, e.pos.y - 5 - hop, e.radius, e.radius * 0.8, 0, 0, Math.PI * 2)
+   834→      ctx.fill()
+   835→      ctx.fillStyle = '#2c3220'
+   836→      ctx.beginPath()
+   837→      ctx.ellipse(e.pos.x + e.radius * 0.45, e.pos.y - 4 - hop, e.radius * 0.4, e.radius * 0.22, 0, 0, Math.PI * 2)
+   838→      ctx.fill()
+   839→      ctx.fillStyle = '#e8d568'
+   840→      ctx.beginPath()
+   841→      ctx.arc(e.pos.x + e.radius * 0.4, e.pos.y - 8 - hop, 1.8, 0, Math.PI * 2)
+   842→      ctx.arc(e.pos.x + e.radius * 0.4, e.pos.y - 4 - hop, 1.8, 0, Math.PI * 2)
+   843→      ctx.fill()
+   844→      break
+   845→    }
+   846→    case 'ash_shade':
+   847→    case 'ash_mother': {
+   848→      // Пепельные: парящий обугленный силуэт с углями
+   849→      const big = e.enemyType === 'ash_mother'
+   850→      const hover = Math.sin(t * 2.2 + e.eid) * 2
+   851→      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+   852→      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : 'rgba(48,42,38,0.92)'
+   853→      ctx.beginPath()
+   854→      ctx.moveTo(e.pos.x - e.radius * (big ? 1.1 : 0.85), e.pos.y)
+   855→      ctx.quadraticCurveTo(e.pos.x - e.radius * (big ? 0.7 : 0.5), e.pos.y - e.radius * (big ? 3.4 : 2.4) - hover, e.pos.x, e.pos.y - e.radius * (big ? 3.8 : 2.7) - hover)
+   856→      ctx.quadraticCurveTo(e.pos.x + e.radius * (big ? 0.7 : 0.5), e.pos.y - e.radius * (big ? 3.4 : 2.4) - hover, e.pos.x + e.radius * (big ? 1.1 : 0.85), e.pos.y)
+   857→      ctx.closePath()
+   858→      ctx.fill()
+   859→      const pulse = 0.5 + 0.5 * Math.sin(t * 4 + e.eid)
+   860→      ctx.fillStyle = `rgba(255,122,48,${0.5 + pulse * 0.4})`
+   861→      ctx.beginPath()
+   862→      ctx.arc(e.pos.x, e.pos.y - e.radius * (big ? 1.6 : 1.2) - hover, big ? 5 : 2.6, 0, Math.PI * 2)
+   863→      ctx.fill()
+   864→      ctx.fillStyle = '#ffb04a'
+   865→      ctx.beginPath()
+   866→      ctx.arc(e.pos.x - 3, e.pos.y - e.radius * (big ? 2.9 : 2.2) - hover, 1.6, 0, Math.PI * 2)
+   867→      ctx.arc(e.pos.x + 3, e.pos.y - e.radius * (big ? 2.9 : 2.2) - hover, 1.6, 0, Math.PI * 2)
+   868→      ctx.fill()
+   869→      break
+   870→    }
+   871→    case 'boss':
+   872→      drawBoss(ctx, e, t)
+   873→      break
+   874→    default: {
+   875→      const weapon =
+   876→        e.id === 'kaya'
+   877→          ? 'staff'
+   878→          : e.id === 'torvald'
+   879→            ? 'shield'
+   880→            : e.enemyType === 'archer'
+   881→              ? 'bow'
+   882→              : e.enemyType
+   883→                ? 'sword'
+   884→                : e.role === 'Архимаг Ковена' || e.role === 'Магистр-странница'
+   885→                  ? 'staff'
+   886→                  : 'sword'
+   887→      drawHumanoid(ctx, e, t, e.color, weapon)
+   888→    }
+   889→  }
+   890→  // оглушение
+   891→  if (e.stunT > 0) {
+   892→    for (let i = 0; i < 3; i++) {
+   893→      const a = t * 5 + (i / 3) * Math.PI * 2
+   894→      ctx.fillStyle = '#f5c96b'
+   895→      ctx.beginPath()
+   896→      ctx.arc(e.pos.x + Math.cos(a) * 10, e.pos.y - e.radius * 2.4 + Math.sin(a) * 4, 2.2, 0, Math.PI * 2)
+   897→      ctx.fill()
+   898→    }
+   899→  }
+   900→  // горение
+   901→  if (e.burnT > 0) {
+   902→    for (let i = 0; i < 2; i++) {
+   903→      const px = e.pos.x + Math.sin(t * 12 + i * 2 + e.eid) * 6
+   904→      ctx.fillStyle = `rgba(224,138,58,${0.5 + Math.random() * 0.3})`
+   905→      ctx.beginPath()
+   906→      ctx.arc(px, e.pos.y - 6 - Math.random() * 14, 2.4, 0, Math.PI * 2)
+   907→      ctx.fill()
+   908→    }
+   909→  }
+   910→  // замедление
+   911→  if (e.slowT > 0) {
+   912→    ctx.strokeStyle = 'rgba(200,230,240,0.5)'
+   913→    ctx.lineWidth = 1.5
+   914→    ctx.beginPath()
+   915→    ctx.arc(e.pos.x, e.pos.y, e.radius + 4, 0, Math.PI * 2)
+   916→    ctx.stroke()
+   917→  }
+   918→  // каст
+   919→  if (e.castT > 0) {
+   920→    ctx.strokeStyle = 'rgba(159,184,164,0.6)'
+   921→    ctx.lineWidth = 2
+   922→    ctx.beginPath()
+   923→    ctx.arc(e.pos.x, e.pos.y, e.radius + 10 - (0.4 - e.castT) * 20, 0, Math.PI * 2)
+   924→    ctx.stroke()
+   925→  }
+   926→  // полоса HP
+   927→  if (e.kind === 'enemy' && e.hp < e.maxHp) {
+   928→    hpBar(ctx, e.pos.x, e.pos.y - e.radius * 2.2 - 8, Math.max(26, e.radius * 2), e.hp / e.maxHp, e.boss ? '#a06bd9' : '#c94f3d')
+   929→  }
+   930→  if (e.kind === 'companion' && e.hp < e.maxHp) {
+   931→    hpBar(ctx, e.pos.x, e.pos.y - e.radius * 2.2 - 8, 26, e.hp / e.maxHp, '#8fbf7f')
+   932→  }
+   933→  // имя
+   934→  if (e.kind === 'npc' || e.kind === 'companion') {
+   935→    ctx.font = '11px ui-sans-serif, system-ui'
+   936→    ctx.textAlign = 'center'
+   937→    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+   938→    const tw = ctx.measureText(e.name).width
+   939→    ctx.fillRect(e.pos.x - tw / 2 - 4, e.pos.y - e.radius * 2.2 - 24, tw + 8, 14)
+   940→    ctx.fillStyle = e.kind === 'companion' ? '#c9e0b8' : '#e8d5a8'
+   941→    ctx.fillText(e.name, e.pos.x, e.pos.y - e.radius * 2.2 - 13)
+   942→  }
+   943→}
+   944→
+   945→// ---------------- Частицы и текст ----------------
+   946→
+   947→export function drawParticles(ctx: CanvasRenderingContext2D, ps: Particle[]) {
+   948→  for (const p of ps) {
+   949→    const a = p.life / p.maxLife
+   950→    ctx.globalAlpha = Math.max(0, a)
+   951→    if (p.kind === 'ring' || p.kind === 'slam') {
+   952→      ctx.strokeStyle = p.color
+   953→      ctx.lineWidth = p.kind === 'slam' ? 4 : 2.5
+   954→      ctx.beginPath()
+   955→      ctx.arc(p.x, p.y, p.size * (1 - a) * 2.2 + 6, 0, Math.PI * 2)
+   956→      ctx.stroke()
+   957→    } else {
+   958→      ctx.fillStyle = p.color
+   959→      ctx.beginPath()
+   960→      ctx.arc(p.x, p.y, p.size * (0.4 + a * 0.6), 0, Math.PI * 2)
+   961→      ctx.fill()
+   962→    }
+   963→  }
+   964→  ctx.globalAlpha = 1
+   965→}
+   966→
+   967→export function drawFloaters(ctx: CanvasRenderingContext2D, fs: Floater[]) {
+   968→  ctx.textAlign = 'center'
+   969→  for (const f of fs) {
+   970→    const a = Math.min(1, f.life / f.maxLife + 0.25)
+   971→    ctx.font = `${f.size}px ui-sans-serif, system-ui`
+   972→    ctx.globalAlpha = Math.max(0, Math.min(1, a))
+   973→    ctx.strokeStyle = 'rgba(10,8,6,0.9)'
+   974→    ctx.lineWidth = 3
+   975→    ctx.strokeText(f.text, f.x, f.y)
+   976→    ctx.fillStyle = f.color
+   977→    ctx.fillText(f.text, f.x, f.y)
+   978→  }
+   979→  ctx.globalAlpha = 1
+   980→}
+   981→
+   982→// ---------------- Миникарта и полная карта ----------------
+   983→
+   984→export function drawMinimap(
+   985→  mini: HTMLCanvasElement,
+   986→  baked: HTMLCanvasElement,
+   987→  entities: Entity[],
+   988→  playerPos: Vec,
+   989→  questMarker: Vec | null,
+   990→  size: number,
+   991→  t: number,
+   992→) {
+   993→  const ctx = mini.getContext('2d')
+   994→  if (!ctx) return
+   995→  const scale = size / WORLD.w
+   996→  ctx.clearRect(0, 0, size, size)
+   997→  ctx.drawImage(baked, 0, 0, WORLD.w, WORLD.h, 0, 0, size, size * (WORLD.h / WORLD.w))
+   998→  const mh = size * (WORLD.h / WORLD.w)
+   999→  const dot = (x: number, y: number, color: string, r: number) => {
+  1000→    ctx.fillStyle = color
+  1001→    ctx.beginPath()
+  1002→    ctx.arc(x * scale, y * (mh / WORLD.h), r, 0, Math.PI * 2)
+  1003→    ctx.fill()
+  1004→  }
+  1005→  for (const e of entities) {
+  1006→    if (!e.alive) continue
+  1007→    if (e.kind === 'npc') dot(e.pos.x, e.pos.y, '#e8d5a8', 2)
+  1008→    else if (e.kind === 'companion') dot(e.pos.x, e.pos.y, '#c9e0b8', 2)
+  1009→    else if (e.kind === 'enemy' && e.aiState !== 'return') dot(e.pos.x, e.pos.y, '#c94f3d', 2)
+  1010→  }
+  1011→  if (questMarker) {
+  1012→    const pulse = 2 + Math.sin(t * 4) * 1
+  1013→    ctx.strokeStyle = '#f5c96b'
+  1014→    ctx.lineWidth = 1.5
+  1015→    ctx.beginPath()
+  1016→    ctx.arc(questMarker.x * scale, questMarker.y * (mh / WORLD.h), 4 + pulse, 0, Math.PI * 2)
+  1017→    ctx.stroke()
+  1018→  }
+  1019→  // игрок
+  1020→  ctx.fillStyle = '#f5c96b'
+  1021→  ctx.beginPath()
+  1022→  ctx.arc(playerPos.x * scale, playerPos.y * (mh / WORLD.h), 3, 0, Math.PI * 2)
+  1023→  ctx.fill()
+  1024→  ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+  1025→  ctx.lineWidth = 1
+  1026→  ctx.stroke()
+  1027→}
+  1028→
+  1029→export function drawFullMap(
+  1030→  canvas: HTMLCanvasElement,
+  1031→  baked: HTMLCanvasElement,
+  1032→  playerPos: Vec,
+  1033→  questMarker: Vec | null,
+  1034→) {
+  1035→  const ctx = canvas.getContext('2d')
+  1036→  if (!ctx) return
+  1037→  const w = canvas.width
+  1038→  const h = canvas.height
+  1039→  ctx.clearRect(0, 0, w, h)
+  1040→  ctx.drawImage(baked, 0, 0, WORLD.w, WORLD.h, 0, 0, w, h)
+  1041→  const sx = w / WORLD.w
+  1042→  const sy = h / WORLD.h
+  1043→  ctx.font = '12px ui-serif, Georgia, serif'
+  1044→  ctx.textAlign = 'center'
+  1045→  for (const m of AREA_MARKERS) {
+  1046→    ctx.fillStyle = 'rgba(20,16,12,0.6)'
+  1047→    const tw = ctx.measureText(m.label).width
+  1048→    ctx.fillRect(m.pos.x * sx - tw / 2 - 5, m.pos.y * sy - 18, tw + 10, 16)
+  1049→    ctx.fillStyle = '#e8d5a8'
+  1050→    ctx.fillText(m.label, m.pos.x * sx, m.pos.y * sy - 6)
+  1051→  }
+  1052→  if (questMarker) {
+  1053→    ctx.strokeStyle = '#f5c96b'
+  1054→    ctx.lineWidth = 2
+  1055→    ctx.beginPath()
+  1056→    ctx.arc(questMarker.x * sx, questMarker.y * sy, 7, 0, Math.PI * 2)
+  1057→    ctx.stroke()
+  1058→    ctx.beginPath()
+  1059→    ctx.arc(questMarker.x * sx, questMarker.y * sy, 2.5, 0, Math.PI * 2)
+  1060→    ctx.fillStyle = '#f5c96b'
+  1061→    ctx.fill()
+  1062→  }
+  1063→  ctx.fillStyle = '#f5c96b'
+  1064→  ctx.beginPath()
+  1065→  ctx.arc(playerPos.x * sx, playerPos.y * sy, 5, 0, Math.PI * 2)
+  1066→  ctx.fill()
+  1067→  ctx.strokeStyle = '#fff'
+  1068→  ctx.lineWidth = 1.5
+  1069→  ctx.stroke()
+  1070→}
+  1071→
+  1072→import { IRenderer } from './types'
+  1073→
+  1074→/** Канвас-2D бэкенд IRenderer (легаси-рендер прототипа). */
+  1075→export const renderer2d: IRenderer = {
+  1076→  bakeTerrain,
+  1077→  drawProp,
+  1078→  drawEntity,
+  1079→  drawParticles,
+  1080→  drawFloaters,
+  1081→  drawMinimap,
+  1082→  drawFullMap,
+  1083→}
+  1084→
