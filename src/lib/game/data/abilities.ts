@@ -192,7 +192,20 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 430, ac: 14, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
     speed: 88, aggroR: 300, leashR: 1200, attackRange: 56, attackCd: 1.6, xp: 600, radius: 30,
   },
+  // ---------------- Фаза 3: Вельд ----------------
+  bogling: {
+    hp: 22, ac: 10, atk: 3, dmgDice: 1, dmgSides: 4, dmgMod: 1,
+    speed: 140, aggroR: 200, leashR: 620, attackRange: 38, attackCd: 1.1, xp: 25, radius: 11,
+  },
+  ash_shade: {
+    hp: 48, ac: 12, atk: 4, dmgDice: 1, dmgSides: 8, dmgMod: 2,
+    speed: 104, aggroR: 220, leashR: 720, attackRange: 46, attackCd: 1.4, xp: 55, radius: 14,
+  },
+  ash_mother: {
+    hp: 340, ac: 13, atk: 6, dmgDice: 2, dmgSides: 6, dmgMod: 3,
+    speed: 94, aggroR: 260, leashR: 950, attackRange: 52, attackCd: 1.5, xp: 400, radius: 26, ranged: 260,
+  },
 }
 
-export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha'])
-export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss'])
+export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling'])
+export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother'])

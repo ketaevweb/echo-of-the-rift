@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Heart, Map, ScrollText, Shield, User, Volume2, VolumeX, X } from 'lucide-react'
+import { Heart, Map, Moon, ScrollText, Shield, Sun, User, Volume2, VolumeX, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
@@ -94,6 +94,9 @@ export default function Hud() {
   const bossBar = useGame((s) => s.bossBar)
   const paused = useGame((s) => s.paused)
   const interactHint = useGame((s) => s.interactHint)
+  const oil = useGame((s) => s.oil)
+  const daytime = useGame((s) => s.daytime)
+  const zoneLabel = useGame((s) => s.zoneLabel)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -117,6 +120,8 @@ export default function Hud() {
   }, [areaToast])
 
   const xpPct = player ? Math.min(100, (player.xp / Math.max(1, player.xpNext)) * 100) : 0
+  // Сутки (Фаза 3): рассвет 0.25, закат 0.75
+  const isDay = daytime > 0.23 && daytime < 0.77
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans text-[#e8d5a8]">
@@ -132,7 +137,10 @@ export default function Hud() {
         <div className="pointer-events-auto overflow-hidden rounded border border-[#5a4632]/80 bg-[#181410]/85 p-1 backdrop-blur-sm">
           <canvas ref={miniRef} data-minimap width={214} height={160} className="h-auto w-full rounded-sm" />
           <div className="mt-1 flex items-center justify-between px-1 pb-0.5">
-            <span className="text-[10px] tracking-widest text-[#8a8068]">ХЕЙМХОЛЛ И ОКРЕСТНОСТИ</span>
+            <span className="flex items-center gap-1.5">
+              {isDay ? <Sun className="h-3.5 w-3.5 text-[#d9a441]" /> : <Moon className="h-3.5 w-3.5 text-[#8a9a88]" />}
+              <span className="text-[10px] tracking-widest text-[#8a8068]">{zoneLabel}</span>
+            </span>
             <button
               onClick={() => getEngine()?.openPanel('map')}
               className="text-[#9a8f78] transition hover:text-[#d9a441]"
@@ -156,7 +164,9 @@ export default function Hud() {
               <div className={trackerQuest ? 'mt-2 border-t border-[#3a2e20] pt-2' : ''}>
                 <p className="text-[11px] font-semibold text-[#c9b06b]">{contractQuest.name}</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-[#a89a7d]">
-                  {contractQuest.stage === 1 ? `${contractQuest.stageText}` : contractQuest.stageText}
+                  {contractQuest.id === 'veld' && contractQuest.stage === 1
+                    ? `${contractQuest.stageText} (${contractQuest.counter}/3)`
+                    : contractQuest.stageText}
                 </p>
               </div>
             )}
@@ -309,6 +319,14 @@ export default function Hud() {
               )
             })}
           </div>
+          {/* Масло на клинке (Фаза 3) */}
+          {oil && (
+            <div className="mx-auto mb-1 flex w-fit items-center gap-1.5 rounded border border-[#d9a441]/50 bg-[#181410]/90 px-2 py-0.5">
+              <GameIcon name="Droplets" className="h-3 w-3 text-[#d9a441]" />
+              <span className="text-[10px] text-[#f5c96b]">{oil.name}</span>
+              <span className="text-[10px] tabular-nums text-[#9a8f78]">{oil.remain}с</span>
+            </div>
+          )}
           {/* XP полоска */}
           <div className="mx-auto mt-1 w-72">
             <div className="h-1 overflow-hidden rounded-full bg-[#241c14]">

@@ -21,11 +21,11 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS } from './data/world'
-import { sfx } from './sfx'
+import { LAKE, PLAYER_SPAWN, PROPS, GATES, zoneOf } from './data/world'
+import { sfx, setAmbient } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
-import { EngineCtx, RenderMode, ToastKind } from './core/ctx'
+import { EngineCtx, RenderMode, ToastKind, ZoneId } from './core/ctx'
 import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
@@ -145,6 +145,13 @@ export class GameEngine implements EngineCtx {
   currentArea = ''
   destroyed = false
   buffT = 0
+
+  // --- Фаза 3: сутки, зоны, масла ---
+  dayClock = 0.3
+  zone: ZoneId = 'valley'
+  oilT = 0
+  oilKind: string | null = null
+  private zoneBusy = false
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -353,6 +360,40 @@ export class GameEngine implements EngineCtx {
 
   // ---------------- Панели / приказы / сейвы ----------------
 
+  /** Переход через Врата Тумана: затемнение → телепорт партии → проявление. */
+  travelTo(zone: ZoneId) {
+    if (this.zoneBusy || this.destroyed) return
+    if (zoneOf(this.player.pos.y) === zone) return
+    if (!this.player.alive) return
+    this.zoneBusy = true
+    const gate = zone === 'veld' ? GATES.veld : GATES.valley
+    sfx('portal')
+    useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })
+    window.setTimeout(() => {
+      if (this.destroyed) return
+      const p = { ...gate.exit }
+      this.player.pos = { ...p }
+      this.player.dest = null
+      this.targetEid = null
+      for (const e of this.entities) {
+        if (e.kind === 'companion') {
+          e.pos = { x: p.x - 26, y: p.y + 18 }
+          e.dest = null
+        }
+      }
+      this.camera = { ...p }
+      this.zone = zone
+      this.currentArea = '' // заставит updateArea показать плашку зоны
+      useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'in' } })
+      this.syncUi()
+      window.setTimeout(() => {
+        if (this.destroyed) return
+        useGame.getState().patch({ zoneFade: null })
+        this.zoneBusy = false
+      }, 750)
+    }, 750)
+  }
+
   /** Переключение режима рендера (2D ⇄ 3D) на живую игру. */
   setRenderMode(mode: RenderMode) {
     if (this.renderMode === mode) return
@@ -416,6 +457,8 @@ export class GameEngine implements EngineCtx {
 
   syncUi() {
     syncUiSys(this)
+    // Эмбиент по зоне (Фаза 3)
+    setAmbient(this.zone === 'veld' ? 'veld' : 'valley')
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------
@@ -450,6 +493,8 @@ export class GameEngine implements EngineCtx {
         telegraphs: this.telegraphs,
         targetEid: this.targetEid,
         removedProps: this.removedProps,
+        zone: this.zone,
+        dayT: this.dayClock,
       })
       return
     }
@@ -471,6 +516,8 @@ export class GameEngine implements EngineCtx {
       floaters: this.floaters,
       telegraphs: this.telegraphs,
       playerAlive: this.player.alive,
+      zone: this.zone,
+      dayT: this.dayClock,
     })
   }
 }

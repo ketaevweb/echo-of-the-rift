@@ -8,12 +8,14 @@
 
 import * as THREE from 'three'
 import { Entity, Vec } from '../types'
-import { WORLD } from '../data/world'
+import { WORLD, zoneOf } from '../data/world'
 import { heightAt } from './heightmap'
 import { Terrain, buildSky } from './Terrain'
 import { Props3d } from './Props'
 import { AvatarFactory } from './Avatars'
 import { Fx3d } from './Fx'
+import { daylightOf } from '../data/tables'
+import type { ZoneId } from '../core/ctx'
 
 // ---------------- Снимок состояния движка ----------------
 
@@ -28,6 +30,8 @@ export interface SceneView3d {
   telegraphs: import('../types').Telegraph[]
   targetEid: number | null
   removedProps: Set<string>
+  zone: ZoneId
+  dayT: number
 }
 
 export interface EntityPick {
@@ -45,12 +49,22 @@ export class Renderer3d {
   private scene = new THREE.Scene()
   private camera: THREE.PerspectiveCamera
   private sun: THREE.DirectionalLight
+  private hemi: THREE.HemisphereLight
+  private amb: THREE.AmbientLight
+  private sky: THREE.Mesh
+  private skyMat: THREE.ShaderMaterial
   private terrain: Terrain
   private props: Props3d
   private entityGroup = new THREE.Group()
   private avatars: AvatarFactory
   private fx: Fx3d
   private camInitialized = false
+
+  // Атмосфера (Фаза 3): текущие значения лерпятся к целям зоны/времени суток
+  private daylight = 1
+  private fog = new THREE.FogExp2(0xb4bc9e, 0.00092)
+  private sunDay = new THREE.Color(0xffe0b0)
+  private sunDusk = new THREE.Color(0xff9a50)
 
   // Орбита камеры
   private yaw = 0
@@ -84,14 +98,14 @@ export class Renderer3d {
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 1, 9000)
 
-    // Туман и фон — тёплые, без синевы
-    this.scene.fog = new THREE.FogExp2(0xb4bc9e, 0.00092)
+    // Туман и фон — тёплые, без синевы; лерпятся по зоне/суткам (Фаза 3)
+    this.scene.fog = this.fog
 
     // Свет
-    const hemi = new THREE.HemisphereLight(0xd8dcc4, 0x55613f, 0.72)
-    this.scene.add(hemi)
-    const amb = new THREE.AmbientLight(0xffffff, 0.22)
-    this.scene.add(amb)
+    this.hemi = new THREE.HemisphereLight(0xd8dcc4, 0x55613f, 0.72)
+    this.scene.add(this.hemi)
+    this.amb = new THREE.AmbientLight(0xffffff, 0.22)
+    this.scene.add(this.amb)
     this.sun = new THREE.DirectionalLight(0xffe0b0, 1.55)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)
@@ -106,7 +120,9 @@ export class Renderer3d {
     this.scene.add(this.sun, this.sun.target)
 
     // Мир
-    this.scene.add(buildSky())
+    this.sky = buildSky()
+    this.skyMat = this.sky.material as THREE.ShaderMaterial
+    this.scene.add(this.sky)
     this.terrain = new Terrain()
     this.scene.add(this.terrain.group)
     this.props = new Props3d()
@@ -201,10 +217,61 @@ export class Renderer3d {
     this.camera.position.set(cx + sx, camY + sy, cz)
     this.camera.lookAt(this.camTarget.x, focusY + sy * 0.4, this.camTarget.z)
 
-    // Солнце следует за героем (покрытие теней)
-    this.sun.position.set(this.camTarget.x + 120, groundH + 190, this.camTarget.z + 70)
+    // Небо следует за камерой (мир стал больше — сфера должна везде накрывать)
+    this.sky.position.copy(this.camera.position)
+
+    // Солнце следует за героем (покрытие теней); высота зависит от суток (Фаза 3)
+    const sunY = groundH + 40 + this.daylight * 160
+    this.sun.position.set(this.camTarget.x + 120, sunY, this.camTarget.z + 70)
     this.sun.target.position.set(this.camTarget.x, groundH, this.camTarget.z)
     this.sun.target.updateMatrixWorld()
+  }
+
+  // ---------------- Атмосфера: зона + сутки (Фаза 3) ----------------
+
+  private tmpColor = new THREE.Color()
+  private tmpColor2 = new THREE.Color()
+
+  /** Лерпит туман/небо/свет к целям зоны и времени суток. */
+  private updateAtmosphere(zone: ZoneId, dayT: number) {
+    this.daylight = daylightOf(dayT)
+    const veld = zone === 'veld'
+    const dl = this.daylight
+    const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
+
+    // Туман
+    if (veld) {
+      this.tmpColor.setRGB(0.16 + dl * 0.32, 0.19 + dl * 0.33, 0.12 + dl * 0.28) // ночь → день
+      this.fog.density += (0.0023 - dl * 0.0008 - this.fog.density) * k
+    } else {
+      this.tmpColor.setRGB(0.07 + dl * 0.65, 0.09 + dl * 0.66, 0.09 + dl * 0.52)
+      this.fog.density += (0.00165 - dl * 0.00073 - this.fog.density) * k
+    }
+    this.fog.color.lerp(this.tmpColor, k)
+
+    // Небо
+    const top = this.skyMat.uniforms.top.value as THREE.Color
+    const hor = this.skyMat.uniforms.horizon.value as THREE.Color
+    if (veld) {
+      this.tmpColor.setRGB(0.10 + dl * 0.24, 0.12 + dl * 0.25, 0.10 + dl * 0.19)
+      this.tmpColor2.setRGB(0.14 + dl * 0.46, 0.16 + dl * 0.44, 0.12 + dl * 0.38)
+    } else {
+      this.tmpColor.setRGB(0.10 + dl * 0.32, 0.12 + dl * 0.38, 0.13 + dl * 0.43)
+      this.tmpColor2.setRGB(0.12 + dl * 0.70, 0.12 + dl * 0.68, 0.10 + dl * 0.60)
+    }
+    top.lerp(this.tmpColor, k)
+    hor.lerp(this.tmpColor2, k)
+
+    // Свет
+    const zoneDim = veld ? 0.78 : 1
+    this.sun.intensity += ((0.04 + dl * 1.55 * zoneDim) - this.sun.intensity) * k
+    // цвет солнца: на низком солнце — тёплый закатный
+    const dusk = Math.max(0, 1 - Math.abs(Math.sin((dayT - 0.25) * Math.PI * 2)) * 2.6)
+    this.tmpColor.copy(this.sunDay).lerp(this.sunDusk, dusk * 0.8)
+    this.sun.color.lerp(this.tmpColor, k)
+    this.hemi.intensity += ((0.16 + dl * 0.58) - this.hemi.intensity) * k
+    this.hemi.color.lerp(this.tmpColor.setRGB(0.28 + dl * 0.57, 0.32 + dl * 0.54, 0.30 + dl * 0.47), k)
+    this.amb.intensity += ((0.07 + dl * 0.16) - this.amb.intensity) * k
   }
 
   // ---------------- Пикинг и луч в землю ----------------
@@ -260,7 +327,7 @@ export class Renderer3d {
     for (const e of this.avatarsSyncedEntities) {
       if (!e.alive && e.kind !== 'npc') continue
       const h = heightAt(e.pos.x, e.pos.y)
-      const headH = e.boss ? 58 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : 28
+      const headH = e.boss ? 58 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : 28
       // Экранные координаты ног и головы
       this.tmpV.set(e.pos.x, h + 1, e.pos.y)
       this.tmpV.project(this.camera)
@@ -309,6 +376,8 @@ export class Renderer3d {
     if (this.disposed) return
     this.avatarsSyncedEntities = view.entities
 
+    this.updateAtmosphere(view.zone ?? zoneOf(view.player.pos.y), view.dayT ?? 0.4)
+
     const avatars = this.avatars.sync(view.entities)
     for (const e of view.entities) {
       const av = avatars.get(e.eid)
@@ -318,7 +387,7 @@ export class Renderer3d {
     }
 
     this.terrain.update(view.time)
-    this.props.update(view.time, view.removedProps)
+    this.props.update(view.time, view.removedProps, 1 - this.daylight)
     const target = view.targetEid ? view.entities.find((x) => x.eid === view.targetEid) ?? null : null
     this.fx.update(view.particles, view.floaters, view.telegraphs, target, view.time)
 

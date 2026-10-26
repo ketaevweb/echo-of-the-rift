@@ -6,6 +6,7 @@
 // ============================================================
 
 import { QuestState, SaveData, SignId } from '../types'
+import { QUESTS } from '../data/quests'
 import { useGame, writeSave } from '../store'
 import { EngineCtx } from '../core/ctx'
 
@@ -69,6 +70,9 @@ export function collectSave(ctx: EngineCtx): SaveData {
     companions: { ...ctx.companionIds },
     bestiary: [...ctx.bestiary],
     pos: { ...ctx.player.pos },
+    dayClock: ctx.dayClock,
+    oilKind: ctx.oilKind,
+    oilT: ctx.oilT,
   }
 }
 
@@ -98,10 +102,17 @@ export function applySave(ctx: EngineCtx, s: SaveData) {
   ctx.armor = s.armor
   ctx.inventory = s.inventory.map((i) => ({ ...i }))
   ctx.faction = s.faction
-  ctx.quests = JSON.parse(JSON.stringify(s.quests)) as Record<string, QuestState>
+  // Квесты: слить со свежими дефолтами — сейвы старых версий могут не знать новых квестов (Фаза 3)
+  const fresh: Record<string, QuestState> = {}
+  for (const q of QUESTS) fresh[q.id] = { stage: 0, counter: 0, done: false }
+  ctx.quests = { ...fresh, ...(JSON.parse(JSON.stringify(s.quests)) as Record<string, QuestState>) }
   ctx.flags = { ...s.flags }
   ctx.companionIds = { ...s.companions }
   ctx.bestiary = new Set(s.bestiary)
+  // Фаза 3: сутки/масло — в старых сейвах отсутствуют, подставляем дефолты
+  ctx.dayClock = typeof s.dayClock === 'number' ? s.dayClock : 0.3
+  ctx.oilKind = s.oilKind ?? null
+  ctx.oilT = typeof s.oilT === 'number' ? s.oilT : 0
   ctx.createPlayer({ ...s.pos })
   ctx.spawnWorld()
 }

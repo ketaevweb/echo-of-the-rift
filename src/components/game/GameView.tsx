@@ -13,6 +13,7 @@ export default function GameView() {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const screen = useGame((s) => s.screen)
   const renderMode = useGame((s) => s.renderMode)
+  const zoneFade = useGame((s) => s.zoneFade)
 
   useEffect(() => {
     if (screen !== 'game') return
@@ -66,6 +67,19 @@ export default function GameView() {
       <Hud />
       <DialogueOverlay />
       <Panels />
+      {/* Переход через Врата Тумана (Фаза 3): затемнение с названием зоны */}
+      {zoneFade && (
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center bg-black transition-opacity duration-700 ${
+            zoneFade.phase === 'out' ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <p className="game-title-font text-4xl tracking-[0.4em] text-[#9ad0a8]/90">{zoneFade.label.toUpperCase()}</p>
+          <div className="mt-4 h-px w-56 bg-gradient-to-r from-transparent via-[#9ad0a8]/70 to-transparent" />
+          <p className="mt-3 text-xs tracking-widest text-[#6a7a68]">ТУМАН ЧАСТИТ ПУТЬ...</p>
+        </div>
+      )}
     </div>
   )
 }

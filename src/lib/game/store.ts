@@ -106,6 +106,18 @@ export interface AreaToastState {
   name: string
 }
 
+/** Активное масло на клинке (Фаза 3). */
+export interface OilHudState {
+  name: string
+  remain: number
+}
+
+/** Экран перехода через Врата Тумана (Фаза 3). */
+export interface ZoneFadeState {
+  label: string
+  phase: 'out' | 'in'
+}
+
 // Режим запуска игры (новая / продолжить)
 export const boot: { mode: 'new' | 'continue' } = { mode: 'new' }
 
@@ -152,6 +164,11 @@ interface GameStore {
   paused: boolean
   interactHint: string | null
   renderMode: RenderModePref
+  // Фаза 3
+  oil: OilHudState | null
+  daytime: number
+  zoneLabel: string
+  zoneFade: ZoneFadeState | null
   setScreen: (s: Screen) => void
   setPanel: (p: PanelId) => void
   patch: (partial: Partial<GameStore>) => void
@@ -184,6 +201,10 @@ export const useGame = create<GameStore>((set) => ({
   paused: false,
   interactHint: null,
   renderMode: '3d',
+  oil: null,
+  daytime: 0.3,
+  zoneLabel: 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+  zoneFade: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
   patch: (partial) => set(partial),

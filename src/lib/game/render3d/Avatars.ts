@@ -250,6 +250,118 @@ function buildHorror(scale = 1): { group: THREE.Group; refs: { body: THREE.Objec
   return { group, refs: { body } }
 }
 
+// ---------------- Вельд: болотник / пепельные (Фаза 3) ----------------
+
+/** Болотник — присосистый ком тины с пастью; скачет. */
+function buildBogling(scale = 1): { group: THREE.Group; refs: { body: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const hide = mat(0x4a5230)
+  const dark = mat(0x2c3220)
+  const trunk = new THREE.Mesh(new THREE.SphereGeometry(6.5, 10, 8), hide)
+  trunk.scale.set(1.15, 0.85, 1)
+  trunk.position.y = 5.4
+  trunk.castShadow = true
+  const maw = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2.6, 4.5), dark)
+  maw.position.set(5.6, 4.2, 0)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xe8d568 })
+  for (const sz of [-2.6, 2.6]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(1.15, 6, 5), eyeMat)
+    eye.position.set(5.8, 7.4, sz)
+    body.add(eye)
+  }
+  for (const [lx, lz] of [[-3, 3.4], [-3, -3.4], [3.4, 2.6], [3.4, -2.6]]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(1.4, 3.4, 3, 5), dark)
+    leg.position.set(lx, 1.4, lz)
+    body.add(leg)
+  }
+  body.add(trunk, maw)
+  group.add(body)
+  group.scale.setScalar(0.78 * scale)
+  return { group, refs: { body } }
+}
+
+/** Пепельный мрак — полупрозрачный сгоревший силуэт с углями в груди. */
+function buildAshShade(scale = 1): { group: THREE.Group; refs: { body: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const shroud = new THREE.Mesh(
+    new THREE.ConeGeometry(8.5, 25, 7, 1, true),
+    new THREE.MeshStandardMaterial({
+      color: 0x35302c,
+      emissive: 0xc05a2a,
+      emissiveIntensity: 0.32,
+      transparent: true,
+      opacity: 0.74,
+      side: THREE.DoubleSide,
+    }),
+  )
+  shroud.position.y = 13.5
+  const emberCore = new THREE.Mesh(
+    new THREE.SphereGeometry(2.6, 8, 6),
+    new THREE.MeshBasicMaterial({ color: 0xff8a4a, transparent: true, opacity: 0.8 }),
+  )
+  emberCore.position.set(0, 15, 0)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffa04a })
+  for (const sz of [-2.2, 2.2]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 4), eyeMat)
+    eye.position.set(3.6, 18.5, sz)
+    body.add(eye)
+  }
+  const glow = new THREE.PointLight(0xc05a2a, 45, 80, 2)
+  glow.position.y = 15
+  body.add(shroud, emberCore, glow)
+  group.add(body)
+  group.scale.setScalar(0.8 * scale)
+  return { group, refs: { body } }
+}
+
+/** Пепельная Мать — высокая обугленная фигура с тлеющим нутром. */
+function buildAshMother(): { group: THREE.Group; refs: { body: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const robe = new THREE.Mesh(
+    new THREE.ConeGeometry(16, 44, 9, 1, true),
+    new THREE.MeshStandardMaterial({
+      color: 0x3a3430,
+      emissive: 0xb04a20,
+      emissiveIntensity: 0.42,
+      transparent: true,
+      opacity: 0.92,
+      side: THREE.DoubleSide,
+      roughness: 0.95,
+    }),
+  )
+  robe.position.y = 24
+  robe.castShadow = true
+  const cowl = new THREE.Mesh(new THREE.ConeGeometry(6.5, 10, 7), mat(0x26221f))
+  cowl.position.set(0, 47, 0)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffb04a })
+  for (const sz of [-2.6, 2.6]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(1.2, 6, 4), eyeMat)
+    eye.position.set(4.4, 46, sz)
+    body.add(eye)
+  }
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(4.2, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff7a30, transparent: true, opacity: 0.85 }),
+  )
+  core.position.set(0, 30, 2)
+  const glow = new THREE.PointLight(0xd05a20, 170, 200, 2)
+  glow.position.y = 30
+  // Рога-крона из пепла
+  for (const [hx, hz, hr] of [[-4.5, 0, 0.7], [4.5, 0, -0.7], [0, 4.5, 0]]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(1.6, 10, 5), mat(0x1e1a17))
+    horn.position.set(hx, 52, hz)
+    horn.rotation.z = hr
+    body.add(horn)
+  }
+  body.add(robe, cowl, core, glow)
+  group.add(body)
+  group.scale.setScalar(1.45)
+  return { group, refs: { body } }
+}
+
 // ---------------- Аватар сущности ----------------
 
 export class Avatar {
@@ -296,6 +408,15 @@ export class Avatar {
       case 'horror':
         built = buildHorror(1)
         break
+      case 'bogling':
+        built = buildBogling(1)
+        break
+      case 'ash_shade':
+        built = buildAshShade(1)
+        break
+      case 'ash_mother':
+        built = buildAshMother()
+        break
       case 'boss':
         built = buildHumanoid(e.color, 0x6a5a5a, { horns: true, sword: true, scale: 2.5 })
         break
@@ -310,7 +431,9 @@ export class Avatar {
     }
     this.group.scale.copy(built.group.scale)
     this.refs = built.refs as Avatar['refs']
-    this.forwardX = arch === 'wolf' || arch === 'alpha' || arch === 'horror'
+    this.forwardX =
+      arch === 'wolf' || arch === 'alpha' || arch === 'horror' ||
+      arch === 'bogling' || arch === 'ash_shade' || arch === 'ash_mother'
     this.mats = collectMats(this.group)
     this.hpBar = new HpBar()
     this.group.add(this.hpBar.obj)
@@ -327,6 +450,9 @@ export class Avatar {
     | 'archer'
     | 'captain'
     | 'horror'
+    | 'bogling'
+    | 'ash_shade'
+    | 'ash_mother'
     | 'boss'
     | 'humanoid' {
     if (e.kind === 'player') return 'player'
@@ -339,6 +465,9 @@ export class Avatar {
       case 'archer': return 'archer'
       case 'captain': return 'captain'
       case 'horror': return 'horror'
+      case 'bogling': return 'bogling'
+      case 'ash_shade': return 'ash_shade'
+      case 'ash_mother': return 'ash_mother'
       case 'boss': return 'boss'
       default: return 'humanoid'
     }
@@ -410,10 +539,15 @@ export class Avatar {
       }
     }
 
-    // Порождение Разлома парит
-    if (this.refs.body && e.enemyType === 'horror') {
-      this.refs.body.position.y = 6 + Math.sin(time * 2.2 + this.eid) * 2.4
+    // Порождение Разлома/пепельные парят; болотник скачет
+    if (this.refs.body && (e.enemyType === 'horror' || e.enemyType === 'ash_shade' || e.enemyType === 'ash_mother')) {
+      const hover = e.enemyType === 'ash_mother' ? 10 : 6
+      const amp = e.enemyType === 'ash_mother' ? 2.8 : 2.4
+      this.refs.body.position.y = hover + Math.sin(time * 2.2 + this.eid) * amp
       this.refs.body.rotation.y = Math.sin(time * 1.1) * 0.25
+    } else if (this.refs.body && e.enemyType === 'bogling') {
+      this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 10)) * 3.4 : Math.sin(time * 3 + this.eid) * 0.8
+      this.refs.body.rotation.x = moving ? Math.sin(e.walkPhase * 10) * 0.14 : 0
     }
 
     // Вспышка урона

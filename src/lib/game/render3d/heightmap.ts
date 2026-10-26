@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -141,6 +141,35 @@ export function heightAt(x: number, y: number): number {
     h = h * (1 - fr) + crater * fr
   }
 
+  // --- Фаза 3: Хребет и Вельд ---
+  // Хребет между долиной и Вельдом (движение блокирует systems/movement)
+  const dr = Math.abs(y - RIDGE.y)
+  if (dr < 330) {
+    const jag = (fbm(x / 110 + 51, y / 110 + 7, 2) - 0.5) * 10
+    const t = falloff(dr, 70, 260)
+    h += t * t * (56 + jag)
+  }
+  // Вельд: болотистая низина с омутами
+  if (y > RIDGE.y + 40) {
+    const sw = falloff(y - (RIDGE.y + 40), 0, 240)
+    const swamp = (fbm(x / 340 + 13, y / 340 + 3, 3) - 0.5) * 6 + 0.9
+    h = h * (1 - sw) + swamp * sw
+    for (const p of POOLS) {
+      const dp = Math.hypot(x - p.x, y - p.y)
+      const fp = falloff(dp, p.r * 0.72, p.r * 0.6)
+      if (fp > 0) {
+        const bowl = -2.9 - 1.2 * (1 - Math.min(1, dp / p.r))
+        h = h * (1 - fp) + bowl * fp
+      }
+    }
+  }
+  // Плоские пятачки у Врат Тумана (по обе стороны хребта)
+  for (const g of [GATES.valley, GATES.veld]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    h = h * (1 - fg) + 1.6 * fg
+  }
+
   return h
 }
 
@@ -157,6 +186,12 @@ const C_ASH: [number, number, number] = [0.32, 0.27, 0.34]
 const C_EMBER: [number, number, number] = [0.42, 0.2, 0.24]
 const C_SAND: [number, number, number] = [0.62, 0.56, 0.4]
 const C_ROCK: [number, number, number] = [0.42, 0.42, 0.4]
+// Палитра Вельда (Фаза 3): торф, тина, мёртвые пятна
+const C_PEAT: [number, number, number] = [0.19, 0.22, 0.13]
+const C_PEAT2: [number, number, number] = [0.14, 0.16, 0.10]
+const C_MURK: [number, number, number] = [0.25, 0.27, 0.16]
+const C_DEAD: [number, number, number] = [0.33, 0.32, 0.25]
+const C_MUD: [number, number, number] = [0.22, 0.18, 0.12]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -183,6 +218,32 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
   // Север — снежная дымка
   const snowT = falloff(y, 620, 380) * 0.85
   lerp3(tmpA, C_SNOW, snowT, tmpA)
+
+  // Вельд — торф и мёртвая тина (Фаза 3)
+  if (y > RIDGE.y - 120) {
+    const sw = falloff(y - (RIDGE.y - 120), 0, 300)
+    if (sw > 0) {
+      const peat = fbm(x / 200 + 41, y / 200 + 17, 3)
+      lerp3(tmpA, peat > 0.5 ? C_PEAT : C_PEAT2, sw, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      lerp3(tmpA, C_MURK, Math.max(0, dry - 0.42) * sw, tmpA)
+      lerp3(tmpA, C_DEAD, Math.max(0, 0.52 - dry) * 0.9 * sw, tmpA)
+    }
+    // Омуты — тёмная грязь по кромке
+    for (const p of POOLS) {
+      const dp = Math.hypot(x - p.x, y - p.y)
+      if (dp < p.r + 26) {
+        lerp3(tmpA, C_MUD, falloff(dp, p.r * 0.8, p.r * 0.5) * 0.9, tmpA)
+      }
+    }
+  }
+  // Хребет — голый камень
+  const drg = Math.abs(y - RIDGE.y)
+  if (drg < 320) {
+    lerp3(tmpA, C_ROCK, falloff(drg, 70, 250) * 0.85, tmpA)
+  }
 
   // Разлом — пепел и тлеющие трещины
   const tr = Math.hypot(x - RIFT.x, y - RIFT.y)

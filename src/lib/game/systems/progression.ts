@@ -6,7 +6,7 @@
 // ============================================================
 
 import { ABILITY_MAP } from '../data/abilities'
-import { ITEMS, MERCHANT_STOCK } from '../data/items'
+import { ALRA_STOCK, ITEMS, MERCHANT_STOCK } from '../data/items'
 import { ATTR_NAMES } from '../data/tables'
 import { SignId } from '../types'
 import { TrainerHudState, useGame } from '../store'
@@ -92,8 +92,15 @@ export function spendLp(ctx: EngineCtx, attr: 'might' | 'vigor' | 'intellect' | 
 
 // ---------------- Магазин и тренер ----------------
 
-export function openShop(ctx: EngineCtx) {
-  useGame.getState().patch({ shop: { merchantName: 'Грим', stock: [...MERCHANT_STOCK] }, panel: 'shop' })
+/** Торговцы (Фаза 3): Грим в лавке и Альра-алхимик. */
+const SHOPS: Record<'grim' | 'alra', { name: string; stock: string[] }> = {
+  grim: { name: 'Грим', stock: MERCHANT_STOCK },
+  alra: { name: 'Альра', stock: ALRA_STOCK },
+}
+
+export function openShop(ctx: EngineCtx, merchant: 'grim' | 'alra' = 'grim') {
+  const s = SHOPS[merchant]
+  useGame.getState().patch({ shop: { merchantName: s.name, stock: [...s.stock] }, panel: 'shop' })
 }
 
 export function buildTrainerOptions(ctx: EngineCtx): TrainerHudState {

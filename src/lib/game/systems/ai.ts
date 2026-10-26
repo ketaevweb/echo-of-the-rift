@@ -7,7 +7,7 @@
 
 import { ABILITY_MAP, ENEMY_STATS } from '../data/abilities'
 import { ENEMY_NAME } from '../data/tables'
-import { NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS } from '../data/world'
+import { ASH_MOTHER, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
 import { Entity, Stance, Vec } from '../types'
 import { sfx } from '../sfx'
 import { d, rndRange } from '../core/util'
@@ -74,6 +74,13 @@ export function spawnWorld(ctx: EngineCtx) {
     if (u.enemy === 'boss' && ctx.flags.bossDead) continue
     spawnUnique(ctx, u.enemy, u.pos)
   }
+  // Вельд (Фаза 3): Пепельная Мать появляется после прочтения всех следов
+  if (ctx.flags.ashMotherRevealed && !ctx.flags.ashMotherDead) {
+    spawnAshMother(ctx)
+  }
+  for (const c of VELD_CLUES) {
+    if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
+  }
   if (ctx.companionIds.kaya) spawnCompanion(ctx, 'kaya')
   if (ctx.companionIds.torvald) spawnCompanion(ctx, 'torvald')
   if (ctx.flags.gateOpen) {
@@ -116,7 +123,7 @@ export function spawnZoneEnemy(ctx: EngineCtx, z: (typeof SPAWN_ZONES)[number]) 
   ctx.entities.push(e)
 }
 
-export function spawnUnique(ctx: EngineCtx, type: 'alpha' | 'captain' | 'boss', pos: Vec) {
+export function spawnUnique(ctx: EngineCtx, type: 'alpha' | 'captain' | 'boss' | 'ash_mother', pos: Vec) {
   const st = ENEMY_STATS[type]
   const e = makeEntity(ctx, {
     id: type,
@@ -303,6 +310,96 @@ export function castCompanionAbility(ctx: EngineCtx, eid: number, abilityId: str
   ctx.syncUi()
 }
 
+// ---------------- Вельд: Пепельная Мать (Фаза 3) ----------------
+
+/** Мини-босс Вельда: спавнится у кургана, если контракт дошёл до стадии охоты. */
+export function spawnAshMother(ctx: EngineCtx) {
+  if (ctx.flags.ashMotherDead) return
+  if (ctx.entities.some((e) => e.enemyType === 'ash_mother' && e.alive)) return
+  spawnUnique(ctx, 'ash_mother', { ...ASH_MOTHER.pos })
+}
+
+/** Пепельный взрыв + призыв болотников по фазам HP. */
+export function ashMotherLogic(ctx: EngineCtx, e: Entity, dist: number, dt: number) {
+  // --- Пепельный взрыв: телеграф-круг следует за ней ---
+  if (e.slamT > 0) {
+    e.slamT -= dt
+    if (e.slamT <= 0) {
+      ring(ctx, e.pos, '#e0703a', 150, 0.7, 'slam')
+      ctx.shake = 8
+      sfx('boss')
+      for (const a of ctx.entities) {
+        if (a.team !== 'party' || !a.alive) continue
+        if (Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < 155) {
+          damage(ctx, a, d(6) + d(6) + e.dmgMod, { color: '#e08a5a' })
+          ctx.kb.set(a.eid, { x: (a.pos.x - e.pos.x) * 3, y: (a.pos.y - e.pos.y) * 3 })
+        }
+      }
+    }
+    return
+  }
+  if (e.cds['burst'] === undefined) e.cds['burst'] = 5
+  if (e.cds['burst'] <= 0 && dist < 250) {
+    e.cds['burst'] = 9
+    e.slamT = 0.9
+    floater(ctx, e.pos, 'Пепел воспаряет!', '#e0703a', 15)
+    spawnTelegraph(ctx, {
+      shape: 'circle',
+      x: e.pos.x,
+      y: e.pos.y,
+      facing: 0,
+      radius: 150,
+      width: 0,
+      life: 0.9,
+      maxLife: 0.9,
+      color: '#e0703a',
+      followEid: e.eid,
+    })
+    return
+  }
+  // Фазы: призыв болотников
+  const ratio = e.hp / e.maxHp
+  if (ratio < 0.66 && e.summonStage < 1) {
+    e.summonStage = 1
+    summonBoglings(ctx, e)
+  }
+  if (ratio < 0.33 && e.summonStage < 2) {
+    e.summonStage = 2
+    summonBoglings(ctx, e)
+  }
+}
+
+export function summonBoglings(ctx: EngineCtx, e: Entity) {
+  for (let i = 0; i < 2; i++) {
+    const st = ENEMY_STATS.bogling
+    const a = Math.random() * Math.PI * 2
+    const h = makeEntity(ctx, {
+      id: 'bogling',
+      name: ENEMY_NAME.bogling,
+      pos: { x: e.pos.x + Math.cos(a) * 70, y: e.pos.y + Math.sin(a) * 70 },
+      radius: st.radius,
+      hp: st.hp,
+      maxHp: st.hp,
+      speed: st.speed,
+      atkBonus: st.atk,
+      ac: st.ac,
+      dmgDice: st.dmgDice,
+      dmgSides: st.dmgSides,
+      dmgMod: st.dmgMod,
+      attackCd: st.attackCd,
+      attackRange: st.attackRange,
+      enemyType: 'bogling',
+      aggroR: st.aggroR,
+      leashR: 9999,
+      aiState: 'chase',
+    })
+    ctx.entities.push(h)
+    ring(ctx, h.pos, '#7a8a4a', 40, 0.6)
+  }
+  floater(ctx, e.pos, 'Топи отвечают ей!', '#a3c06b', 15)
+  sfx('boss')
+}
+
 // ---------------- ИИ врагов ----------------
 
 export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
@@ -402,6 +499,7 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
   }
 
   if (e.boss) bossLogic(ctx, e, dist, dt)
+  if (e.enemyType === 'ash_mother') ashMotherLogic(ctx, e, dist, dt)
 
   // Замах/рывок босса: обычное движение и атаки заблокированы —
   // вся логика внутри bossLogic (return после него не выходим,

@@ -1,5 +1,5 @@
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
-import { AREA_MARKERS, LAKE, ROADS, WORLD } from '../data/world'
+import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD } from '../data/world'
 
 // ---------------- Терен (запекается один раз) ----------------
 
@@ -118,6 +118,44 @@ export function bakeTerrain(): HTMLCanvasElement {
     ctx.beginPath()
     ctx.arc(LAKE.x + Math.cos(a) * rr, LAKE.y + Math.sin(a) * rr, 14 + rnd() * 20, 0, Math.PI)
     ctx.stroke()
+  }
+
+  // --- Фаза 3: Хребет и Вельд ---
+  // Хребет — серая полоса гор
+  const mg = ctx.createLinearGradient(0, RIDGE.y - 200, 0, RIDGE.y + 200)
+  mg.addColorStop(0, 'rgba(74,72,62,0)')
+  mg.addColorStop(0.5, 'rgba(86,84,72,0.95)')
+  mg.addColorStop(1, 'rgba(74,76,58,0)')
+  ctx.fillStyle = mg
+  ctx.fillRect(0, RIDGE.y - 200, WORLD.w, 400)
+  // Болота — тёмно-торфяная база + пятна тины
+  const vg = ctx.createLinearGradient(0, RIDGE.y + 120, 0, WORLD.h)
+  vg.addColorStop(0, 'rgba(58,64,42,0.55)')
+  vg.addColorStop(1, 'rgba(42,48,32,0.85)')
+  ctx.fillStyle = vg
+  ctx.fillRect(0, RIDGE.y + 120, WORLD.w, WORLD.h - RIDGE.y - 120)
+  for (let i = 0; i < 500; i++) {
+    const x = rnd() * WORLD.w
+    const y = RIDGE.y + 200 + rnd() * (WORLD.h - RIDGE.y - 260)
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(52,62,38,0.3)' : 'rgba(38,44,30,0.35)'
+    ctx.beginPath()
+    ctx.arc(x, y, 16 + rnd() * 50, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // Омуты Топей
+  for (const p of POOLS) {
+    ctx.fillStyle = 'rgba(40,44,28,0.6)'
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r + 12, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#242c1c'
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(76,88,52,0.5)'
+    ctx.beginPath()
+    ctx.arc(p.x - p.r * 0.2, p.y - p.r * 0.15, p.r * 0.55, 0, Math.PI * 2)
+    ctx.fill()
   }
 
   // Тёмная рамка мира
@@ -449,6 +487,95 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
       ctx.fill()
       break
     }
+    // --- Фаза 3: Вельд ---
+    case 'deadtree': {
+      const s = 0.85 + ((p.seed ?? 0) % 30) / 100
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 12 * s, 5 * s, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#3a322a'
+      ctx.lineWidth = 4 * s
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x + 2, pos.y - 26 * s)
+      ctx.stroke()
+      ctx.lineWidth = 2 * s
+      ctx.beginPath()
+      ctx.moveTo(pos.x, pos.y - 12 * s)
+      ctx.lineTo(pos.x - 9 * s, pos.y - 20 * s)
+      ctx.moveTo(pos.x + 1, pos.y - 17 * s)
+      ctx.lineTo(pos.x + 10 * s, pos.y - 26 * s)
+      ctx.stroke()
+      break
+    }
+    case 'reed': {
+      const sway = Math.sin(t * 1.6 + pos.x * 0.1) * 2.4
+      ctx.strokeStyle = '#4a5530'
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 4, pos.y)
+      ctx.quadraticCurveTo(pos.x - 4 + sway * 0.5, pos.y - 5, pos.x - 4 + sway, pos.y - 10)
+      ctx.moveTo(pos.x, pos.y)
+      ctx.quadraticCurveTo(pos.x + sway * 0.5, pos.y - 6, pos.x + sway, pos.y - 13)
+      ctx.moveTo(pos.x + 4, pos.y)
+      ctx.quadraticCurveTo(pos.x + 4 + sway * 0.5, pos.y - 4, pos.x + 4 + sway, pos.y - 9)
+      ctx.stroke()
+      break
+    }
+    case 'stump': {
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 2, 8, 3.4, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#4a3a28'
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y, 6.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#6a5a40'
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 1.5, 5, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'board': {
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 2, 18, 6, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#4a3626'
+      ctx.fillRect(pos.x - 14, pos.y - 24, 4, 26)
+      ctx.fillRect(pos.x + 10, pos.y - 24, 4, 26)
+      ctx.fillStyle = '#5c4630'
+      ctx.fillRect(pos.x - 19, pos.y - 34, 38, 22)
+      ctx.fillStyle = '#d8cfb4'
+      ctx.fillRect(pos.x - 13, pos.y - 31, 9, 12)
+      ctx.fillRect(pos.x - 1, pos.y - 28, 9, 12)
+      ctx.fillRect(pos.x + 10, pos.y - 30, 7, 10)
+      break
+    }
+    case 'portal': {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2)
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 2, 30, 9, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#6a6a62'
+      ctx.fillRect(pos.x - 27, pos.y - 46, 8, 46)
+      ctx.fillRect(pos.x + 19, pos.y - 46, 8, 46)
+      ctx.fillRect(pos.x - 30, pos.y - 52, 60, 8)
+      ctx.fillStyle = `rgba(154,208,168,${0.18 + pulse * 0.2})`
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 22, 18, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = `rgba(217,232,192,${0.5 + pulse * 0.4})`
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 22, 10 + pulse * 2, 0, Math.PI * 2)
+      ctx.stroke()
+      break
+    }
   }
 }
 
@@ -697,6 +824,50 @@ export function drawEntity(
     case 'horror':
       drawHorror(ctx, e, t)
       break
+    case 'bogling': {
+      // Вельд 2D: присосистый ком тины
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+      const hop = Math.abs(Math.sin(e.walkPhase * 10)) * 3
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a5230'
+      ctx.beginPath()
+      ctx.ellipse(e.pos.x, e.pos.y - 5 - hop, e.radius, e.radius * 0.8, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#2c3220'
+      ctx.beginPath()
+      ctx.ellipse(e.pos.x + e.radius * 0.45, e.pos.y - 4 - hop, e.radius * 0.4, e.radius * 0.22, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#e8d568'
+      ctx.beginPath()
+      ctx.arc(e.pos.x + e.radius * 0.4, e.pos.y - 8 - hop, 1.8, 0, Math.PI * 2)
+      ctx.arc(e.pos.x + e.radius * 0.4, e.pos.y - 4 - hop, 1.8, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'ash_shade':
+    case 'ash_mother': {
+      // Пепельные: парящий обугленный силуэт с углями
+      const big = e.enemyType === 'ash_mother'
+      const hover = Math.sin(t * 2.2 + e.eid) * 2
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : 'rgba(48,42,38,0.92)'
+      ctx.beginPath()
+      ctx.moveTo(e.pos.x - e.radius * (big ? 1.1 : 0.85), e.pos.y)
+      ctx.quadraticCurveTo(e.pos.x - e.radius * (big ? 0.7 : 0.5), e.pos.y - e.radius * (big ? 3.4 : 2.4) - hover, e.pos.x, e.pos.y - e.radius * (big ? 3.8 : 2.7) - hover)
+      ctx.quadraticCurveTo(e.pos.x + e.radius * (big ? 0.7 : 0.5), e.pos.y - e.radius * (big ? 3.4 : 2.4) - hover, e.pos.x + e.radius * (big ? 1.1 : 0.85), e.pos.y)
+      ctx.closePath()
+      ctx.fill()
+      const pulse = 0.5 + 0.5 * Math.sin(t * 4 + e.eid)
+      ctx.fillStyle = `rgba(255,122,48,${0.5 + pulse * 0.4})`
+      ctx.beginPath()
+      ctx.arc(e.pos.x, e.pos.y - e.radius * (big ? 1.6 : 1.2) - hover, big ? 5 : 2.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#ffb04a'
+      ctx.beginPath()
+      ctx.arc(e.pos.x - 3, e.pos.y - e.radius * (big ? 2.9 : 2.2) - hover, 1.6, 0, Math.PI * 2)
+      ctx.arc(e.pos.x + 3, e.pos.y - e.radius * (big ? 2.9 : 2.2) - hover, 1.6, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
     case 'boss':
       drawBoss(ctx, e, t)
       break

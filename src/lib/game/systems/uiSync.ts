@@ -7,7 +7,8 @@
 
 import { ABILITY_MAP } from '../data/abilities'
 import { QUESTS } from '../data/quests'
-import { ABILITY_BAR_IDS } from '../data/tables'
+import { ITEMS } from '../data/items'
+import { ABILITY_BAR_IDS, ENEMY_NAME } from '../data/tables'
 import { AbilityHud, PartyHud, QuestHud, useGame } from '../store'
 import { SignId } from '../types'
 import type { EngineCtx } from '../core/ctx'
@@ -85,7 +86,11 @@ export function syncUi(ctx: EngineCtx): void {
   }))
   const mainQ = quests.find((q) => q.id === 'main')!
   const contractQ = quests.find((q) => q.id === 'contract')!
-  const boss = ctx.entities.find((e) => e.enemyType === 'boss' && e.alive && e.aiState !== 'idle')
+  const veldQ = quests.find((q) => q.id === 'veld')!
+  const sideQ = [contractQ, veldQ].find((q) => q.stage > 0 && !q.done) ?? null
+  const boss = ctx.entities.find(
+    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother') && e.alive && e.aiState !== 'idle',
+  )
   const n = ctx.isFrozen() ? null : nearestInteraction(ctx)
   st.patch({
     party,
@@ -111,9 +116,13 @@ export function syncUi(ctx: EngineCtx): void {
     inventory: ctx.inventory.map((i) => ({ ...i })),
     quests,
     trackerQuest: mainQ.done ? null : mainQ,
-    contractQuest: contractQ.stage > 0 && !contractQ.done ? contractQ : null,
-    bossBar: boss ? { name: 'Пожиратель Бурь', hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
+    contractQuest: sideQ,
+    bossBar: boss ? { name: ENEMY_NAME[boss.enemyType!] ?? 'Хозяин', hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
     interactHint: n ? `${n.label} — [F]` : null,
     bestiary: [...ctx.bestiary],
+    // Фаза 3: масло, сутки, зона
+    oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
+    daytime: ctx.dayClock,
+    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
   })
 }

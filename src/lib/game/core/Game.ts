@@ -6,7 +6,8 @@
 // stepWorld — фиксированный порядок систем симуляции.
 // ============================================================
 
-import { WORLD } from '../data/world'
+import { WORLD, zoneOf } from '../data/world'
+import { DAY_LENGTH } from '../data/tables'
 import { tickCds, updateTelegraphs } from '../systems/combat'
 import { updateCompanion, updateEnemy } from '../systems/ai'
 import { updateStatuses } from '../systems/combat'
@@ -33,6 +34,10 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   updateParticles(ctx, dt)
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
+  // Фаза 3: сутки, масло, зона
+  ctx.dayClock = (ctx.dayClock + dt / DAY_LENGTH) % 1
+  if (ctx.oilT > 0) ctx.oilT = Math.max(0, ctx.oilT - dt)
+  ctx.zone = zoneOf(ctx.player.pos.y)
   updateArea(ctx)
   updateEnding(ctx)
   // камера следует за игроком (в 3D кламп не нужен — там своя орбита)

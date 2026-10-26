@@ -8,7 +8,7 @@
 
 import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from '../data/abilities'
 import { ITEMS } from '../data/items'
-import { BESTIARY_INFO } from '../data/tables'
+import { BESTIARY_INFO, OIL_TARGETS } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
 import { Entity, Particle, SignId, Telegraph, Vec } from '../types'
 import { useGame } from '../store'
@@ -32,6 +32,14 @@ function heightMod(a: Entity, t: Entity): number {
   return 0
 }
 
+/** Бонус масла (Фаза 3): урон игрока против класса врагов, пока масло активно. */
+function oilBonus(ctx: EngineCtx, a: Entity, t: Entity): number {
+  if (a.kind !== 'player' || ctx.oilT <= 0 || !ctx.oilKind) return 0
+  const def = ITEMS[ctx.oilKind]
+  if (!def?.oil) return 0
+  return OIL_TARGETS[def.oil.targets].has(t.enemyType ?? '') ? def.oil.bonus : 0
+}
+
 export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   a.cds['atk'] = a.attackCd
   a.attackT = 0.28
@@ -42,7 +50,9 @@ export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   const total = roll + a.atkBonus + buff + hMod
   if (roll === 20 || (roll !== 1 && total >= t.ac)) {
     const crit = roll === 20
-    const dmg = Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod)
+    const dmg =
+      Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod) +
+      oilBonus(ctx, a, t)
     damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
     if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
   } else {
@@ -59,7 +69,9 @@ export function rangedAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   const total = roll + a.atkBonus + buff + hMod
   if (roll === 20 || (roll !== 1 && total >= t.ac)) {
     const crit = roll === 20
-    const dmg = Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod)
+    const dmg =
+      Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod) +
+      oilBonus(ctx, a, t)
     damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
     beam(ctx, a.pos, t.pos, a.team === 'party' ? '#bfe3ea' : '#d9c04f')
     if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
@@ -128,6 +140,15 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     if (Math.random() < 0.5) addItem(ctx, 'rift_shard', 1)
   } else if (type === 'captain') {
     goldLoot = 60
+  } else if (type === 'bogling') {
+    if (Math.random() < 0.55) addItem(ctx, 'bog_bile', 1)
+  } else if (type === 'ash_shade') {
+    if (Math.random() < 0.35) addItem(ctx, 'rift_shard', 1)
+  } else if (type === 'ash_mother') {
+    ctx.flags.ashMotherDead = true
+    goldLoot = 120
+    addItem(ctx, 'ash_heart', 1)
+    if (ctx.quests.veld.stage === 2) advanceQuest(ctx, 'veld', 3)
   } else if (type === 'boss') {
     goldLoot = 150
     addItem(ctx, 'rift_shard', 3)

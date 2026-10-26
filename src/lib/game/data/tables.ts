@@ -5,6 +5,18 @@
 
 export const ABILITY_BAR_IDS = ['igni', 'aard', 'quen', 'axii', 'shout', 'potion_heal', 'potion_stam']
 
+// ---------------- Сутки (Фаза 3) ----------------
+
+/** Длина игровых суток в секундах реального времени (8 минут). */
+export const DAY_LENGTH = 480
+
+/** Дневной свет 0..1 из фазы суток (0.25 — рассвет, 0.5 — полдень, 0.75 — закат). */
+export function daylightOf(dayClock: number): number {
+  const elev = Math.sin((dayClock - 0.25) * Math.PI * 2)
+  const t = Math.max(0, Math.min(1, (elev + 0.14) / 0.46))
+  return t * t * (3 - 2 * t)
+}
+
 export const BESTIARY_INFO: Record<string, { name: string; text: string; weakness: string }> = {
   wolf: {
     name: 'Лесной волк',
@@ -41,6 +53,21 @@ export const BESTIARY_INFO: Record<string, { name: string; text: string; weaknes
     text: 'Пасть Разлома. Ел королей и богов с их молитвами. Славит отчаяние.',
     weakness: 'Сильные удержания. Убеждение (СЛ 15) ослабляет его ещё до боя.',
   },
+  bogling: {
+    name: 'Болотник',
+    text: 'Мелкая прожорливая тварь Топей. Нападает стаей, кусает за пятки. В кишках — тина и желчь.',
+    weakness: 'Уязвим к огню (Игни). Масло против тварей усиливает удары.',
+  },
+  ash_shade: {
+    name: 'Пепельный мрак',
+    text: 'Отголосок существ, сгоревших при первом дыхании Разлома. Бродит по Вельду, оставляя пепельные следы.',
+    weakness: 'Спектр. Аксий держит крепче. Масло против спектров — обязательно.',
+  },
+  ash_mother: {
+    name: 'Пепельная Мать',
+    text: 'Матриарх пепельных мраков, гнездится в кургане за Топями. Отмечена Доской объявлений Хеймхолла: топы уносят скот и детей.',
+    weakness: 'Спектр. Взрывается пеплом — уходи из круга-телеграфа. Масло против спектров и Аксий решают бой.',
+  },
 }
 
 export const ENEMY_NAME: Record<string, string> = {
@@ -51,6 +78,17 @@ export const ENEMY_NAME: Record<string, string> = {
   captain: 'Главарь разбойников',
   horror: 'Порождение Разлома',
   boss: 'Пожиратель Бурь',
+  bogling: 'Болотник',
+  ash_shade: 'Пепельный мрак',
+  ash_mother: 'Пепельная Мать',
+}
+
+// ---------------- Масла (Фаза 3) ----------------
+
+/** Классы врагов для масел: «звери» и «спектры». */
+export const OIL_TARGETS: Record<'beast' | 'specter', Set<string>> = {
+  beast: new Set(['wolf', 'alpha', 'bogling']),
+  specter: new Set(['horror', 'ash_shade', 'ash_mother']),
 }
 
 export const ATTR_NAMES: Record<string, string> = {

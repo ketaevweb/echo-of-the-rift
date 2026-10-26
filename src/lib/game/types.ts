@@ -33,7 +33,7 @@ export interface SignState {
   level: number
 }
 
-export type ItemType = 'potion' | 'weapon' | 'armor' | 'misc' | 'quest'
+export type ItemType = 'potion' | 'weapon' | 'armor' | 'misc' | 'quest' | 'oil'
 
 export interface ItemDef {
   id: string
@@ -46,6 +46,8 @@ export interface ItemDef {
   heal?: number
   stamina?: number
   icon: string // имя иконки lucide
+  /** Масло (Фаза 3): наносится на клинок, бонус против класса врагов. */
+  oil?: { targets: 'beast' | 'specter'; bonus: number; dur: number }
 }
 
 export interface InventoryEntry {
@@ -142,7 +144,28 @@ export interface PortraitDef {
 
 export interface PropDef {
   id?: string
-  kind: 'tree' | 'rock' | 'house' | 'tent' | 'stone' | 'fire' | 'fence' | 'dummy' | 'stall' | 'carcass' | 'rift' | 'barrier' | 'altar' | 'shrub' | 'flower'
+  kind:
+    | 'tree'
+    | 'rock'
+    | 'house'
+    | 'tent'
+    | 'stone'
+    | 'fire'
+    | 'fence'
+    | 'dummy'
+    | 'stall'
+    | 'carcass'
+    | 'rift'
+    | 'barrier'
+    | 'altar'
+    | 'shrub'
+    | 'flower'
+    // Фаза 3 (Вельд):
+    | 'board'
+    | 'portal'
+    | 'deadtree'
+    | 'reed'
+    | 'stump'
   pos: Vec
   w?: number
   h?: number
@@ -170,7 +193,18 @@ export interface SpawnZoneDef {
   respawnSec: number
 }
 
-export type EnemyType = 'wolf' | 'alpha' | 'bandit' | 'archer' | 'captain' | 'horror' | 'boss'
+export type EnemyType =
+  | 'wolf'
+  | 'alpha'
+  | 'bandit'
+  | 'archer'
+  | 'captain'
+  | 'horror'
+  | 'boss'
+  // Фаза 3 (Вельд):
+  | 'bogling'
+  | 'ash_shade'
+  | 'ash_mother'
 
 export interface InteractableDef {
   id: string
@@ -178,7 +212,7 @@ export interface InteractableDef {
   pos: Vec
   r: number
   prompt: string
-  kind: 'altar' | 'herb' | 'barrier'
+  kind: 'altar' | 'herb' | 'barrier' | 'clue' | 'portal' | 'board'
   action: string
   cond?: string
 }
@@ -338,4 +372,8 @@ export interface SaveData {
   companions: { kaya: boolean; torvald: boolean }
   bestiary: string[]
   pos: Vec
+  // --- Фаза 3: сутки и масло (в старых сейвах отсутствуют — applySave подставит дефолты) ---
+  dayClock: number
+  oilKind: string | null
+  oilT: number
 }

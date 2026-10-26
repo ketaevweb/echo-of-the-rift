@@ -113,6 +113,41 @@ export const ITEMS: Record<string, ItemDef> = {
     price: 20,
     icon: 'Leaf',
   },
+  // ---------------- Фаза 3: масла и Вельд ----------------
+  oil_beast: {
+    id: 'oil_beast',
+    name: 'Масло против тварей',
+    desc: 'Наносится на клинок: +5 урона зверям (волки, болотники) на 4 минуты.',
+    type: 'oil',
+    price: 55,
+    icon: 'Droplets',
+    oil: { targets: 'beast', bonus: 5, dur: 240 },
+  },
+  oil_specter: {
+    id: 'oil_specter',
+    name: 'Масло против спектров',
+    desc: 'Наносится на клинок: +5 урона спектрам (порожденья, мраки) на 4 минуты.',
+    type: 'oil',
+    price: 65,
+    icon: 'Droplet',
+    oil: { targets: 'specter', bonus: 5, dur: 240 },
+  },
+  bog_bile: {
+    id: 'bog_bile',
+    name: 'Болотная желчь',
+    desc: 'Едкая тина из кишок болотника. Альра платит за неё.',
+    type: 'misc',
+    price: 14,
+    icon: 'FlaskRound',
+  },
+  ash_heart: {
+    id: 'ash_heart',
+    name: 'Пепельное сердце',
+    desc: 'Доказательство: сердце Матери ещё тлеет. Отнести Альре (или тому, кто заплатит).',
+    type: 'quest',
+    price: 120,
+    icon: 'Flame',
+  },
 }
 
 export const SELL_RATE = 0.4
@@ -123,4 +158,12 @@ export const MERCHANT_STOCK = [
   'sword_steel',
   'armor_leather',
   'sword_rune',
+]
+
+/** Склад алхимика Альры (Фаза 3): масла, зелья. */
+export const ALRA_STOCK = [
+  'potion_heal',
+  'potion_stam',
+  'oil_beast',
+  'oil_specter',
 ]

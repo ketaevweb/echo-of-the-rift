@@ -9,8 +9,9 @@
 
 import { DIALOGUES, PORTRAITS } from '../data/dialogues'
 import { QUESTS, QUEST_MAP } from '../data/quests'
-import { AREAS, INTERACTABLES, NPCS } from '../data/world'
+import { AREAS, INTERACTABLES, NPCS, ASH_MOTHER, VELD_CLUES } from '../data/world'
 import { ITEMS } from '../data/items'
+import { BESTIARY_INFO } from '../data/tables'
 import { Entity, Faction, InteractableDef, Vec } from '../types'
 import { useGame } from '../store'
 import { sfx } from '../sfx'
@@ -20,6 +21,7 @@ import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, openShop, openTrainer } from './progression'
 import { saveGame } from './save'
 import { floater } from './combat'
+import { spawnAshMother } from './ai'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -177,8 +179,15 @@ export function runAction(ctx: EngineCtx, action: string) {
         break
       case 'open':
         closeDialogue(ctx)
-        if (arg1 === 'shop') openShop(ctx)
+        if (arg1 === 'shop') openShop(ctx, arg2 === 'alra' ? 'alra' : 'grim')
         if (arg1 === 'trainer') openTrainer(ctx)
+        break
+      case 'bestiary':
+        if (!ctx.bestiary.has(arg1)) {
+          ctx.bestiary.add(arg1)
+          ctx.toast('Бестиарий: ' + (BESTIARY_INFO[arg1]?.name ?? arg1), 'quest')
+          sfx('quest')
+        }
         break
       case 'join':
         if (arg1 === 'kaya' || arg1 === 'torvald') {
@@ -233,6 +242,32 @@ export function runAction(ctx: EngineCtx, action: string) {
 export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
   if (it.action.startsWith('dialogue:')) {
     openDialogue(ctx, it.action.slice(9))
+  } else if (it.action.startsWith('portal:')) {
+    // Врата Тумана (Фаза 3): затемнение + телепорт через Хребет
+    const zone = it.action.slice(7) === 'veld' ? 'veld' : 'valley'
+    ctx.travelTo(zone)
+  } else if (it.action.startsWith('clue:')) {
+    // Следопытство W3 (Фаза 3): цепочка следов ведёт к логову
+    const questId = it.action.slice(5)
+    ctx.removedProps.add(it.id)
+    ctx.flags['clue_' + it.id] = true
+    const clue = VELD_CLUES.find((c) => c.id === it.id)
+    floater(ctx, it.pos, clue?.name ?? 'След', '#d9c04f', 14)
+    if (clue) ctx.toast(clue.text, 'info')
+    sfx('quest')
+    const q = ctx.quests[questId]
+    if (q && !q.done) {
+      q.counter++
+      if (q.stage === 1 && q.counter >= 3) {
+        ctx.flags.ashMotherRevealed = true
+        spawnAshMother(ctx)
+        advanceQuest(ctx, questId, 2)
+      } else {
+        ctx.toast(`След: ${q.counter}/3`, 'quest')
+        saveGame(ctx, false)
+        ctx.syncUi()
+      }
+    }
   } else if (it.action.startsWith('gather:')) {
     const item = it.action.slice(7)
     addItem(ctx, item, 1)
@@ -352,11 +387,23 @@ export function questMarker(ctx: EngineCtx): Vec | null {
     if (c.stage === 1) return { x: 720, y: 450 }
     return NPCS.find((n) => n.id === 'grim')!.pos
   }
+  // Контракт Вельда (Фаза 3)
+  const v = ctx.quests.veld
+  if (v.stage > 0 && !v.done) {
+    if (v.stage === 1) {
+      const clue = VELD_CLUES.find((cl) => !ctx.flags['clue_' + cl.id])
+      if (clue) return { ...clue.pos }
+      return { ...ASH_MOTHER.pos }
+    }
+    if (v.stage === 2) return { ...ASH_MOTHER.pos }
+    if (v.stage === 3) return NPCS.find((n) => n.id === 'alra')!.pos
+  }
   return null
 }
 
 export function updateArea(ctx: EngineCtx) {
-  let name = 'Долина'
+  // Фолбэк по зоне (Фаза 3): юг за Хребтом — Вельд
+  let name = ctx.zone === 'veld' ? 'Вельд' : 'Долина'
   for (const a of AREAS) {
     if (a.id === 'wilds') continue
     const [x, y, w, h] = a.rect

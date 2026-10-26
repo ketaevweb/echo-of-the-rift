@@ -209,6 +209,14 @@ function InvPanel() {
                     Выпить
                   </button>
                 )}
+                {def.type === 'oil' && (
+                  <button
+                    onClick={() => getEngine()?.useItem(inv.item)}
+                    className="rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-2.5 py-1 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25"
+                  >
+                    Нанести
+                  </button>
+                )}
                 {def.type !== 'quest' && (
                   <span className="flex items-center rounded border border-[#3a2e20] px-2 py-1 text-[11px] text-[#8a8068]">
                     {Math.floor(def.price * 0.4)} зол.

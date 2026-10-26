@@ -15,6 +15,7 @@ type SfxName =
   | 'death'
   | 'boss'
   | 'potion'
+  | 'portal'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -139,5 +140,66 @@ export function sfx(name: SfxName) {
       tone(300, 0.12, 'sine', 0.12, 500)
       setTimeout(() => tone(500, 0.15, 'sine', 0.1, 700), 90)
       break
+    case 'portal':
+      // Врата Тумана: восходящий вихрь
+      tone(180, 0.7, 'sine', 0.1, 720)
+      tone(320, 0.9, 'triangle', 0.07, 900)
+      noise(0.8, 0.1, 600)
+      break
   }
+}
+
+// ---------------- Эмбиент (Фаза 3): петля ветра/топей ----------------
+
+type AmbientMode = 'valley' | 'veld' | 'off'
+interface AmbientNodes {
+  src: AudioBufferSourceNode
+  filter: BiquadFilterNode
+  gain: GainNode
+}
+let amb: AmbientNodes | null = null
+let ambMode: AmbientMode = 'off'
+
+const AMBIENT_PARAMS: Record<AmbientMode, { freq: number; q: number; gain: number }> = {
+  valley: { freq: 850, q: 0.5, gain: 0.022 },
+  veld: { freq: 260, q: 1.1, gain: 0.042 },
+  off: { freq: 400, q: 0.7, gain: 0 },
+}
+
+/** Медленный ветер (долина) или низкий гул топей (Вельд). Вызывать регулярно. */
+export function setAmbient(mode: AmbientMode) {
+  const c = ensure()
+  if (!c || !master) return
+  if (ambMode === mode && amb) return
+  ambMode = mode
+  if (!amb) {
+    // Зацикленный шум через полосовой фильтр
+    const len = Math.floor(c.sampleRate * 2)
+    const buffer = c.createBuffer(1, len, c.sampleRate)
+    const data = buffer.getChannelData(0)
+    let v = 0
+    for (let i = 0; i < len; i++) {
+      v = v * 0.98 + (Math.random() * 2 - 1) * 0.02
+      data[i] = v * 8
+    }
+    const src = c.createBufferSource()
+    src.buffer = buffer
+    src.loop = true
+    const filter = c.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 800
+    filter.Q.value = 0.6
+    const gain = c.createGain()
+    gain.gain.value = 0
+    src.connect(filter)
+    filter.connect(gain)
+    gain.connect(master)
+    src.start()
+    amb = { src, filter, gain }
+  }
+  const p = AMBIENT_PARAMS[mode]
+  const t = c.currentTime
+  amb.filter.frequency.setTargetAtTime(p.freq, t, 1.2)
+  amb.filter.Q.setTargetAtTime(p.q, t, 1.2)
+  amb.gain.gain.setTargetAtTime(p.gain, t, 1.5)
 }

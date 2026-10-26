@@ -6,10 +6,11 @@
 // передаёт снимок состояния (SceneView).
 // ============================================================
 
-import { INTERACTABLES } from '../data/world'
+import { INTERACTABLES, VELD_CLUES } from '../data/world'
 import { Entity, Floater, Particle, PropDef, Telegraph, Vec } from '../types'
 import { rndRange } from '../core/util'
 import { IRenderer } from './types'
+import { daylightOf } from '../data/tables'
 
 export interface SceneView {
   ctx: CanvasRenderingContext2D
@@ -29,6 +30,9 @@ export interface SceneView {
   floaters: Floater[]
   telegraphs: Telegraph[]
   playerAlive: boolean
+  // Фаза 3: атмосфера
+  zone: 'valley' | 'veld'
+  dayT: number
 }
 
 export function drawScene(v: SceneView) {
@@ -64,6 +68,20 @@ export function drawScene(v: SceneView) {
     ctx.lineTo(it.pos.x - 5, it.pos.y - 11)
     ctx.moveTo(it.pos.x, it.pos.y - 5)
     ctx.lineTo(it.pos.x + 5, it.pos.y - 11)
+    ctx.stroke()
+  }
+  // следы следопытства (Фаза 3): пепельная метка
+  for (const c of VELD_CLUES) {
+    if (v.removedProps.has(c.id)) continue
+    const pulse = 0.5 + 0.5 * Math.sin(v.time * 2 + c.pos.x)
+    ctx.fillStyle = `rgba(224,112,58,${0.3 + pulse * 0.3})`
+    ctx.beginPath()
+    ctx.arc(c.pos.x, c.pos.y - 6, 5 + pulse * 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#e0703a'
+    ctx.lineWidth = 1.6
+    ctx.beginPath()
+    ctx.arc(c.pos.x, c.pos.y, 9 + pulse * 2, 0, Math.PI * 2)
     ctx.stroke()
   }
   // Телеграфы АоЕ (Фаза 2): круг/конус/коридор с пульсацией
@@ -107,6 +125,17 @@ export function drawScene(v: SceneView) {
   vg.addColorStop(1, 'rgba(10,8,5,0.55)')
   ctx.fillStyle = vg
   ctx.fillRect(0, 0, w, h)
+  // Атмосфера (Фаза 3): ночь и мрак Вельда
+  const dl = daylightOf(v.dayT)
+  const night = (1 - dl) * 0.5
+  if (night > 0.01) {
+    ctx.fillStyle = `rgba(8,10,14,${night})`
+    ctx.fillRect(0, 0, w, h)
+  }
+  if (v.zone === 'veld') {
+    ctx.fillStyle = 'rgba(58,68,44,0.16)'
+    ctx.fillRect(0, 0, w, h)
+  }
   if (!v.playerAlive) {
     ctx.fillStyle = 'rgba(60,10,10,0.5)'
     ctx.fillRect(0, 0, w, h)

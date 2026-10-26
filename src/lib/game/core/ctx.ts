@@ -12,6 +12,9 @@ import type { PanelId } from '../store'
 
 export type ToastKind = 'info' | 'quest' | 'level' | 'warn' | 'loot'
 
+/** Зона мира (Фаза 3): долина на севере, Вельд за Хребтом на юге. */
+export type ZoneId = 'valley' | 'veld'
+
 // ---------------- Мост 3D-рендера (Фаза 1) ----------------
 
 /** Снимок состояния движка для 3D-рендера (структурно = SceneView3d). */
@@ -26,6 +29,9 @@ export interface View3dSnapshot {
   telegraphs: Telegraph[]
   targetEid: number | null
   removedProps: Set<string>
+  /** Зона игрока и фаза суток — для атмосферы (Фаза 3). */
+  zone: ZoneId
+  dayT: number
 }
 
 /** Минимальный интерфейс 3D-вью, которым пользуется движок/ввод. */
@@ -109,6 +115,17 @@ export interface EngineCtx {
   endingAt: number | null
   buffT: number
   destroyed: boolean
+
+  // --- Фаза 3: сутки, зоны, масла ---
+  /** Фаза суток 0..1 (0.25 рассвет, 0.5 полдень, 0.75 закат). */
+  dayClock: number
+  /** Текущая зона игрока (пересчитывается в stepWorld). */
+  zone: ZoneId
+  /** Активное масло: остаток секунд и id предмета. */
+  oilT: number
+  oilKind: string | null
+  /** Переход через Врата Тумана: затемнение + телепорт партии. */
+  travelTo(zone: ZoneId): void
 
   // --- Хуки, реализуемые движком (делегируют в системы/инициализацию) ---
   toast(text: string, kind?: ToastKind): void

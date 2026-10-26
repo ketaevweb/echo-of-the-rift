@@ -8,6 +8,7 @@ import { ITEMS, SELL_RATE } from '../data/items'
 import { sfx } from '../sfx'
 import { EngineCtx } from '../core/ctx'
 import { recalcStats } from './progression'
+import { floater } from './combat'
 
 export function addItem(ctx: EngineCtx, id: string, qty: number) {
   const def = ITEMS[id]
@@ -84,4 +85,13 @@ export function unequipItem(ctx: EngineCtx, slot: 'weapon' | 'armor') {
 export function useItem(ctx: EngineCtx, id: string) {
   const def = ITEMS[id]
   if (def?.type === 'potion') ctx.castAbility(id)
+  else if (def?.type === 'oil' && def.oil) {
+    // Масло на клинок (Фаза 3): бонус против класса врагов на время
+    ctx.oilKind = id
+    ctx.oilT = def.oil.dur
+    floater(ctx, ctx.player.pos, def.name, '#d9a441', 13)
+    ctx.toast(`${def.name} нанесено на клинок (${Math.round(def.oil.dur / 60)} мин).`, 'loot')
+    sfx('potion')
+    ctx.syncUi()
+  }
 }

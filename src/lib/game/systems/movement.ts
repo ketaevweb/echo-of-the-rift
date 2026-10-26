@@ -5,7 +5,7 @@
 // (WASD/клик-движение, автопатака по цели, стамина).
 // ============================================================
 
-import { WORLD } from '../data/world'
+import { WORLD, RIDGE } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
@@ -24,6 +24,12 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   nx = Math.max(30, Math.min(WORLD.w - 30, nx))
   ny = Math.max(30, Math.min(WORLD.h - 30, ny))
   const er = e.radius * 0.7
+  // Хребет между долиной и Вельдом непроходим (Фаза 3): переход только через Врата Тумана.
+  const lo = RIDGE.y - RIDGE.band
+  const hi = RIDGE.y + RIDGE.band
+  if (ny > lo - er && ny < hi + er) {
+    ny = e.pos.y >= RIDGE.y ? Math.max(ny, hi + er) : Math.min(ny, lo - er)
+  }
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue
     if (c.hw !== undefined && c.hd !== undefined) {

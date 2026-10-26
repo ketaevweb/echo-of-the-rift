@@ -5,11 +5,12 @@
 // ============================================================
 
 import * as THREE from 'three'
-import { LAKE, WORLD } from '../data/world'
+import { LAKE, POOLS, WORLD } from '../data/world'
 import { heightAt, terrainColorAt, WATER_LEVEL } from './heightmap'
 
 const CHUNK_X = 8
-const CHUNK_Z = 6
+// Мир вытянут на юг (Вельд) — считаем чанки так, чтобы размер куска остался ~400
+const CHUNK_Z = Math.max(6, Math.round((WORLD.h / WORLD.w) * CHUNK_X))
 const SEG = 30 // сегментов на чанк по оси
 
 export class Terrain {
@@ -17,10 +18,12 @@ export class Terrain {
   private chunks: THREE.Mesh[] = []
   private water!: THREE.Mesh
   private waterMat!: THREE.MeshStandardMaterial
+  private poolMats: THREE.MeshStandardMaterial[] = []
 
   constructor() {
     this.buildChunks()
     this.buildWater()
+    this.buildPools()
   }
 
   private buildChunks() {
@@ -77,17 +80,40 @@ export class Terrain {
     this.group.add(this.water)
   }
 
+  /** Тинистые омуты Гнилых Топей (Фаза 3). */
+  private buildPools() {
+    for (const p of POOLS) {
+      const geo = new THREE.CircleGeometry(p.r + 6, 28)
+      geo.rotateX(-Math.PI / 2)
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0.13, 0.16, 0.1),
+        transparent: true,
+        opacity: 0.92,
+        roughness: 0.32,
+        metalness: 0.05,
+      })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.set(p.x, WATER_LEVEL - 0.3, p.y)
+      this.group.add(mesh)
+      this.poolMats.push(mat)
+    }
+  }
+
   /** Лёгкая анимация воды (вызывается каждый кадр). */
   update(time: number) {
     this.water.position.y = WATER_LEVEL + Math.sin(time * 0.8) * 0.07
     const rip = 0.8 + Math.sin(time * 1.7) * 0.08
     this.waterMat.roughness = rip
+    for (let i = 0; i < this.poolMats.length; i++) {
+      this.poolMats[i].roughness = 0.3 + Math.sin(time * 1.1 + i * 1.7) * 0.1
+    }
   }
 
   dispose() {
     for (const c of this.chunks) c.geometry.dispose()
     this.water.geometry.dispose()
     this.waterMat.dispose()
+    for (const m of this.poolMats) m.dispose()
   }
 }
 

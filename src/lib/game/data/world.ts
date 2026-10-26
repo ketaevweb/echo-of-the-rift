@@ -1,8 +1,27 @@
 import { AreaDef, InteractableDef, NpcDef, PropDef, SpawnZoneDef, Vec } from '../types'
+import {
+  ASH_MOTHER,
+  GATES,
+  RIDGE,
+  VELD_AREAS,
+  VELD_CLUES,
+  VELD_INTERACTABLES,
+  VELD_MARKERS,
+  VELD_PROPS,
+  VELD_ROADS,
+  VELD_SPAWN_ZONES,
+} from './veld'
 
-export const WORLD = { w: 3200, h: 2400 }
+/** Мир: долина Хеймхолл на севере + Вельд на юге за Хребтом (Фаза 3). */
+export const WORLD = { w: 3200, h: 4200 }
+
+/** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
+const VALLEY_BOTTOM = 2380
 
 export const PLAYER_SPAWN: Vec = { x: 960, y: 1780 }
+
+/** Верхняя граница «Долины» на карте (до Хребта). */
+const RIDGE_OF_WORLD = RIDGE.y + 40
 
 export const AREAS: AreaDef[] = [
   { id: 'heimarhall', name: 'Хеймхолл', rect: [660, 1330, 680, 480] },
@@ -11,12 +30,13 @@ export const AREAS: AreaDef[] = [
   { id: 'lake', name: 'Озеро Лун', rect: [1300, 1950, 640, 430] },
   { id: 'camp', name: 'Лагерь разбойников', rect: [2380, 1520, 500, 380] },
   { id: 'rift', name: 'Сердце Разлома', rect: [2660, 100, 520, 480] },
-  { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, WORLD.h] },
+  ...VELD_AREAS,
+  { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
 export const LAKE = { x: 1600, y: 2160, r: 160 }
 
-// Дороги для рендера и проверки препятствий
+// Дороги для рендера и проверки препятствий (долина + Вельд)
 export const ROADS: Vec[][] = [
   [
     { x: 960, y: 1820 }, { x: 960, y: 1480 },
@@ -36,6 +56,11 @@ export const ROADS: Vec[][] = [
   [
     { x: 2200, y: 660 }, { x: 2580, y: 540 }, { x: 2880, y: 440 },
   ],
+  // Тропа к Вратам Тумана и вельдские тропы (Фаза 3)
+  [
+    { x: 1430, y: 2040 }, { x: 1460, y: 2230 }, { x: 1480, y: 2350 },
+  ],
+  ...VELD_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -57,13 +82,16 @@ function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, b
 }
 
 function blocked(px: number, py: number): boolean {
-  // Деревня, лагерь, озеро, камни, разлом
+  // Хребет между долиной и Вельдом — не застраиваем
+  if (Math.abs(py - RIDGE.y) < 340) return true
+  // Деревня, лагерь, озеро, камни, разлом, врата
   if (px > 640 && px < 1380 && py > 1310 && py < 1830) return true
   if (px > 2380 && px < 2900 && py > 1500 && py < 1920) return true
   if (Math.hypot(px - LAKE.x, py - LAKE.y) < LAKE.r + 120) return true
   if (Math.hypot(px - 2200, py - 650) < 200) return true
   if (px > 2640 && px < 3200 && py > 80 && py < 600) return true
-  // Дороги
+  if (Math.hypot(px - GATES.valley.x, py - GATES.valley.y) < 150) return true
+  // Дороги (включая вельдские)
   for (const road of ROADS) {
     for (let i = 0; i < road.length - 1; i++) {
       if (distToSeg(px, py, road[i].x, road[i].y, road[i + 1].x, road[i + 1].y) < 85) return true
@@ -79,7 +107,7 @@ function buildTrees(): PropDef[] {
   while (trees.length < 130 && guard < 4000) {
     guard++
     const x = 60 + rnd() * (WORLD.w - 120)
-    const y = 60 + rnd() * (WORLD.h - 120)
+    const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (blocked(x, y)) continue
     if (trees.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 90)) continue
     trees.push({ kind: 'tree', pos: { x: Math.round(x), y: Math.round(y) }, r: 13, solid: true, seed: Math.floor(rnd() * 9999) })
@@ -94,7 +122,7 @@ function buildRocks(): PropDef[] {
   while (rocks.length < 42 && guard < 2000) {
     guard++
     const x = 60 + rnd() * (WORLD.w - 120)
-    const y = 60 + rnd() * (WORLD.h - 120)
+    const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (blocked(x, y)) continue
     if (rocks.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 140)) continue
     rocks.push({ kind: 'rock', pos: { x: Math.round(x), y: Math.round(y) }, r: 9 + Math.floor(rnd() * 8), solid: true, seed: Math.floor(rnd() * 9999) })
@@ -120,7 +148,7 @@ function buildShrubsFixed(): PropDef[] {
   while (shrubs.length < 90 && guard < 3000) {
     guard++
     const x = 60 + rnd() * (WORLD.w - 120)
-    const y = 60 + rnd() * (WORLD.h - 120)
+    const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (inRects(x, y, NO_SHRUB_RECTS)) continue
     if (Math.hypot(x - LAKE.x, y - LAKE.y) < LAKE.r + 30) continue
     if (shrubs.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 70)) continue
@@ -171,6 +199,7 @@ export const PROPS: PropDef[] = [
   // Озеро: ритуальные камни
   { kind: 'stone', pos: { x: 1420, y: 2075 }, r: 10, solid: true, seed: 51 },
   { kind: 'stone', pos: { x: 1810, y: 2230 }, r: 10, solid: true, seed: 52 },
+  ...VELD_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -179,6 +208,7 @@ export const PROPS: PropDef[] = [
 export const NPCS: NpcDef[] = [
   { id: 'bjorn', name: 'Бьорн', role: 'Старейшина', pos: { x: 965, y: 1475 }, color: '#d9a441', dialogue: 'elder_bjorn' },
   { id: 'grim', name: 'Грим', role: 'Торговец', pos: { x: 1078, y: 1615 }, color: '#c9b06b', dialogue: 'merchant_grim' },
+  { id: 'alra', name: 'Альра', role: 'Алхимик', pos: { x: 1180, y: 1560 }, color: '#7a9a6a', dialogue: 'alchemist_alra' },
   { id: 'dorn', name: 'Дорн', role: 'Наставник', pos: { x: 868, y: 1585 }, color: '#b08356', dialogue: 'trainer_dorn' },
   { id: 'irma', name: 'Ирма', role: 'Капитан Ордена', pos: { x: 1215, y: 1510 }, color: '#d96b3a', dialogue: 'recruit_flame' },
   { id: 'selena', name: 'Селена', role: 'Архимаг Ковена', pos: { x: 742, y: 1462 }, color: '#9a7fc0', dialogue: 'recruit_mist' },
@@ -192,6 +222,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   { id: 'camp_melee', enemy: 'bandit', center: { x: 2540, y: 1650 }, radius: 130, max: 4, respawnSec: 45 },
   { id: 'camp_ranged', enemy: 'archer', center: { x: 2660, y: 1590 }, radius: 110, max: 2, respawnSec: 50 },
   { id: 'rift_a', enemy: 'horror', center: { x: 2860, y: 280 }, radius: 130, max: 3, respawnSec: 60 },
+  ...VELD_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -207,6 +238,7 @@ export const INTERACTABLES: InteractableDef[] = [
   { id: 'herb3', name: 'Лунная трава', pos: { x: 1790, y: 2160 }, r: 34, prompt: 'Собрать', kind: 'herb', action: 'gather:moon_herb' },
   { id: 'herb4', name: 'Лунная трава', pos: { x: 1650, y: 2320 }, r: 34, prompt: 'Собрать', kind: 'herb', action: 'gather:moon_herb' },
   { id: 'barrier_ui', name: 'Пелена Разлома', pos: { x: 2935, y: 470 }, r: 60, prompt: 'Осмотреть', kind: 'barrier', action: 'dialogue:barrier', cond: 'quest.main<5' },
+  ...VELD_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -216,4 +248,8 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   { pos: { x: 1600, y: 2160 }, label: 'Озеро Лун' },
   { pos: { x: 2590, y: 1640 }, label: 'Лагерь' },
   { pos: { x: 2950, y: 280 }, label: 'Разлом' },
+  ...VELD_MARKERS,
 ]
+
+// Реэкспорты Вельда для движка/рендеров (единая точка импорта мира)
+export { ASH_MOTHER, GATES, POOLS, RIDGE, VELD_CLUES, zoneOf } from './veld'
