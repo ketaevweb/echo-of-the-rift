@@ -70,6 +70,8 @@ export interface EngineCtx {
   toast(text: string, kind?: ToastKind): void
   createPlayer(pos: Vec): void
   spawnWorld(): void
+  spawnCompanion(id: 'kaya' | 'torvald'): void
   syncUi(): void
   castAbility(id: string): void
+  isFrozen(): boolean
 }

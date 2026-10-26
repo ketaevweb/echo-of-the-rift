@@ -80,6 +80,22 @@ import {
   tickCds,
   updateParticles as updateParticlesSys,
 } from './systems/combat'
+import {
+  advanceQuest as advanceQuestSys,
+  checkProof as checkProofSys,
+  chooseOption as chooseOptionSys,
+  closeDialogue as closeDialogueSys,
+  doInteract as doInteractSys,
+  initQuests as initQuestsSys,
+  nearestInteraction as nearestInteractionSys,
+  openDialogue as openDialogueSys,
+  pickInteractable as pickInteractableSys,
+  questMarker as questMarkerSys,
+  runInteractable as runInteractableSys,
+  stageText as stageTextSys,
+  updateArea as updateAreaSys,
+  updateEnding as updateEndingSys,
+} from './systems/quest'
 
 export { BESTIARY_INFO } from './data/tables'
 
@@ -184,12 +200,6 @@ export class GameEngine implements EngineCtx {
             ? (p.w ?? 60) * 0.4
             : (p.r ?? 10)
       this.colliders.push({ x: p.pos.x, y: p.pos.y, r, propId: p.id })
-    }
-  }
-
-  private initQuests() {
-    for (const q of QUESTS) {
-      this.quests[q.id] = { stage: 0, counter: 0, done: false }
     }
   }
 
@@ -382,7 +392,7 @@ export class GameEngine implements EngineCtx {
     this.entities.push(e)
   }
 
-  private spawnCompanion(id: 'kaya' | 'torvald') {
+  spawnCompanion(id: 'kaya' | 'torvald') {
     if (this.companionIds[id]) return
     this.companionIds[id] = true
     const npcDef = NPCS.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
@@ -494,9 +504,9 @@ export class GameEngine implements EngineCtx {
       this.openDialogue(npc.npc.dialogue)
       return
     }
-    const it = this.pickInteractable(p, 28)
+    const it = pickInteractableSys(this, p, 28)
     if (it) {
-      this.runInteractable(it)
+      runInteractableSys(this, it)
       return
     }
     this.targetEid = null
@@ -578,7 +588,7 @@ export class GameEngine implements EngineCtx {
     if (engineInstance === this) engineInstance = null
   }
 
-  private isFrozen() {
+  isFrozen() {
     return useGame.getState().panel !== null || this.dialogueTree !== null
   }
 
@@ -597,8 +607,8 @@ export class GameEngine implements EngineCtx {
     updateParticlesSys(this, dt)
     this.buffT = Math.max(0, this.buffT - dt)
     this.shake = Math.max(0, this.shake - dt * 26)
-    this.updateArea()
-    this.updateEnding()
+    updateAreaSys(this)
+    updateEndingSys(this)
     const lerp = 1 - Math.pow(0.0001, dt)
     this.camera.x += (this.player.pos.x - this.camera.x) * lerp
     this.camera.y += (this.player.pos.y - this.camera.y) * lerp
@@ -1165,22 +1175,22 @@ export class GameEngine implements EngineCtx {
     }
     if (type === 'wolf' && this.quests.main.stage === 2 && !this.quests.main.done) {
       this.quests.main.counter++
-      if (this.quests.main.counter >= 4) this.advanceQuest('main', 3)
+      if (this.quests.main.counter >= 4) advanceQuestSys(this, 'main', 3)
       else this.toast(`Волки: ${this.quests.main.counter}/4`, 'info')
     }
     if (type === 'alpha') {
       this.flags.alphaDead = true
-      if (this.quests.contract.stage === 1) this.advanceQuest('contract', 2)
-      this.checkProof()
+      if (this.quests.contract.stage === 1) advanceQuestSys(this, 'contract', 2)
+      checkProofSys(this)
     }
     if (type === 'captain') {
       this.flags.captainDead = true
-      if (this.quests.flame.stage === 1) this.advanceQuest('flame', 2)
-      this.checkProof()
+      if (this.quests.flame.stage === 1) advanceQuestSys(this, 'flame', 2)
+      checkProofSys(this)
     }
     if (type === 'boss') {
       this.flags.bossDead = true
-      this.advanceQuest('main', 6)
+      advanceQuestSys(this, 'main', 6)
       useGame.getState().patch({ bossBar: null })
       this.endingAt = this.time + 1.8
     }
@@ -1345,389 +1355,26 @@ export class GameEngine implements EngineCtx {
     coneParticlesSys(this, pos, facing, range, color)
   }
 
-  // ---------------- Диалоги ----------------
+  // ---------------- Диалоги/квесты/интеракты (делегаты systems/quest) ----------------
 
-  private dialogueCtx() {
-    return {
-      quest: (id: string) => this.quests[id],
-      flag: (name: string) => !!this.flags[name],
-      faction: this.faction,
-      companion: (id: string) => this.companionIds[id as 'kaya' | 'torvald'],
-      has: (item: string, qty = 1) => this.countItem(item) >= qty,
-      lp: this.lp,
-      gold: this.gold,
-    }
-  }
-
-  private evalCond(cond: string): boolean {
-    if (!cond) return true
-    for (const tok of cond.split(',')) {
-      const s = tok.trim()
-      if (s && !this.evalToken(s)) return false
-    }
-    return true
-  }
-
-  private evalToken(s: string): boolean {
-    let m = s.match(/^quest\.(\w+)==(\d+)$/)
-    if (m) return this.quests[m[1]].stage === parseInt(m[2], 10)
-    m = s.match(/^quest\.(\w+)>=(\d+)$/)
-    if (m) return this.quests[m[1]].stage >= parseInt(m[2], 10)
-    m = s.match(/^quest\.(\w+)<(\d+)$/)
-    if (m) return this.quests[m[1]].stage < parseInt(m[2], 10)
-    m = s.match(/^flag\.(\w+)$/)
-    if (m) return !!this.flags[m[1]]
-    m = s.match(/^!flag\.(\w+)$/)
-    if (m) return !this.flags[m[1]]
-    m = s.match(/^faction==(\w+)$/)
-    if (m) return this.faction === (m[1] as Faction)
-    m = s.match(/^comp\.(\w+)$/)
-    if (m) return !!this.companionIds[m[1] as 'kaya' | 'torvald']
-    m = s.match(/^!comp\.(\w+)$/)
-    if (m) return !this.companionIds[m[1] as 'kaya' | 'torvald']
-    m = s.match(/^has\.(\w+)(?::(\d+))?$/)
-    if (m) return this.countItem(m[1]) >= (m[2] ? parseInt(m[2], 10) : 1)
-    m = s.match(/^lp>=(\d+)$/)
-    if (m) return this.lp >= parseInt(m[1], 10)
-    m = s.match(/^gold>=(\d+)$/)
-    if (m) return this.gold >= parseInt(m[1], 10)
-    return true
+  private initQuests() {
+    initQuestsSys(this)
   }
 
   openDialogue(treeId: string) {
-    const tree = DIALOGUES[treeId]
-    if (!tree) return
-    this.dialogueTree = treeId
-    const start = typeof tree.start === 'function' ? tree.start(this.dialogueCtx()) : tree.start
-    this.setNode(start)
-  }
-
-  private setNode(nodeId: string) {
-    const tree = DIALOGUES[this.dialogueTree!]
-    const node = tree.nodes[nodeId]
-    if (!node) {
-      this.closeDialogue()
-      return
-    }
-    const choices = node.choices.filter((c) => this.evalCond(c.cond ?? ''))
-    this.dlgChoices = choices
-    const p = PORTRAITS[node.speaker] ?? { icon: 'User', color: '#b08356', title: node.role ?? '' }
-    useGame.getState().patch({
-      dialogue: {
-        speaker: node.speaker,
-        role: p.title,
-        portraitIcon: p.icon,
-        portraitColor: p.color,
-        text: node.text,
-        choices: choices.map((c) => ({
-          text: c.text,
-          tag: c.tag,
-          checkLabel: c.check ? c.check.label : undefined,
-        })),
-      },
-    })
+    openDialogueSys(this, treeId)
   }
 
   chooseOption(i: number) {
-    const c = this.dlgChoices[i]
-    if (!c) return
-    sfx('click')
-    if (c.check) {
-      const bonus = 1 + Math.floor(this.attributes.charisma / 2) + this.skills.speech
-      const roll = d(20)
-      const total = roll + bonus
-      const success = roll !== 1 && (roll === 20 || total >= c.check.dc)
-      this.toast(
-        `${c.check.label}: d20 ${roll} + ${bonus} = ${total} — ${success ? 'успех!' : 'провал'}`,
-        success ? 'quest' : 'warn',
-      )
-      if (success && c.action) this.runAction(c.action)
-      const next = success ? c.goto : (c.gotoFail ?? null)
-      if (next === null || next === undefined) {
-        this.closeDialogue()
-        return
-      }
-      this.setNode(next)
-      return
-    }
-    if (c.action) this.runAction(c.action)
-    if (c.goto === null || c.goto === undefined) {
-      this.closeDialogue()
-      return
-    }
-    this.setNode(c.goto)
+    chooseOptionSys(this, i)
   }
 
   closeDialogue() {
-    this.dialogueTree = null
-    this.dlgChoices = []
-    useGame.getState().patch({ dialogue: null })
-  }
-
-  private runAction(action: string) {
-    for (const cmdRaw of action.split(';')) {
-      const cmd = cmdRaw.trim()
-      if (!cmd || cmd === 'end') continue
-      const [op, arg1, arg2] = cmd.split(':')
-      switch (op) {
-        case 'quest':
-          this.advanceQuest(arg1, parseInt(arg2, 10))
-          break
-        case 'flag':
-          this.flags[arg1] = true
-          break
-        case 'give':
-          this.addItem(arg1, parseInt(arg2 ?? '1', 10))
-          break
-        case 'take':
-          this.removeItem(arg1, parseInt(arg2 ?? '1', 10))
-          break
-        case 'gold': {
-          this.gold = Math.max(0, this.gold + parseInt(arg1, 10))
-          sfx('coin')
-          break
-        }
-        case 'xp':
-          gainXpSys(this, parseInt(arg1, 10))
-          break
-        case 'lp':
-          this.lp = Math.max(0, this.lp + parseInt(arg1, 10))
-          break
-        case 'open':
-          this.closeDialogue()
-          if (arg1 === 'shop') openShopSys(this)
-          if (arg1 === 'trainer') openTrainerSys(this)
-          break
-        case 'join':
-          if (arg1 === 'kaya' || arg1 === 'torvald') {
-            const wasNew = !this.companionIds[arg1]
-            this.spawnCompanion(arg1)
-            if (wasNew) {
-              this.toast(`${arg1 === 'kaya' ? 'Кайя' : 'Торвальд'} присоединяется к отряду!`, 'quest')
-              sfx('quest')
-            }
-          }
-          break
-        case 'faction':
-          this.faction = arg1 as Faction
-          this.toast(arg1 === 'flame' ? 'Ты вступил в Орден Пламени!' : 'Ты вступил в Ковен Тумана!', 'quest')
-          if (arg1 === 'mist') this.checkProof()
-          sfx('quest')
-          break
-        case 'sign':
-          if (arg1 === 'shout' && !this.signs.shout.unlocked) {
-            this.signs.shout.unlocked = true
-            this.toast('Голос Древних изучен! Клавиша 5.', 'level')
-            sfx('level')
-          }
-          break
-        case 'boss':
-          if (arg1 === 'fight') {
-            const boss = this.entities.find((e) => e.enemyType === 'boss' && e.alive)
-            if (boss) boss.aiState = 'chase'
-          } else if (arg1 === 'weaken') {
-            const boss = this.entities.find((e) => e.enemyType === 'boss' && e.alive)
-            if (boss) {
-              boss.hp = Math.round(boss.hp * 0.8)
-              boss.dmgMod = 2
-              boss.summonStage = 1
-              this.floater(boss.pos, 'Слова жгут его!', '#c9a3e8', 15)
-            }
-          }
-          break
-        case 'heal':
-          if (arg1 === 'full') {
-            this.hp = this.maxHp
-            this.player.hp = this.hp
-          }
-          break
-      }
-    }
-    this.syncUi()
-  }
-
-  private runInteractable(it: InteractableDef) {
-    if (it.action.startsWith('dialogue:')) {
-      this.openDialogue(it.action.slice(9))
-    } else if (it.action.startsWith('gather:')) {
-      const item = it.action.slice(7)
-      this.addItem(item, 1)
-      this.removedProps.add(it.id)
-      this.flags['herb_' + it.id] = true
-      sfx('coin')
-      this.toast('Собрано: ' + ITEMS[item].name, 'loot')
-      const q = this.quests.mist
-      if (q.stage === 1 && !q.done) {
-        q.counter++
-        if (q.counter >= 3) this.toast('Лунные травы собраны — к Селене!', 'quest')
-        else this.toast(`Лунная трава: ${q.counter}/3`, 'info')
-      }
-      this.syncUi()
-    }
-  }
-
-  private pickInteractable(p: Vec, extra = 0): InteractableDef | null {
-    let best: InteractableDef | null = null
-    let bd = 1e9
-    for (const it of INTERACTABLES) {
-      if (this.removedProps.has(it.id)) continue
-      if (!this.evalCond(it.cond ?? '')) continue
-      const dist = Math.hypot(it.pos.x - p.x, it.pos.y - p.y)
-      if (dist < it.r + extra && dist < bd) {
-        bd = dist
-        best = it
-      }
-    }
-    return best
-  }
-
-  private nearestInteraction(): { label: string; npc?: Entity; it?: InteractableDef } | null {
-    let best: { label: string; npc?: Entity; it?: InteractableDef } | null = null
-    let bd = 1e9
-    for (const e of this.entities) {
-      if (e.kind !== 'npc' || !e.alive) continue
-      const dist = Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y)
-      if (dist < 58 && dist < bd) {
-        bd = dist
-        best = { label: `Поговорить: ${e.name}`, npc: e }
-      }
-    }
-    for (const it of INTERACTABLES) {
-      if (this.removedProps.has(it.id)) continue
-      if (!this.evalCond(it.cond ?? '')) continue
-      const dist = Math.hypot(it.pos.x - this.player.pos.x, it.pos.y - this.player.pos.y)
-      if (dist < it.r + 14 && dist < bd) {
-        bd = dist
-        best = { label: `${it.prompt}: ${it.name}`, it }
-      }
-    }
-    return best
+    closeDialogueSys(this)
   }
 
   private doInteract() {
-    if (this.isFrozen() || this.tacticalPaused) return
-    const n = this.nearestInteraction()
-    if (!n) return
-    if (n.npc) this.openDialogue(n.npc.npc!.dialogue)
-    else if (n.it) this.runInteractable(n.it)
-  }
-
-  // ---------------- Квесты ----------------
-
-  private advanceQuest(id: string, stage: number) {
-    const q = this.quests[id]
-    if (!q || q.done) return
-    q.stage = stage
-    const def = QUEST_MAP[id]
-    if (stage >= def.stages.length) q.done = true
-    if (id === 'main' && stage === 5 && !this.flags.gateOpen) {
-      this.flags.gateOpen = true
-      this.removedProps.add('barrier')
-      this.removedProps.add('barrier2')
-      this.removedProps.add('barrier3')
-      this.toast('Пелена перед Разломом опала!', 'quest')
-    }
-    this.toast(`${def.name}: ${this.stageText(id)}`, 'quest')
-    sfx('quest')
-    this.saveGame(false)
-    this.syncUi()
-  }
-
-  private stageText(id: string) {
-    const def = QUEST_MAP[id]
-    const q = this.quests[id]
-    if (q.done) return def.stages[def.stages.length - 1].text
-    const st = def.stages[Math.max(0, Math.min(def.stages.length - 1, q.stage - 1))]
-    return st ? st.text : ''
-  }
-
-  private checkProof() {
-    const q = this.quests.main
-    if (q.stage === 4 && !q.done) {
-      if (this.flags.alphaDead || this.flags.captainDead || this.flags.mistJoined) {
-        this.advanceQuest('main', 5)
-      }
-    }
-  }
-
-  private questMarker(): Vec | null {
-    const q = this.quests.main
-    if (!q.done) {
-      if (q.stage <= 1) return NPCS.find((n) => n.id === 'bjorn')!.pos
-      if (q.stage === 2) return { x: 900, y: 720 }
-      if (q.stage === 3) return { x: 2200, y: 660 }
-      if (q.stage === 4) {
-        if (!this.flags.alphaDead) return { x: 720, y: 450 }
-        if (!this.flags.captainDead) return { x: 2590, y: 1690 }
-        return { x: 1600, y: 2160 }
-      }
-      if (q.stage === 5) return { x: 2935, y: 470 }
-    }
-    const c = this.quests.contract
-    if (c.stage > 0 && !c.done) {
-      if (c.stage === 1) return { x: 720, y: 450 }
-      return NPCS.find((n) => n.id === 'grim')!.pos
-    }
-    return null
-  }
-
-  private updateArea() {
-    let name = 'Долина'
-    for (const a of AREAS) {
-      if (a.id === 'wilds') continue
-      const [x, y, w, h] = a.rect
-      if (this.player.pos.x > x && this.player.pos.x < x + w && this.player.pos.y > y && this.player.pos.y < y + h) {
-        name = a.name
-        break
-      }
-    }
-    if (name !== this.currentArea) {
-      this.currentArea = name
-      useGame.getState().patch({ areaToast: { id: Date.now(), name } })
-    }
-  }
-
-  private updateEnding() {
-    if (this.endingAt !== null && this.time >= this.endingAt) {
-      this.endingAt = null
-      this.openEnding()
-    }
-  }
-
-  private openEnding() {
-    const factionLine: Record<Faction, string[]> = {
-      none: [
-        'Ты ушёл из долины до рассвета, никому ничего не сказав. Долг Смотрителя исполнен — а судьба Хеймхолла теперь в руках его людей.',
-      ],
-      flame: [
-        'Орден Пламени воздвиг у Разлома сторожевую башню. Капитан Ирма лично подняла твоё имя на её ворота.',
-        'Сталь и строй — теперь этого достаточно. Пока достаточно.',
-      ],
-      mist: [
-        'Ковен Тумана переписал печать, и Разлом затянулся туманом. Архимаг Селена назвала тебя «голосом между мирами».',
-        'Туман помнит. Туман ждёт.',
-      ],
-    }
-    const epilogue: string[] = [
-      'Пожиратель Бурь рассыпался пеплом, и небо над Хеймхоллом срослось швом из первых лучей солнца.',
-      ...factionLine[this.faction],
-    ]
-    if (this.companionIds.kaya && this.companionIds.torvald) {
-      epilogue.push(
-        'Кайя ушла дальше на север — искать истоки Разлома. Торвальд остался: сказал, что в деревне наконец появилось приличное пиво.',
-      )
-    }
-    epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
-    const mins = Math.floor(this.playtime / 60)
-    const stats: Array<[string, string]> = [
-      ['Уровень', String(this.level)],
-      ['Убито врагов', String(this.kills)],
-      ['Золото', String(this.gold)],
-      ['Время в игре', `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`],
-      ['Фракция', this.faction === 'flame' ? 'Орден Пламени' : this.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель'],
-      ['Спутники', `${(this.companionIds.kaya ? 1 : 0) + (this.companionIds.torvald ? 1 : 0)} из 2`],
-    ]
-    useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
+    doInteractSys(this)
   }
 
   // ---------------- Предметы (делегаты systems/inventory) ----------------
@@ -1882,13 +1529,13 @@ export class GameEngine implements EngineCtx {
       counter: this.quests[qd.id].counter,
       summary: qd.summary,
       stageText:
-        this.quests[qd.id].stage > 0 || this.quests[qd.id].done ? this.stageText(qd.id) : qd.stages[0].text,
+        this.quests[qd.id].stage > 0 || this.quests[qd.id].done ? stageTextSys(this, qd.id) : qd.stages[0].text,
       side: qd.side ?? false,
     }))
     const mainQ = quests.find((q) => q.id === 'main')!
     const contractQ = quests.find((q) => q.id === 'contract')!
     const boss = this.entities.find((e) => e.enemyType === 'boss' && e.alive && e.aiState !== 'idle')
-    const n = this.isFrozen() ? null : this.nearestInteraction()
+    const n = this.isFrozen() ? null : nearestInteractionSys(this)
     st.patch({
       party,
       abilities,
@@ -1922,11 +1569,11 @@ export class GameEngine implements EngineCtx {
 
   private renderMinimap() {
     if (!this.mini) return
-    drawMinimap(this.mini, this.baked, this.entities, this.player.pos, this.questMarker(), this.mini.width, this.time)
+    drawMinimap(this.mini, this.baked, this.entities, this.player.pos, questMarkerSys(this), this.mini.width, this.time)
   }
 
   renderFullMap(canvas: HTMLCanvasElement) {
-    drawFullMap(canvas, this.baked, this.player.pos, this.questMarker())
+    drawFullMap(canvas, this.baked, this.player.pos, questMarkerSys(this))
   }
 
   // ---------------- Рендер ----------------
