@@ -76,6 +76,9 @@ export function collectSave(ctx: EngineCtx): SaveData {
     // Фаза 4: одобрение и строй (старые сейвы получат дефолты в applySave)
     approval: { ...ctx.approval },
     formation: ctx.formation,
+    // Фаза 5: происхождение и Тишь (старые сейвы получат дефолты в applySave)
+    origin: ctx.origin,
+    silence: ctx.silence,
   }
 }
 
@@ -122,6 +125,9 @@ export function applySave(ctx: EngineCtx, s: SaveData) {
     torvald: typeof s.approval?.torvald === 'number' ? s.approval.torvald : 45,
   }
   ctx.formation = s.formation === 'line' ? 'line' : 'wedge'
+  // Фаза 5: происхождение/Тишь — дефолты для сейвов до Фазы 5
+  ctx.origin = s.origin === 'exile' || s.origin === 'ember' ? s.origin : 'warden'
+  ctx.silence = typeof s.silence === 'number' ? Math.max(0, Math.min(100, s.silence)) : 0
   ctx.createPlayer({ ...s.pos })
   ctx.spawnWorld()
 }

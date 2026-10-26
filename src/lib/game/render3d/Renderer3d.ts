@@ -35,6 +35,11 @@ export interface SceneView3d {
   /** Фаза 4: тактическая пауза — отъём камеры + линии приказов. */
   tactical: boolean
   selEid: number | null
+  /** Фаза 5: диалог активен + eid сущности-спикера (кинокамера; null — наезд на героя). */
+  dialogue: boolean
+  dialogueFocus: number | null
+  /** Фаза 5: Тишь 0..100 — выцветание мира. */
+  silence: number
 }
 
 export interface EntityPick {
@@ -68,6 +73,8 @@ export class Renderer3d {
   private fog = new THREE.FogExp2(0xb4bc9e, 0.00092)
   private sunDay = new THREE.Color(0xffe0b0)
   private sunDusk = new THREE.Color(0xff9a50)
+  /** Фаза 5: текущая Тишь 0..1 (лерпится к цели — мир выцветает плавно). */
+  private silenceAmt = 0
 
   // Орбита камеры (Фаза 4): user-значения правит ввод, pitch/dist —
   // анимируемые текущие (лерп к целям, тактика отъезжает в изометрию)
@@ -203,13 +210,44 @@ export class Renderer3d {
       this.camInitialized = true
       this.camTarget.set(px, 0, pz)
     }
-    // Плавное слежение за героем
+
+    // Фаза 5: цели кадра — по умолчанию обычная орбита, в тактике изометрия,
+    // в диалоге — кинокадр (наезд + over-the-shoulder от спикера)
+    let goalYaw: number | null = null
+    let goalPitch = this.tactical ? Math.max(this.userPitch, 1.08) : this.userPitch
+    let goalDist = this.tactical ? Math.max(this.userDist, 235) : this.userDist
+    let tx = px
+    let tz = pz
+    if (view.dialogue) {
+      const f = view.dialogueFocus != null ? view.entities.find((x) => x.eid === view.dialogueFocus) : null
+      if (f) {
+        // Кинокадр: цель между героем и спикером (к спикеру), камера сбоку-сзади
+        // от героя — спикер крупно в кадре, герой на переднем плане (rack focus)
+        const dxf = p.x - f.pos.x
+        const dzf = p.y - f.pos.y
+        const dTotal = Math.max(30, Math.hypot(dxf, dzf))
+        goalYaw = Math.atan2(dzf, dxf) + 0.55
+        goalDist = Math.min(78, dTotal * 0.55 + 34)
+        goalPitch = 0.3
+        tx = Math.max(40, Math.min(WORLD.w - 40, f.pos.x + dxf * 0.62))
+        tz = Math.max(40, Math.min(WORLD.h - 40, f.pos.y + dzf * 0.62))
+      } else {
+        // Интерактив без сущности (алтарь/барьер/доска): интимный наезд на героя
+        goalDist = Math.min(goalDist, 58)
+        goalPitch = Math.min(goalPitch, 0.38)
+      }
+    }
+
+    // Плавное слежение за целью кадра
     const lerp = 1 - Math.pow(0.00002, 1 / 60)
-    this.camTarget.x += (px - this.camTarget.x) * lerp
-    this.camTarget.z += (pz - this.camTarget.z) * lerp
+    this.camTarget.x += (tx - this.camTarget.x) * lerp
+    this.camTarget.z += (tz - this.camTarget.z) * lerp
+    // yaw в диалоге — по кратчайшей дуге (камера обходит к нужному боку)
+    if (goalYaw !== null) {
+      const dy = ((goalYaw - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      this.yaw += dy * 0.06
+    }
     // Фаза 4: анимация наклона/дистанции к тактической изометрии или к пользовательской орбите
-    const goalPitch = this.tactical ? Math.max(this.userPitch, 1.08) : this.userPitch
-    const goalDist = this.tactical ? Math.max(this.userDist, 235) : this.userDist
     const k = 0.08
     this.pitch += (goalPitch - this.pitch) * k
     this.dist += (goalDist - this.dist) * k
@@ -251,12 +289,13 @@ export class Renderer3d {
   private tmpColor = new THREE.Color()
   private tmpColor2 = new THREE.Color()
 
-  /** Лерпит туман/небо/свет к целям зоны и времени суток. */
-  private updateAtmosphere(zone: ZoneId, dayT: number) {
+  /** Лерпит туман/небо/свет к целям зоны и времени суток; Тишь выцветает картинку. */
+  private updateAtmosphere(zone: ZoneId, dayT: number, silenceGoal: number) {
     this.daylight = daylightOf(dayT)
     const veld = zone === 'veld'
     const dl = this.daylight
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
+    this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
 
     // Туман
     if (veld) {
@@ -291,6 +330,27 @@ export class Renderer3d {
     this.hemi.intensity += ((0.16 + dl * 0.58) - this.hemi.intensity) * k
     this.hemi.color.lerp(this.tmpColor.setRGB(0.28 + dl * 0.57, 0.32 + dl * 0.54, 0.30 + dl * 0.47), k)
     this.amb.intensity += ((0.07 + dl * 0.16) - this.amb.intensity) * k
+
+    // Фаза 5: Тишь — выцветание (desaturation) и гаснущий свет
+    if (this.silenceAmt > 0.005) {
+      const ds = this.silenceAmt * 0.62
+      this.desat(this.fog.color, ds)
+      this.desat(top, ds)
+      this.desat(hor, ds)
+      this.desat(this.sun.color, ds)
+      this.desat(this.hemi.color, ds)
+      const dim = 1 - this.silenceAmt * 0.24
+      this.sun.intensity *= dim
+      this.hemi.intensity *= dim
+      this.amb.intensity *= dim
+    }
+  }
+
+  /** Тишина съедает насыщенность цвета (выцветание LUT). */
+  private desat(c: THREE.Color, amt: number) {
+    const hsl = { h: 0, s: 0, l: 0 }
+    c.getHSL(hsl)
+    c.setHSL(hsl.h, hsl.s * (1 - amt), hsl.l)
   }
 
   // ---------------- Пикинг и луч в землю ----------------
@@ -395,7 +455,7 @@ export class Renderer3d {
     if (this.disposed) return
     this.avatarsSyncedEntities = view.entities
 
-    this.updateAtmosphere(view.zone ?? zoneOf(view.player.pos.y), view.dayT ?? 0.4)
+    this.updateAtmosphere(view.zone ?? zoneOf(view.player.pos.y), view.dayT ?? 0.4, view.silence ?? 0)
 
     const avatars = this.avatars.sync(view.entities)
     for (const e of view.entities) {
@@ -406,7 +466,8 @@ export class Renderer3d {
     }
 
     this.terrain.update(view.time)
-    this.props.update(view.time, view.removedProps, 1 - this.daylight)
+    // Тишь гасит огни мира (костры/факелы) — «гаснут костры» по GDD 01
+    this.props.update(view.time, view.removedProps, Math.min(1, 1 - this.daylight + this.silenceAmt * 0.5))
     const target = view.targetEid ? view.entities.find((x) => x.eid === view.targetEid) ?? null : null
     this.fx.update(view.particles, view.floaters, view.telegraphs, target, view.time)
 

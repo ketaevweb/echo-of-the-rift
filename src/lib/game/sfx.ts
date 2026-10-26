@@ -16,6 +16,7 @@ type SfxName =
   | 'boss'
   | 'potion'
   | 'portal'
+  | 'warn'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -86,6 +87,11 @@ export function sfx(name: SfxName) {
   switch (name) {
     case 'click':
       tone(600, 0.05, 'square', 0.12)
+      break
+    case 'warn':
+      // Фаза 5: провал проверки / тревога — низкий диссонанс
+      tone(160, 0.28, 'sawtooth', 0.14, 90)
+      tone(151, 0.28, 'square', 0.07, 86)
       break
     case 'swing':
       noise(0.12, 0.16, 2400)

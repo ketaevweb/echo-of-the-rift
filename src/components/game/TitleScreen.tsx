@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { ChevronDown, ChevronUp, Play, RotateCcw, Swords } from 'lucide-react'
-import { boot, useGame } from '@/lib/game/store'
+import { boot, ORIGINS, useGame } from '@/lib/game/store'
 import { GameIcon } from './GameIcon'
 
 const INSPIRED = ['The Witcher 3', 'Dragon Age: Origins', 'Skyrim', "Baldur's Gate 3", 'Gothic 2', 'Mass Effect 2']
@@ -16,15 +16,18 @@ const FEATURES = [
   'Наставники и очки обучения — как в Готике',
   'Фракции: Орден Пламени или Ковен Тумана',
   'Контракт на монстра, бестиарий и боссфайт с диалогом',
+  'Происхождения, таймер-выборы и Тишь (выборы видны в мире)',
 ]
 
 export default function TitleScreen() {
   const hasSave = useGame((s) => s.hasSave)
   const [confirmNew, setConfirmNew] = useState(false)
   const [showControls, setShowControls] = useState(false)
+  const [origin, setOrigin] = useState(boot.origin)
 
   const start = (mode: 'new' | 'continue') => {
     boot.mode = mode
+    boot.origin = origin
     useGame.getState().setScreen('game')
   }
 
@@ -55,6 +58,38 @@ export default function TitleScreen() {
             Dragon Age, северный мир и крики силы, кубики d20 Baldur&apos;s Gate, наставники Готики
             и диалоги в духе Mass Effect.
           </p>
+
+          {/* Происхождение (Фаза 5): выбор героя для новой игры */}
+          {(!hasSave || confirmNew) && (
+            <div className="mt-6 max-w-xl">
+              <p className="game-title-font text-xs tracking-[0.35em] text-[#c9b06b]">ПРОИСХОЖДЕНИЕ СМОТРИТЕЛЯ</p>
+              <p className="mt-1 text-[11px] text-[#8a8068]">Открывает уникальные реплики в диалогах. Выбор — только для новой игры.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {ORIGINS.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setOrigin(o.id)}
+                    aria-pressed={origin === o.id}
+                    className={`rounded border p-3 text-left transition ${
+                      origin === o.id
+                        ? 'border-[#d9a441] bg-[#d9a441]/15 shadow-[0_0_18px_rgba(217,164,65,0.15)]'
+                        : 'border-[#5a4632] bg-[#181410]/85 hover:border-[#8a7a5a]'
+                    }`}
+                  >
+                    <span className={`flex items-center gap-1.5 text-sm font-semibold ${origin === o.id ? 'text-[#f5c96b]' : 'text-[#e8d5a8]'}`}>
+                      <GameIcon
+                        name={o.id === 'warden' ? 'Shield' : o.id === 'exile' ? 'Footprints' : 'Flame'}
+                        className={`h-3.5 w-3.5 ${origin === o.id ? 'text-[#d9a441]' : 'text-[#8a8068]'}`}
+                      />
+                      {o.name}
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-snug text-[#a89a7d]">{o.desc}</span>
+                    <span className="mt-1.5 block text-[10px] italic text-[#8a8068]">{o.tag}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Кнопки */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">

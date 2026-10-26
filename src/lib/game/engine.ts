@@ -14,6 +14,7 @@ import {
   Floater,
   FormationId,
   InventoryEntry,
+  OriginId,
   Particle,
   QuestState,
   SaveData,
@@ -76,6 +77,8 @@ export interface CreateEngineOpts {
   canvas3d?: HTMLCanvasElement | null
   /** Стартовый режим рендера (по умолчанию 3d). */
   mode?: RenderMode
+  /** Фаза 5: происхождение героя при новой игре (по умолчанию — Дозорный). */
+  origin?: OriginId
 }
 export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null, opts?: CreateEngineOpts) {
   engineInstance = new GameEngine(canvas, save, opts)
@@ -160,6 +163,11 @@ export class GameEngine implements EngineCtx {
   formation: FormationId = 'wedge'
   selEid: number | null = null
 
+  // --- Фаза 5: происхождение, Тишь, кинокамера диалогов ---
+  origin: OriginId = 'warden'
+  silence = 0
+  dialogueFocusEid: number | null = null
+
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
   private mini: HTMLCanvasElement | null = null
@@ -170,6 +178,7 @@ export class GameEngine implements EngineCtx {
     this.canvas = canvas
     this.canvas3d = opts?.canvas3d ?? null
     this.renderMode = opts?.mode ?? '3d'
+    this.origin = opts?.origin ?? 'warden'
     this.inputCanvas = this.renderMode === '3d' && this.canvas3d ? this.canvas3d : canvas
     if (this.renderMode === '3d' && this.canvas3d) {
       this.view3d = new Renderer3d(this.canvas3d)
@@ -517,6 +526,9 @@ export class GameEngine implements EngineCtx {
         dayT: this.dayClock,
         tactical: this.tacticalPaused,
         selEid: this.selEid,
+        dialogue: this.dialogueTree !== null,
+        dialogueFocus: this.dialogueFocusEid,
+        silence: this.silence,
       })
       return
     }
@@ -542,6 +554,7 @@ export class GameEngine implements EngineCtx {
       dayT: this.dayClock,
       tactical: this.tacticalPaused,
       selEid: this.selEid,
+      silence: this.silence,
     })
   }
 }

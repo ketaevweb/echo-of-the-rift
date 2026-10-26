@@ -27,6 +27,11 @@ const handlers = new WeakMap<EngineCtx, InputHandlers>()
 function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
   const store = useGame.getState()
   if (ctx.dialogueTree) {
+    // Фаза 5: пока кубик d20 летит — цифры не выбирают варианты
+    if (useGame.getState().diceRoll) {
+      ev.preventDefault()
+      return
+    }
     const n = parseInt(ev.key, 10)
     if (!isNaN(n) && n >= 1 && n <= 9) {
       chooseOption(ctx, n - 1)

@@ -12,7 +12,7 @@ import { QUESTS, QUEST_MAP } from '../data/quests'
 import { AREAS, INTERACTABLES, NPCS, ASH_MOTHER, VELD_CLUES } from '../data/world'
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO } from '../data/tables'
-import { Entity, Faction, InteractableDef, Vec } from '../types'
+import { Entity, Faction, InteractableDef, OriginId, Vec } from '../types'
 import { useGame } from '../store'
 import { sfx } from '../sfx'
 import { d } from '../core/util'
@@ -76,6 +76,8 @@ function evalToken(ctx: EngineCtx, s: string): boolean {
   if (m) return ctx.lp >= parseInt(m[1], 10)
   m = s.match(/^gold>=(\d+)$/)
   if (m) return ctx.gold >= parseInt(m[1], 10)
+  m = s.match(/^origin:(\w+)$/)
+  if (m) return ctx.origin === (m[1] as OriginId)
   return true
 }
 
@@ -97,6 +99,8 @@ export function setNode(ctx: EngineCtx, nodeId: string) {
   const choices = node.choices.filter((c) => evalCond(ctx, c.cond ?? ''))
   ctx.dlgChoices = choices
   const p = PORTRAITS[node.speaker] ?? { icon: 'User', color: '#b08356', title: node.role ?? '' }
+  // Фаза 5: кинокамера — ищем сущность по имени спикера рядом с героем
+  ctx.dialogueFocusEid = findSpeakerEntity(ctx, node.speaker)
   useGame.getState().patch({
     dialogue: {
       speaker: node.speaker,
@@ -108,14 +112,36 @@ export function setNode(ctx: EngineCtx, nodeId: string) {
         text: c.text,
         tag: c.tag,
         checkLabel: c.check ? c.check.label : undefined,
+        origin: !!c.origin,
       })),
+      timer: node.timer,
+      onTimeout: node.onTimeout,
     },
+    diceRoll: null, // новый узел — старый бросок не должен висеть
   })
+}
+
+/** Сущность спикера для кинокамеры: NPC/уникальный враг с тем же именем в 450 ед. от героя. */
+function findSpeakerEntity(ctx: EngineCtx, speaker: string): number | null {
+  let best: Entity | null = null
+  let bd = 450
+  for (const e of ctx.entities) {
+    if (e.kind !== 'npc' && e.kind !== 'enemy') continue
+    if (e.name !== speaker) continue
+    const d = Math.hypot(e.pos.x - ctx.player.pos.x, e.pos.y - ctx.player.pos.y)
+    if (d < bd) {
+      bd = d
+      best = e
+    }
+  }
+  return best ? best.eid : null
 }
 
 export function chooseOption(ctx: EngineCtx, i: number) {
   const c = ctx.dlgChoices[i]
   if (!c) return
+  // Фаза 5: пока кубик летит — повторный выбор игнорируем
+  if (useGame.getState().diceRoll) return
   sfx('click')
   if (c.check) {
     const bonus = 1 + Math.floor(ctx.attributes.charisma / 2) + ctx.skills.speech
@@ -126,13 +152,20 @@ export function chooseOption(ctx: EngineCtx, i: number) {
       `${c.check.label}: d20 ${roll} + ${bonus} = ${total} — ${success ? 'успех!' : 'провал'}`,
       success ? 'quest' : 'warn',
     )
-    if (success && c.action) runAction(ctx, c.action)
-    const next = success ? c.goto : (c.gotoFail ?? null)
-    if (next === null || next === undefined) {
-      closeDialogue(ctx)
-      return
-    }
-    setNode(ctx, next)
+    // Фаза 5: видимый бросок (BG3) — оверлей, потом продолжение ветки
+    useGame.getState().patch({ diceRoll: { label: c.check.label, roll, bonus, total, dc: c.check.dc, success } })
+    sfx(success ? 'quest' : 'warn')
+    window.setTimeout(() => {
+      if (ctx.destroyed) return
+      useGame.getState().patch({ diceRoll: null })
+      if (success && c.action) runAction(ctx, c.action)
+      const next = success ? c.goto : (c.gotoFail ?? null)
+      if (next === null || next === undefined) {
+        closeDialogue(ctx)
+        return
+      }
+      setNode(ctx, next)
+    }, 1700)
     return
   }
   if (c.action) runAction(ctx, c.action)
@@ -146,7 +179,8 @@ export function chooseOption(ctx: EngineCtx, i: number) {
 export function closeDialogue(ctx: EngineCtx) {
   ctx.dialogueTree = null
   ctx.dlgChoices = []
-  useGame.getState().patch({ dialogue: null })
+  ctx.dialogueFocusEid = null // кинокамера возвращается к герою
+  useGame.getState().patch({ dialogue: null, diceRoll: null })
 }
 
 export function runAction(ctx: EngineCtx, action: string) {
@@ -174,6 +208,10 @@ export function runAction(ctx: EngineCtx, action: string) {
       }
       case 'xp':
         gainXp(ctx, parseInt(arg1, 10))
+        break
+      case 'silence':
+        // Фаза 5: Тишь — дешёвые решения +=N, человечные -=N; мир выцветает
+        ctx.silence = Math.max(0, Math.min(100, ctx.silence + parseInt(arg1, 10)))
         break
       case 'lp':
         ctx.lp = Math.max(0, ctx.lp + parseInt(arg1, 10))
@@ -452,6 +490,16 @@ export function openEnding(ctx: EngineCtx) {
       'Кайя ушла дальше на север — искать истоки Разлома. Торвальд остался: сказал, что в деревне наконец появилось приличное пиво.',
     )
   }
+  // Фаза 5: высокая Тишь портит даже лучший финал
+  if (ctx.silence >= 60) {
+    epilogue.push(
+      'Но краски долины так и не вернулись: где-то в швах мира осталась Тишь — цена тех выборов, что были дешевле слов.',
+    )
+  } else if (ctx.silence <= 15) {
+    epilogue.push(
+      'Небо над долиной того же цвета, что и до Разлома: человечность — редкая валюта, ты потратил её бережно.',
+    )
+  }
   epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
   const mins = Math.floor(ctx.playtime / 60)
   const stats: Array<[string, string]> = [
@@ -461,6 +509,7 @@ export function openEnding(ctx: EngineCtx) {
     ['Время в игре', `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`],
     ['Фракция', ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель'],
     ['Спутники', `${(ctx.companionIds.kaya ? 1 : 0) + (ctx.companionIds.torvald ? 1 : 0)} из 2`],
+    ['Тишь', `${ctx.silence}/100`],
   ]
   useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
 }

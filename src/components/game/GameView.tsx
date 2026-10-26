@@ -22,7 +22,7 @@ export default function GameView() {
     const save = boot.mode === 'continue' ? readSave() : null
     const mode = readRenderMode()
     useGame.getState().patch({ renderMode: mode })
-    const engine = createEngine(canvas, save, { canvas3d: canvas3dRef.current, mode })
+    const engine = createEngine(canvas, save, { canvas3d: canvas3dRef.current, mode, origin: boot.origin })
     const onResize = () => engine.resize()
     window.addEventListener('resize', onResize)
     // миникарта рендерится в HUD (дочерний эффект уже отработал)

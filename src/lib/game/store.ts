@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Faction, FormationId, InventoryEntry, SaveData, SignId, Stance } from './types'
+import { Faction, FormationId, InventoryEntry, OriginId, SaveData, SignId, Stance } from './types'
 
 export type Screen = 'title' | 'game'
 export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'ending'
@@ -64,6 +64,8 @@ export interface DialogueChoiceHud {
   text: string
   tag?: string
   checkLabel?: string
+  /** Фаза 5: реплика происхождения — особый бейдж. */
+  origin?: boolean
 }
 
 export interface DialogueHudState {
@@ -73,6 +75,19 @@ export interface DialogueHudState {
   portraitColor: string
   text: string
   choices: DialogueChoiceHud[]
+  /** Фаза 5: таймер-выбор (ME2) — секунды; onTimeout — индекс варианта молчания. */
+  timer?: number
+  onTimeout?: number
+}
+
+/** Фаза 5: видимый бросок d20 (BG3) — оверлей поверх диалога. */
+export interface DiceRollHudState {
+  label: string
+  roll: number
+  bonus: number
+  total: number
+  dc: number
+  success: boolean
 }
 
 export interface ToastMsg {
@@ -120,8 +135,30 @@ export interface ZoneFadeState {
   phase: 'out' | 'in'
 }
 
-// Режим запуска игры (новая / продолжить)
-export const boot: { mode: 'new' | 'continue' } = { mode: 'new' }
+// Режим запуска игры (новая / продолжить) + выбранное происхождение (Фаза 5)
+export const boot: { mode: 'new' | 'continue'; origin: OriginId } = { mode: 'new', origin: 'warden' }
+
+/** Происхождения героя (Фаза 5): карточки выбора на титуле. */
+export const ORIGINS: Array<{ id: OriginId; name: string; desc: string; tag: string }> = [
+  {
+    id: 'warden',
+    name: 'Дозорный',
+    desc: 'Годы службы на дозорных постах Хребта. Герои старых песен — твои сослуживцы. Горды, но помнят старину.',
+    tag: 'Сталь и привычка к пустотам',
+  },
+  {
+    id: 'exile',
+    name: 'Изгнанник Колонии',
+    desc: 'Ты выжил в Гранитной Колонии без магии и жалованья. Знаешь цену сделки и фальшивой брони, узнаёшь своих по голосу.',
+    tag: 'Дороги и распознанный враг',
+  },
+  {
+    id: 'ember',
+    name: 'Пепельный послушник',
+    desc: 'Ты подметал пепел Ордена Пламени и слушал его молитвы. Верёвки огня лягут на твою руку, как старые знакомые.',
+    tag: 'Связь с Орденом Пламени',
+  },
+]
 
 // Режим рендера: '3d' (Three.js, по умолчанию) или '2d' (легаси-канвас)
 export type RenderModePref = '3d' | '2d'
@@ -173,6 +210,8 @@ interface GameStore {
   zoneFade: ZoneFadeState | null
   // Фаза 4
   formation: FormationId
+  // Фаза 5
+  diceRoll: DiceRollHudState | null
   setScreen: (s: Screen) => void
   setPanel: (p: PanelId) => void
   patch: (partial: Partial<GameStore>) => void
@@ -210,6 +249,7 @@ export const useGame = create<GameStore>((set) => ({
   zoneLabel: 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
   zoneFade: null,
   formation: 'wedge',
+  diceRoll: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
   patch: (partial) => set(partial),

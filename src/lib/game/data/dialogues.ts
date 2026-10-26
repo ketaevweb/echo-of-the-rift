@@ -91,7 +91,7 @@ export const DIALOGUES: Record<string, DialogueTree> = {
         choices: [
           {
             text: '(Отдать Пепельное сердце — 220 золота и опыт)',
-            action: 'take:ash_heart:1;gold:220;xp:260;give:oil_specter:1;quest:veld:4',
+            action: 'take:ash_heart:1;gold:220;xp:260;give:oil_specter:1;quest:veld:4;silence:-2',
             goto: 'turnin_done',
           },
           { text: 'Позже.', goto: null },
@@ -131,8 +131,24 @@ export const DIALOGUES: Record<string, DialogueTree> = {
         text: 'Ты из Смотрителей? Хорошо. Небо над Хеймхоллом треснуло три ночи назад. Из дыры лезут волки размером с медведя и твари, которых я не назову. Долине нужен тот, кто умеет убивать такое.',
         choices: [
           { text: 'Что за дыра в небе?', goto: 'lore' },
+          {
+            text: '(Дозорный) Смотритель Дозора, четвёртая смена у Хребта. Я видел, как рассвет над Хеймхоллом трескался один раз уже.',
+            origin: 'warden',
+            cond: 'origin:warden',
+            tag: 'Происхождение',
+            action: 'xp:30;flag:origin_told;silence:-2',
+            goto: 'origin_warden',
+          },
           { text: 'Я возьмусь. Что нужно делать?', action: 'quest:main:2;xp:25', goto: 'accept' },
           { text: 'До встречи.', goto: null },
+        ],
+      },
+      origin_warden: {
+        speaker: 'Бьорн',
+        text: 'Четвёртая смена... Значит, ты знал старого Хаммела. Он носил тот же знак Дозора, что и мой дед. Дозор не забыл дорогу к Хеймхоллу — да поможет тебе и его память, Смотритель.',
+        choices: [
+          { text: 'Его память — со мной.', goto: 'lore' },
+          { text: 'Я возьмусь. Что нужно делать?', action: 'quest:main:2;xp:25', goto: 'accept' },
         ],
       },
       lore: {
@@ -140,7 +156,7 @@ export const DIALOGUES: Record<string, DialogueTree> = {
         text: 'Старики зовут это Разломом. Говорят, за ним — миры, где магия жжёт небо, а разум пожирает плоть. Мы запирали его Камнями Древних веками. Теперь печать слаба. Что-то тянет оттуда силу... и голод.',
         choices: [
           { text: 'Я возьмусь. Что нужно делать?', action: 'quest:main:2;xp:25', goto: 'accept' },
-          { text: 'Хм. Надо подумать.', goto: null },
+          { text: 'Хм. Надо подумать.', action: 'silence:+2', goto: null },
         ],
       },
       accept: {
@@ -206,11 +222,28 @@ export const DIALOGUES: Record<string, DialogueTree> = {
         speaker: 'Грим',
         text: 'Ага, свежее лицо! Хочешь глянуть товар? А ещё у меня висит контракт — зверь режет овец у леса. Плата честная.',
         choices: [
+          {
+            text: '(Изгнанник Колонии) Грим? Грим Зольный, ладонь-весы из Нижнего яруса? Меня выставили из Колонии раньше, чем тебя повысили.',
+            origin: 'exile',
+            cond: 'origin:exile',
+            tag: 'Происхождение',
+            action: 'xp:30;flag:origin_told;silence:-2',
+            goto: 'origin_exile',
+          },
           { text: 'Покажи, что есть.', tag: 'Торговля', action: 'open:shop', goto: null },
           { text: 'Расскажи про контракт.', cond: '!flag.contractGiven', goto: 'contract' },
           { text: 'Расскажи про контракт.', cond: 'flag.contractGiven,!flag.contractDone', goto: 'contract_wait' },
           { text: 'Есть новости?', goto: 'rumors' },
           { text: 'До встречи.', goto: null },
+        ],
+      },
+      origin_exile: {
+        speaker: 'Грим',
+        text: 'Зольный... Да ты что — изгонённый из Колонии, как и я! Никто не помнит, что мы платили за выход: всё, что имело вес. Такому, как мы, Хеймхолл — второй шанс. Держи скидку по-землячески, и заходи.',
+        choices: [
+          { text: 'Покажи, что есть.', tag: 'Торговля', action: 'open:shop', goto: null },
+          { text: 'Расскажи про контракт.', cond: '!flag.contractGiven', goto: 'contract' },
+          { text: 'Есть новости?', goto: 'rumors' },
         ],
       },
       turnin: {
@@ -291,10 +324,28 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       intro: {
         speaker: 'Ирма',
         text: 'Стой. Орден Пламени охраняет этот тракт, пока Разлом жрёт долину. Мы платим сталью и укрытием. Но лезть в наше братство без дела не советую.',
+        timer: 8,
+        onTimeout: 2,
         choices: [
+          {
+            text: '(Пепельный послушник) Я подметал пепел в домне Ордена. Вера́вки огня ещё тёплые.',
+            origin: 'ember',
+            cond: 'origin:ember',
+            tag: 'Происхождение',
+            action: 'xp:30;flag:origin_told;silence:-2',
+            goto: 'origin_ember',
+          },
           { text: 'Что за Орден?', goto: 'info' },
           { text: 'Я хочу служить.', action: 'quest:flame:1;flag:flameGiven', goto: 'task' },
           { text: 'Обойдусь.', goto: null },
+        ],
+      },
+      origin_ember: {
+        speaker: 'Ирма',
+        text: 'Домна... третьей печи? Я сама варила сталь для мостовых кованых щитов. Послушники гасят свой огонь в голодных годах — но твой ещё дышит, вижу. Орден помнит своих, даже выброшенных. Служи — и вернёшься в братство.',
+        choices: [
+          { text: 'Я хочу служить.', action: 'quest:flame:1;flag:flameGiven', goto: 'task' },
+          { text: 'Что за Орден?', goto: 'info' },
         ],
       },
       info: {
@@ -356,6 +407,8 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       intro: {
         speaker: 'Селена',
         text: 'Ты слышишь это гудение, странник? Разлом — рана в ткани мира, и сталь её не зашьёт. Ковен Тумана переписывает печать. Нам не хватает рук... и лунной травы.',
+        timer: 8,
+        onTimeout: 2,
         choices: [
           { text: 'Что за Ковен?', goto: 'info' },
           { text: 'Чем я могу помочь?', action: 'quest:mist:1;flag:mistGiven', goto: 'task' },
@@ -414,17 +467,19 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       intro: {
         speaker: 'Кайя',
         text: 'Смотри-ка, Смотритель. Я Кайя, магистр-странница, а это Торвальд — он молчит, зато его щит говорит за него. Мы держим печать Камней, пока Разлом расширяется. Один ты с ним не справишься.',
+        timer: 10,
+        onTimeout: 2,
         choices: [
           { text: 'Что вы знаете о Разломе?', goto: 'lore' },
-          { text: 'Тогда пойдём вместе.', action: 'join:kaya;join:torvald;quest:main:4;xp:60', goto: 'joined' },
-          { text: 'Справлюсь и один.', goto: 'lone' },
+          { text: 'Тогда пойдём вместе.', action: 'join:kaya;join:torvald;quest:main:4;xp:60;silence:-3', goto: 'joined' },
+          { text: 'Справлюсь и один.', action: 'silence:+4', goto: 'lone' },
         ],
       },
       lore: {
         speaker: 'Кайя',
         text: 'Разлом тянет силу из-за грани. Там — миры, где мысль материальна, а голодные тени носят чужие лица. Пожиратель Бурь — лишь пасть чего-то большего. Убей его, и рана затянется... на время.',
         choices: [
-          { text: 'Тогда пойдём вместе.', action: 'join:kaya;join:torvald;quest:main:4;xp:60', goto: 'joined' },
+          { text: 'Тогда пойдём вместе.', action: 'join:kaya;join:torvald;quest:main:4;xp:60;silence:-3', goto: 'joined' },
           { text: 'Позже.', goto: null },
         ],
       },
@@ -525,15 +580,17 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       intro: {
         speaker: 'Пожиратель Бурь',
         text: 'Ты пахнешь судьбой, крошка-убийца. Я ел королей. Я ел богов с их молитвами. Твоя долина — между зубами. Скажи мне... какой вкус у отчаяния?',
+        timer: 8,
+        onTimeout: 0,
         choices: [
-          { text: '(Обнажить клинок) Утренний.', action: 'boss:fight', goto: null },
+          { text: '(Обнажить клинок) Утренний.', action: 'boss:fight;silence:+6', goto: null },
           {
             text: '«Разлом сожрёт тебя первым — и я от него не отдам».',
             tag: 'Убеждение',
             check: { dc: 15, label: 'Убеждение (СЛ 15)' },
             goto: 'weaken',
             gotoFail: 'taunt_fail',
-            action: 'boss:fight;boss:weaken',
+            action: 'boss:fight;boss:weaken;silence:-4',
           },
           { text: '(Отступить)', goto: null },
         ],

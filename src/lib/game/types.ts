@@ -17,6 +17,9 @@ export type FormationId = 'wedge' | 'line'
 
 export type SignId = 'igni' | 'aard' | 'quen' | 'axii' | 'shout'
 
+/** Происхождение героя (GDD 02 §5): выбор на титуле, открывает уникальные реплики. */
+export type OriginId = 'exile' | 'ember' | 'warden'
+
 export interface Attributes {
   might: number // Мощь — атака и урон в ближнем бою
   vigor: number // Стойкость — HP и КД (AC)
@@ -112,6 +115,8 @@ export interface DialogueChoice {
   gotoFail?: string | null
   action?: string
   cond?: string
+  /** Фаза 5: реплика происхождения — особый бейдж в UI (доступность — через cond). */
+  origin?: OriginId
 }
 
 export interface DialogueNode {
@@ -119,6 +124,10 @@ export interface DialogueNode {
   role?: string
   text: string
   choices: DialogueChoice[]
+  /** Фаза 5: таймер-выбор (ME2): секунды до авто-выбора; 0/undefined — без таймера. */
+  timer?: number
+  /** Индекс варианта «молчания» — выбирается по истечении таймера. */
+  onTimeout?: number
 }
 
 export interface DialogueTree {
@@ -382,4 +391,7 @@ export interface SaveData {
   // --- Фаза 4: одобрение компаньонов и строй (в старых сейвах нет — дефолты) ---
   approval: { kaya: number; torvald: number }
   formation: FormationId
+  // --- Фаза 5: происхождение и счётчик Тишины (в старых сейвах нет — дефолты) ---
+  origin: OriginId
+  silence: number
 }

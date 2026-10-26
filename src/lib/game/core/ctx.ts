@@ -6,7 +6,7 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
+import { Attributes, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, OriginId, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
 import { Collider } from './util'
 import type { PanelId } from '../store'
 
@@ -34,6 +34,11 @@ export interface View3dSnapshot {
   dayT: number
   /** Фаза 4: тактическая пауза — id выбранного приказом компаньона. */
   selEid: number | null
+  /** Фаза 5: диалог активен + eid сущности-спикера (кинокамера; null — наезд на героя). */
+  dialogue: boolean
+  dialogueFocus: number | null
+  /** Фаза 5: Тишь 0..100 — выцветание мира (LUT-вайб). */
+  silence: number
 }
 
 /** Минимальный интерфейс 3D-вью, которым пользуется движок/ввод. */
@@ -142,6 +147,14 @@ export interface EngineCtx {
   cycleFormation(): void
   /** Вкл/выкл тактическую камеру (изометрический отъём). */
   setTactical(on: boolean): void
+
+  // --- Фаза 5: происхождение, Тишь, кинокамера диалогов ---
+  /** Происхождение героя — источник уникальных реплик (cond: origin:X). */
+  origin: OriginId
+  /** Скрытый счётчик Тишины 0..100: растёт от «дешёвых» решений, выцветает мир. */
+  silence: number
+  /** Сущность-собеседник для кинокамеры (null — наезд на героя). */
+  dialogueFocusEid: number | null
 
   // --- Хуки, реализуемые движком (делегируют в системы/инициализацию) ---
   toast(text: string, kind?: ToastKind): void

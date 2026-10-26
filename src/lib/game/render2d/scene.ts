@@ -36,6 +36,8 @@ export interface SceneView {
   // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
   tactical?: boolean
   selEid?: number | null
+  // Фаза 5: Тишь 0..100 — выцветание мира
+  silence?: number
 }
 
 export function drawScene(v: SceneView) {
@@ -170,6 +172,16 @@ export function drawScene(v: SceneView) {
   }
   if (v.zone === 'veld') {
     ctx.fillStyle = 'rgba(58,68,44,0.16)'
+    ctx.fillRect(0, 0, w, h)
+  }
+  // Фаза 5: Тишь — выцветание мира (composite 'saturation' + гаснущий серый)
+  const s = Math.min(1, (v.silence ?? 0) / 100)
+  if (s > 0.02) {
+    ctx.globalCompositeOperation = 'saturation'
+    ctx.fillStyle = `rgba(128,128,128,${(s * 0.75).toFixed(3)})`
+    ctx.fillRect(0, 0, w, h)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = `rgba(10,10,10,${(s * 0.18).toFixed(3)})`
     ctx.fillRect(0, 0, w, h)
   }
   if (!v.playerAlive) {
