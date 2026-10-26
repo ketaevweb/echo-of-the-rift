@@ -4,6 +4,7 @@ import {
   Faction,
   Floater,
   InteractableDef,
+  InventoryEntry,
   Particle,
   QuestState,
   SaveData,
@@ -45,82 +46,12 @@ import {
   useGame,
   writeSave,
 } from './store'
+import { ABILITY_BAR_IDS, ATTR_NAMES, BESTIARY_INFO, ENEMY_NAME } from './data/tables'
+import { angleDiff, Collider, d, rndRange } from './core/util'
+import { EngineCtx, ToastKind } from './core/ctx'
+import { applySave, saveGame as saveGameSys, toTitle as toTitleSys } from './systems/save'
 
-interface Collider {
-  x: number
-  y: number
-  r: number
-  propId?: string
-}
-
-const ABILITY_BAR_IDS = ['igni', 'aard', 'quen', 'axii', 'shout', 'potion_heal', 'potion_stam']
-
-export const BESTIARY_INFO: Record<string, { name: string; text: string; weakness: string }> = {
-  wolf: {
-    name: 'Лесной волк',
-    text: 'Озверевшая стая Сумрачного леса. Кусает быстро, но шкура тонкая.',
-    weakness: 'Уязвим к огню (Игни).',
-  },
-  alpha: {
-    name: 'Лютая волчица',
-    text: 'Старая, умная и злая. Шрамы говорят: охотилась на людей не раз.',
-    weakness: 'Уязвима к огню. Двойной урон от Игни.',
-  },
-  bandit: {
-    name: 'Разбойник',
-    text: 'Дезертиры с трактов. Дерутся грязно, зато предсказуемо.',
-    weakness: 'Особых нет. Аард ломает строй.',
-  },
-  archer: {
-    name: 'Разбойник-лучник',
-    text: 'Стреляет издалека и норовит держать дистанцию.',
-    weakness: 'Сближение. Аксий даёт фору.',
-  },
-  captain: {
-    name: 'Главарь разбойников',
-    text: 'Два шрама поперёк лица — и два подхода к фехтованию.',
-    weakness: 'Квен против натиска. Боевой клич Торвальда помогает.',
-  },
-  horror: {
-    name: 'Порождение Разлома',
-    text: 'Сгусток чужой голодной мысли. Полупрозрачный, шипит на свет.',
-    weakness: 'Аксий держит его вдвое дольше.',
-  },
-  boss: {
-    name: 'Пожиратель Бурь',
-    text: 'Пасть Разлома. Ел королей и богов с их молитвами. Славит отчаяние.',
-    weakness: 'Сильные удержания. Убеждение (СЛ 15) ослабляет его ещё до боя.',
-  },
-}
-
-const ENEMY_NAME: Record<string, string> = {
-  wolf: 'Лесной волк',
-  alpha: 'Лютая волчица',
-  bandit: 'Разбойник',
-  archer: 'Лучник',
-  captain: 'Главарь разбойников',
-  horror: 'Порождение Разлома',
-  boss: 'Пожиратель Бурь',
-}
-
-const ATTR_NAMES: Record<string, string> = {
-  might: 'Мощь',
-  vigor: 'Стойкость',
-  intellect: 'Разум',
-  charisma: 'Обаяние',
-}
-
-function rndRange(a: number, b: number) {
-  return a + Math.random() * (b - a)
-}
-function d(sides: number) {
-  return 1 + Math.floor(Math.random() * sides)
-}
-function angleDiff(a: number, b: number) {
-  let x = Math.abs(a - b) % (Math.PI * 2)
-  if (x > Math.PI) x = Math.PI * 2 - x
-  return x
-}
+export { BESTIARY_INFO } from './data/tables'
 
 let engineInstance: GameEngine | null = null
 export function getEngine() {
@@ -134,7 +65,7 @@ export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null) {
   return engineInstance
 }
 
-export class GameEngine {
+export class GameEngine implements EngineCtx {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private mini: HTMLCanvasElement | null = null
@@ -148,37 +79,37 @@ export class GameEngine {
   private floaters: Floater[] = []
   private kb = new Map<number, Vec>()
 
-  private player!: Entity
-  private companionIds = { kaya: false, torvald: false }
+  player!: Entity
+  companionIds = { kaya: false, torvald: false }
 
-  private level = 1
-  private xp = 0
-  private lp = 0
-  private gold = 60
-  private hp = 100
-  private maxHp = 100
-  private stamina = 80
-  private maxStamina = 80
-  private attributes = { might: 3, vigor: 3, intellect: 3, charisma: 3 }
-  private skills = { blade: 0, vitality: 0, signs: 0, speech: 0 }
-  private signs: Record<SignId, { unlocked: boolean; level: number }> = {
+  level = 1
+  xp = 0
+  lp = 0
+  gold = 60
+  hp = 100
+  maxHp = 100
+  stamina = 80
+  maxStamina = 80
+  attributes = { might: 3, vigor: 3, intellect: 3, charisma: 3 }
+  skills = { blade: 0, vitality: 0, signs: 0, speech: 0 }
+  signs: Record<SignId, { unlocked: boolean; level: number }> = {
     igni: { unlocked: true, level: 1 },
     aard: { unlocked: false, level: 0 },
     quen: { unlocked: false, level: 0 },
     axii: { unlocked: false, level: 0 },
     shout: { unlocked: false, level: 1 },
   }
-  private weapon: string | null = 'sword_rusty'
-  private armor: string | null = null
-  private inventory: Array<{ item: string; qty: number }> = []
-  private faction: Faction = 'none'
+  weapon: string | null = 'sword_rusty'
+  armor: string | null = null
+  inventory: InventoryEntry[] = []
+  faction: Faction = 'none'
 
-  private quests: Record<string, QuestState> = {}
-  private flags: Record<string, boolean> = {}
-  private bestiary = new Set<string>()
+  quests: Record<string, QuestState> = {}
+  flags: Record<string, boolean> = {}
+  bestiary = new Set<string>()
   private removedProps = new Set<string>()
-  private kills = 0
-  private playtime = 0
+  kills = 0
+  playtime = 0
 
   private keys = new Set<string>()
   private camera: Vec = { ...PLAYER_SPAWN }
@@ -342,7 +273,7 @@ export class GameEngine {
     }
   }
 
-  private createPlayer(pos: Vec) {
+  createPlayer(pos: Vec) {
     this.player = this.makeEntity({
       id: 'player',
       kind: 'player',
@@ -367,7 +298,7 @@ export class GameEngine {
     this.entities.push(this.player)
   }
 
-  private spawnWorld() {
+  spawnWorld() {
     for (const n of NPCS) {
       if (n.id === 'kaya' && this.companionIds.kaya) continue
       if (n.id === 'torvald_npc' && this.companionIds.torvald) continue
@@ -2133,71 +2064,20 @@ export class GameEngine {
   }
 
   saveGame(manual = true) {
-    const data: SaveData = {
-      version: 1,
-      savedAt: Date.now(),
-      playtime: this.playtime,
-      kills: this.kills,
-      level: this.level,
-      xp: this.xp,
-      lp: this.lp,
-      gold: this.gold,
-      hp: this.hp,
-      maxHp: this.maxHp,
-      stamina: this.stamina,
-      maxStamina: this.maxStamina,
-      attributes: { ...this.attributes },
-      skills: { ...this.skills },
-      signs: JSON.parse(JSON.stringify(this.signs)) as Record<SignId, { unlocked: boolean; level: number }>,
-      weapon: this.weapon,
-      armor: this.armor,
-      inventory: this.inventory.map((i) => ({ ...i })),
-      faction: this.faction,
-      quests: JSON.parse(JSON.stringify(this.quests)) as Record<string, QuestState>,
-      flags: { ...this.flags },
-      companions: { ...this.companionIds },
-      bestiary: [...this.bestiary],
-      pos: { ...this.player.pos },
-    }
-    writeSave(data)
-    useGame.getState().setHasSave(true)
-    if (manual) this.toast('Игра сохранена.', 'info')
+    saveGameSys(this, manual)
   }
 
   private loadFrom(s: SaveData) {
-    this.playtime = s.playtime
-    this.kills = s.kills
-    this.level = s.level
-    this.xp = s.xp
-    this.lp = s.lp
-    this.gold = s.gold
-    this.hp = s.hp
-    this.maxHp = s.maxHp
-    this.stamina = s.stamina
-    this.maxStamina = s.maxStamina
-    this.attributes = { ...s.attributes }
-    this.skills = { ...s.skills }
-    this.signs = JSON.parse(JSON.stringify(s.signs)) as Record<SignId, { unlocked: boolean; level: number }>
-    this.weapon = s.weapon
-    this.armor = s.armor
-    this.inventory = s.inventory.map((i) => ({ ...i }))
-    this.faction = s.faction
-    this.quests = JSON.parse(JSON.stringify(s.quests)) as Record<string, QuestState>
-    this.flags = { ...s.flags }
-    this.companionIds = { ...s.companions }
-    this.bestiary = new Set(s.bestiary)
-    this.createPlayer({ ...s.pos })
-    this.spawnWorld()
+    applySave(this, s)
   }
 
   toTitle() {
-    this.saveGame(false)
-    useGame.getState().setScreen('title')
+    toTitleSys(this)
   }
 
   // ---------------- Синхронизация UI ----------------
 
-  private toast(text: string, kind: 'info' | 'quest' | 'level' | 'warn' | 'loot' = 'info') {
+  toast(text: string, kind: ToastKind = 'info') {
     useGame.getState().pushToast(text, kind)
   }
 
