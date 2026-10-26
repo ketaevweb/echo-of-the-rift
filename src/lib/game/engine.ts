@@ -73,6 +73,15 @@ import {
   updateParticles as updateParticlesSys,
   updateStatuses as updateStatusesSys,
 } from './systems/combat'
+import {
+  bindInput as bindInputSys,
+  unbindInput as unbindInputSys,
+} from './systems/input'
+import {
+  moveWithCollisions as moveWithCollisionsSys,
+  separate as separateSys,
+  updatePlayer as updatePlayerSys,
+} from './systems/movement'
 import { nearestEnemyOf as nearestEnemyOfSys } from './core/entity'
 import {
   advanceQuest as advanceQuestSys,
@@ -223,116 +232,14 @@ export class GameEngine implements EngineCtx {
     spawnCompanionSys(this, id)
   }
 
-  // ---------------- Ввод ----------------
-
-  private onKeyDown = (ev: KeyboardEvent) => {
-    const store = useGame.getState()
-    if (this.dialogueTree) {
-      const n = parseInt(ev.key, 10)
-      if (!isNaN(n) && n >= 1 && n <= 9) {
-        this.chooseOption(n - 1)
-        ev.preventDefault()
-      } else if (ev.key === 'Escape') {
-        this.closeDialogue()
-      }
-      return
-    }
-    if (ev.key === 'Escape') {
-      if (store.panel && store.panel !== 'ending') this.closePanel()
-      else if (!store.panel) this.openPanel('pause')
-      return
-    }
-    if (store.panel) {
-      const map: Record<string, PanelId> = { c: 'char', i: 'inv', j: 'journal', m: 'map' }
-      const k = ev.key.toLowerCase()
-      if (map[k] && store.panel === map[k]) {
-        this.closePanel()
-        ev.preventDefault()
-      }
-      return
-    }
-    const k = ev.key.toLowerCase()
-    this.keys.add(k)
-    if (k === ' ') {
-      this.tacticalPaused = !this.tacticalPaused
-      useGame.getState().patch({ paused: this.tacticalPaused })
-      sfx('click')
-      ev.preventDefault()
-      return
-    }
-    if (k === 'f' || k === 'а') this.doInteract()
-    if (k === 'c' || k === 'с') this.openPanel('char')
-    if (k === 'i' || k === 'ш') this.openPanel('inv')
-    if (k === 'j' || k === 'о') this.openPanel('journal')
-    if (k === 'm' || k === 'ь') this.openPanel('map')
-    if (k >= '1' && k <= '7') {
-      const id = ABILITY_BAR_IDS[parseInt(k, 10) - 1]
-      if (id) this.castAbility(id)
-    }
-    if (k === 'q' || k === 'й') this.castAbility('potion_heal')
-    if (k === 'e' || k === 'у') this.castAbility('potion_stam')
-  }
-
-  private onKeyUp = (ev: KeyboardEvent) => {
-    this.keys.delete(ev.key.toLowerCase())
-  }
-
-  private canvasPoint(ev: PointerEvent): Vec {
-    const rect = this.canvas.getBoundingClientRect()
-    return {
-      x: this.camera.x + (ev.clientX - rect.left - rect.width / 2),
-      y: this.camera.y + (ev.clientY - rect.top - rect.height / 2),
-    }
-  }
-
-  private onPointerDown = (ev: PointerEvent) => {
-    if (useGame.getState().panel || this.dialogueTree) return
-    if (ev.button !== 0) return
-    const p = this.canvasPoint(ev)
-    const enemy = this.pickEntity(p, (e) => e.kind === 'enemy' && e.alive, 10)
-    if (enemy) {
-      this.targetEid = enemy.eid
-      sfx('click')
-      return
-    }
-    const npc = this.pickEntity(p, (e) => e.kind === 'npc' && e.alive, 22)
-    if (npc && npc.npc) {
-      this.openDialogue(npc.npc.dialogue)
-      return
-    }
-    const it = pickInteractableSys(this, p, 28)
-    if (it) {
-      runInteractableSys(this, it)
-      return
-    }
-    this.targetEid = null
-    this.player.dest = p
-  }
-
-  private pickEntity(p: Vec, filter: (e: Entity) => boolean, extra = 0): Entity | null {
-    let best: Entity | null = null
-    let bd = 1e9
-    for (const e of this.entities) {
-      if (!filter(e)) continue
-      const dist = Math.hypot(e.pos.x - p.x, e.pos.y - p.y)
-      if (dist < e.radius + extra && dist < bd) {
-        bd = dist
-        best = e
-      }
-    }
-    return best
-  }
+  // ---------------- Ввод (делегаты systems/input) ----------------
 
   private bindInput() {
-    window.addEventListener('keydown', this.onKeyDown)
-    window.addEventListener('keyup', this.onKeyUp)
-    this.canvas.addEventListener('pointerdown', this.onPointerDown)
+    bindInputSys(this)
   }
 
   private unbindInput() {
-    window.removeEventListener('keydown', this.onKeyDown)
-    window.removeEventListener('keyup', this.onKeyUp)
-    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+    unbindInputSys(this)
   }
 
   resize() {
@@ -391,7 +298,7 @@ export class GameEngine implements EngineCtx {
   // ---------------- Обновление ----------------
 
   private update(dt: number) {
-    this.updatePlayer(dt)
+    updatePlayerSys(this, dt)
     for (const e of this.entities) {
       if (e.kind === 'companion') updateCompanionSys(this, e, dt)
       else if (e.kind === 'enemy') updateEnemySys(this, e, dt)
@@ -399,7 +306,7 @@ export class GameEngine implements EngineCtx {
       updateStatusesSys(this, e, dt)
       tickCds(e, dt)
     }
-    this.separate()
+    separateSys(this)
     updateParticlesSys(this, dt)
     this.buffT = Math.max(0, this.buffT - dt)
     this.shake = Math.max(0, this.shake - dt * 26)
@@ -416,99 +323,7 @@ export class GameEngine implements EngineCtx {
   }
 
   moveWithCollisions(e: Entity, vx: number, vy: number, dt: number) {
-    const kbi = this.kb.get(e.eid)
-    let nx = e.pos.x + (vx + (kbi?.x ?? 0)) * dt
-    let ny = e.pos.y + (vy + (kbi?.y ?? 0)) * dt
-    if (kbi) {
-      const decay = Math.pow(0.002, dt)
-      kbi.x *= decay
-      kbi.y *= decay
-      if (Math.hypot(kbi.x, kbi.y) < 8) this.kb.delete(e.eid)
-    }
-    nx = Math.max(30, Math.min(WORLD.w - 30, nx))
-    ny = Math.max(30, Math.min(WORLD.h - 30, ny))
-    for (const c of this.colliders) {
-      if (c.propId && this.removedProps.has(c.propId)) continue
-      const dx = nx - c.x
-      const dy = ny - c.y
-      const dist = Math.hypot(dx, dy)
-      const min = c.r + e.radius * 0.7
-      if (dist < min && dist > 0.001) {
-        nx = c.x + (dx / dist) * min
-        ny = c.y + (dy / dist) * min
-      }
-    }
-    e.pos.x = nx
-    e.pos.y = ny
-  }
-
-  private separate() {
-    const alive = this.entities.filter((e) => e.alive && e.kind !== 'npc')
-    for (let i = 0; i < alive.length; i++) {
-      for (let j = i + 1; j < alive.length; j++) {
-        const a = alive[i]
-        const b = alive[j]
-        const dx = b.pos.x - a.pos.x
-        const dy = b.pos.y - a.pos.y
-        const dist = Math.hypot(dx, dy)
-        const min = a.radius + b.radius
-        if (dist < min && dist > 0.01) {
-          const push = ((min - dist) / 2) * 0.6
-          const ux = dx / dist
-          const uy = dy / dist
-          if (a.kind !== 'player') {
-            a.pos.x -= ux * push
-            a.pos.y -= uy * push
-          }
-          if (b.kind !== 'player') {
-            b.pos.x += ux * push
-            b.pos.y += uy * push
-          }
-        }
-      }
-    }
-  }
-
-  private updatePlayer(dt: number) {
-    const p = this.player
-    if (!p.alive) return
-    let mx = 0
-    let my = 0
-    if (this.keys.has('w') || this.keys.has('arrowup') || this.keys.has('ц')) my -= 1
-    if (this.keys.has('s') || this.keys.has('arrowdown') || this.keys.has('ы')) my += 1
-    if (this.keys.has('a') || this.keys.has('arrowleft') || this.keys.has('ф')) mx -= 1
-    if (this.keys.has('d') || this.keys.has('arrowright') || this.keys.has('в')) mx += 1
-    const moving = mx !== 0 || my !== 0
-    if (moving) {
-      const l = Math.hypot(mx, my)
-      p.vel = { x: (mx / l) * p.speed, y: (my / l) * p.speed }
-      p.dest = null
-    } else if (p.dest) {
-      const dx = p.dest.x - p.pos.x
-      const dy = p.dest.y - p.pos.y
-      const dist = Math.hypot(dx, dy)
-      if (dist < 8) p.dest = null
-      else p.vel = { x: (dx / dist) * p.speed, y: (dy / dist) * p.speed }
-    } else {
-      p.vel = { x: 0, y: 0 }
-    }
-    const target = this.targetEid ? this.entities.find((e) => e.eid === this.targetEid) : null
-    if (target && target.alive) {
-      p.facing = Math.atan2(target.pos.y - p.pos.y, target.pos.x - p.pos.x)
-      const dist = Math.hypot(target.pos.x - p.pos.x, target.pos.y - p.pos.y)
-      if (dist > p.attackRange + target.radius * 0.6 && !moving) {
-        p.dest = { ...target.pos }
-      } else if (dist <= p.attackRange + target.radius * 0.6) {
-        p.dest = null
-        if (p.cds['atk'] <= 0) meleeAttackSys(this, p, target)
-      }
-    } else if (moving) {
-      p.facing = Math.atan2(p.vel.y, p.vel.x)
-    }
-    this.moveWithCollisions(p, p.vel.x, p.vel.y, dt)
-    p.walkPhase += dt * (Math.hypot(p.vel.x, p.vel.y) > 4 ? 1 : 0.2)
-    const inCombat = nearestEnemyOfSys(this, p, 320) !== null
-    this.stamina = Math.min(this.maxStamina, this.stamina + (inCombat ? 6 : 14) * dt)
+    moveWithCollisionsSys(this, e, vx, vy, dt)
   }
 
   // ---------------- Способности игрока (делегат systems/combat) ----------------

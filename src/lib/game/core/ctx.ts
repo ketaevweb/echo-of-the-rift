@@ -8,6 +8,7 @@
 
 import { Attributes, DialogueChoice, Entity, Faction, Floater, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Vec } from '../types'
 import { Collider } from './util'
+import type { PanelId } from '../store'
 
 export type ToastKind = 'info' | 'quest' | 'level' | 'warn' | 'loot'
 
@@ -75,4 +76,6 @@ export interface EngineCtx {
   castAbility(id: string): void
   isFrozen(): boolean
   moveWithCollisions(e: Entity, vx: number, vy: number, dt: number): void
+  openPanel(p: PanelId): void
+  closePanel(): void
 }
