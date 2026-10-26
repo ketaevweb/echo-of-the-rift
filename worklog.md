@@ -140,3 +140,29 @@ Stage Summary:
 - Фаза 2 закрыта по DoD: все бои прототипа воспроизводимы в 3D, знаки и удары босса читаются визуально (телеграфы на земле), тактика обогащена (высота, окружение, кифтинг, рывок).
 - Артефакты: Telegraph в types/ctx, combat (spawnTelegraph/updateTelegraphs/heightMod), ai (фланг/стрейф/рывок), Fx (пул телеграфов), Avatars (позы), 2D-паритет.
 - Следующий шаг по роадмапу — Фаза 3: Вельд-биом, переходы зон, контракты W3, день/ночь.
+
+---
+Task ID: 9
+Agent: Z.ai Code (main)
+Task: Фаза 3 — Мир: хаб + Вельд (GDD 05): Вельд-биом, переходы зон через порталы, день/ночь, контракты W3 (доска/следопытство/масла/бестиарий), Альра-алхимик, мини-босс Пепельная Мать.
+
+Work Log:
+- Данные: data/veld.ts (RIDGE y=2560±95, GATES valley/veld + exits, 6 POOLS, 3 VELD_CLUES с лором, ASH_MOTHER курган 2500,3620, VELD_ROADS/PROPS: 72 мёртвых дерева, 150 камыша, 16 пней, арки-врата, доска объявлений; VELD_SPAWN_ZONES болотники/мраки; VELD_AREAS/MARKERS). world.ts: WORLD 3200×4200, merge всех массивов, генераторы долины клампятся к y<2380, blocked() + хребет/врата.
+- types: EnemyType + bogling/ash_shade/ash_mother; PropDef/InteractableDef + board/portal/deadtree/reed/stump/clue; ItemType + oil; SaveData + dayClock/oilKind/oilT.
+- heightmap: хребет (t²·(56+jag)), вельдская низина (fBm), чаши омутов ниже WATER_LEVEL, плоские пятачки врат; палитра торфа/тины/мёртвых пятен, грязь кромок омутов. Terrain: CHUNK_Z из пропорции мира (88 чанков), вода омутов. Props3d: инстансы deadtree (ствол+2 ветки) и reed (3 стебля), board (столбы+панель+3 листа), portal (арка+диск+свет), stump; спиннеры массивом, огни костров ×(0.8+darkness·1.5).
+- Avatars: buildBogling (пасть/глаза, скачет), buildAshShade (тлеющий уголь, парит), buildAshMother (мантия-конус, рога, ядро-уголь, парит ×1.45); forwardX для всех трёх; headH для пикинга.
+- Renderer3d: updateAtmosphere(zone, dayT) — лерп k=0.045 тумана/неба/солнца/hemi/amb по целям зоны и daylightOf(dayClock); небо следует за камерой; солнце ниже к горизонту ночью; props.update(time, removed, darkness).
+- Движок: dayClock (480с = сутки, старт 0.3), zone = zoneOf(y), oilT/oilKind; travelTo(zone) — sfx portal → zoneFade out (750мс) → телепорт партии+камеры, currentArea='' → fade in → cleanup; снапшоты 3D/2D с zone/dayT. syncUi дергает setAmbient.
+- systems: movement — хребет непроходим (кламп ny по стороне e.pos.y); ai — spawnAshMother (flag ashMotherRevealed, не респавнится при ashMotherDead), ashMotherLogic (пепельный взрыв: телеграф-круг r150 followEid, урон d6+d6+mod+отброс; призыв 2 болотников на <66% и <33%), summonBoglings; combat — oilBonus (+5 урона игрока по классу OIL_TARGETS), лут bog_bile/rift_shard/ash_heart +120з, flag ashMotherDead → advanceQuest veld 3; quest — runInteractable portal:/clue: (flags clue_*, счётчик, на 3/3 спавн Матери + stage 2), runAction bestiary:/open:shop:alra; questMarker veld (след→курган→Альра); updateArea фолбэк «Вельд».
+- Прогрессия: openShop(merchant) grim/alra (ALRA_STOCK: зелья + 2 масла). inventory.useItem: oil → oilKind/oilT 240с. save: collectSave/applySave + новые поля c дефолтами, квесты сливаются со свежими дефолтами (старые сейвы получают quest 'veld'). uiSync: oil/дневное время/zoneLabel, bossBar по ENEMY_NAME (в т.ч. ash_mother), contractQuest = contract ?? veld.
+- sfx: 'portal' (восходящий вихрь) + setAmbient — зацикленный шум через bandpass, цели по зоне (valley 850Гц/0.022, veld 260Гц/0.042), setTargetAtTime.
+- render2d: запекание Вельда (хребет-градиент, торф, пятна, омуты), drawProp deadtree/reed/stump/board/portal, drawEntity bogling/ash_shade/ash_mother, scene.ts — следы-метки + тинт ночи (1-daylight)·0.5 и Вельда.
+- UI: GameView zoneFade-оверлей («ВЕЛЬД» + «ТУМАН ЧАСТИТ ПУТЬ...»), Hud — Sun/Moon по daytime, zoneLabel, бейдж масла (Droplets + остаток), трекер контракта счётчиком (x/3); Panels — кнопка «Нанести» для масел.
+- E2E agent-browser: новая игра → мир 544 пропса/41 сущность (board, 2 портала, 72 deadtree, 150 reed, 9 болотников, Альра) → доска: контракт принят (veld stage 1, бестиарий ash_mother) → юг: F у врат (рядом ближе лунная трава — интеракт-приоритет корректен; travelTo прямой вызов ок) → Вельд: zone/veld, плашка, мрачный туман → 3 следа: счётчик 3/3 → Мать заспавнилась у кургана → бой: chase, урон игроку, пепельный взрыв-телеграф {circle r150 follow} пойман, фаза 66%: +2 болотника (summonStage 1) → добита (stun-контроль в headless из-за 4fps SwiftShader): stage 3, ash_heart, +120 золота, +400 XP (ур.4) → врата назад → Альра: сдано (220з+260 XP+масло спектров, quest done, сердце списано) → масло применено (oilT 240, HUD-бейдж, урон 14 по мраку > 11 макс без масла) → день/ночь: полночь/полдень/вельдская ночь скриншоты (луна/солнце в HUD, атмосфера лерпится) → хребет: 3с шаг на юг упёрся в y=2456 → zoneFade-скрин «ВЕЛЬД» → Legacy 2D: вельд рисуется (топи/врата/ночь) → сейв: dayClock/oilKind/oilT/veld/flags в JSON, продолжить после перезагрузки — всё восстановлено, Мать не респавнится → perf: 117 draw calls, 111k трис (бюджеты 350/700k).
+- lint + tsc --noEmit чистые; dev.log без ошибок.
+- Коммит 1cb5479 запушен в ketaevweb/echo-of-the-rift (main); токен одноразово в URL push, в файлах/конфиге отсутствует (git grep ghp_ — пусто).
+
+Stage Summary:
+- Фаза 3 закрыта по DoD: вертикальная нарезка «титул → Хеймхолл (доска/Альра) → Врата Тумана → Вельд (топи, туман, день/ночь) → следопытство → Пепельная Мать → награда/тренировка» проходима целиком; сейвы совместимы со старыми (v1 + мягкие дефолты).
+- Артефакты: data/veld.ts; render3d — Вельд-рельеф/палитра/пропсы/аватары/атмосфера; systems — хребет-коллизия, следопытство, масла, ИИ Матери; UI — zoneFade/бейдж масла/световой индикатор; sfx — эмбиент и портал.
+- Следующий шаг по роадмапу — Фаза 4: Партия 3D (формации, приказы, тактическая камера, синергии пар).
