@@ -74,4 +74,5 @@ export interface EngineCtx {
   syncUi(): void
   castAbility(id: string): void
   isFrozen(): boolean
+  moveWithCollisions(e: Entity, vx: number, vy: number, dt: number): void
 }

@@ -1,12 +1,317 @@
 // ============================================================
-// ЭХО РАЗЛОМА — система боя (Phase 0.4: эффекты; 0.6: атаки/урон)
-// Пока перенесены частицы и всплывающий текст:
-// floater/ring/beam/coneParticles/updateParticles + tickCds.
+// ЭХО РАЗЛОМА — система боя (Phase 0.6)
+// meleeAttack/rangedAttack/damage/onEnemyKilled/onPlayerDeath/
+// castAbility/enemiesInCone/updateStatuses + частицы и
+// всплывающий текст (floater/ring/beam/coneParticles/
+// updateParticles/tickCds).
 // ============================================================
 
-import { Entity, Particle, Vec } from '../types'
+import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from '../data/abilities'
+import { ITEMS } from '../data/items'
+import { BESTIARY_INFO } from '../data/tables'
+import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
+import { Entity, Particle, SignId, Vec } from '../types'
+import { useGame } from '../store'
+import { sfx } from '../sfx'
+import { angleDiff, d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
-import { rndRange } from '../core/util'
+import { nearestEnemyOf } from '../core/entity'
+import { addItem, countItem, removeItem } from './inventory'
+import { gainXp, signPower } from './progression'
+import { advanceQuest, checkProof } from './quest'
+
+// ---------------- Атаки ----------------
+
+export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
+  a.cds['atk'] = a.attackCd
+  a.attackT = 0.28
+  sfx('swing')
+  const buff = a.team === 'party' && ctx.buffT > 0 ? 2 : 0
+  const roll = d(20)
+  const total = roll + a.atkBonus + buff
+  if (roll === 20 || (roll !== 1 && total >= t.ac)) {
+    const crit = roll === 20
+    const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+    damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
+    if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
+  } else {
+    floater(ctx, t.pos, 'Промах', '#9a9a90', 12)
+  }
+}
+
+export function rangedAttack(ctx: EngineCtx, a: Entity, t: Entity) {
+  a.cds['atk'] = a.attackCd
+  a.attackT = 0.25
+  const buff = a.team === 'party' && ctx.buffT > 0 ? 2 : 0
+  const roll = d(20)
+  const total = roll + a.atkBonus + buff
+  if (roll === 20 || (roll !== 1 && total >= t.ac)) {
+    const crit = roll === 20
+    const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+    damage(ctx, t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
+    beam(ctx, a.pos, t.pos, a.team === 'party' ? '#bfe3ea' : '#d9c04f')
+    if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
+  } else {
+    floater(ctx, t.pos, 'Промах', '#9a9a90', 12)
+    beam(ctx, a.pos, t.pos, 'rgba(200,200,190,0.4)')
+  }
+}
+
+export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?: boolean; silent?: boolean; color?: string } = {}) {
+  if (!t.alive) return
+  let amt = amount
+  if (t.shield > 0) {
+    const absorbed = Math.min(t.shield, amt)
+    t.shield -= absorbed
+    amt -= absorbed
+    if (absorbed > 0) floater(ctx, t.pos, 'Квен −' + absorbed, '#d9a441', 12)
+  }
+  if (amt > 0) {
+    t.hp -= amt
+    t.hitT = 0.15
+    if (!opts.silent) {
+      floater(
+        ctx,
+        t.pos,
+        opts.crit ? 'КРИТ ' + amt : String(amt),
+        opts.color ?? (t.team === 'party' ? '#e0653a' : '#f5c96b'),
+        opts.crit ? 20 : 15,
+      )
+    }
+    if (t.kind === 'player') ctx.hp = t.hp
+    if (t.kind === 'player' || t.kind === 'companion') sfx('hit')
+  }
+  if (t.team === 'hostile' && t.aiState === 'idle') t.aiState = 'chase'
+  if (t.hp <= 0) {
+    t.hp = 0
+    t.alive = false
+    if (t.kind === 'enemy') onEnemyKilled(ctx, t)
+    else if (t.kind === 'companion') {
+      t.downT = 12
+      floater(ctx, t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
+    } else if (t.kind === 'player') onPlayerDeath(ctx)
+  }
+}
+
+export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
+  const type = e.enemyType!
+  ctx.kills++
+  sfx('death')
+  if (e.zoneId) {
+    const z = SPAWN_ZONES.find((zz) => zz.id === e.zoneId)
+    if (z) e.respawnAt = ctx.time + z.respawnSec
+  }
+  const st = ENEMY_STATS[type]
+  gainXp(ctx, st.xp)
+  let goldLoot = 0
+  if (type === 'wolf') {
+    if (Math.random() < 0.6) addItem(ctx, 'wolf_pelt', 1)
+    if (Math.random() < 0.4) addItem(ctx, 'wolf_fang', 1)
+  } else if (type === 'bandit' || type === 'archer') {
+    goldLoot = 8 + Math.floor(Math.random() * 14)
+  } else if (type === 'alpha') {
+    addItem(ctx, 'alpha_pelt', 1)
+    goldLoot = 40
+  } else if (type === 'horror') {
+    if (Math.random() < 0.5) addItem(ctx, 'rift_shard', 1)
+  } else if (type === 'captain') {
+    goldLoot = 60
+  } else if (type === 'boss') {
+    goldLoot = 150
+    addItem(ctx, 'rift_shard', 3)
+  }
+  if (goldLoot > 0) {
+    ctx.gold += goldLoot
+    floater(ctx, e.pos, '+' + goldLoot + ' золота', '#e8d5a8', 13)
+  }
+  if (!ctx.bestiary.has(type)) {
+    ctx.bestiary.add(type)
+    ctx.toast('Бестиарий: ' + BESTIARY_INFO[type].name, 'quest')
+  }
+  if (type === 'wolf' && ctx.quests.main.stage === 2 && !ctx.quests.main.done) {
+    ctx.quests.main.counter++
+    if (ctx.quests.main.counter >= 4) advanceQuest(ctx, 'main', 3)
+    else ctx.toast(`Волки: ${ctx.quests.main.counter}/4`, 'info')
+  }
+  if (type === 'alpha') {
+    ctx.flags.alphaDead = true
+    if (ctx.quests.contract.stage === 1) advanceQuest(ctx, 'contract', 2)
+    checkProof(ctx)
+  }
+  if (type === 'captain') {
+    ctx.flags.captainDead = true
+    if (ctx.quests.flame.stage === 1) advanceQuest(ctx, 'flame', 2)
+    checkProof(ctx)
+  }
+  if (type === 'boss') {
+    ctx.flags.bossDead = true
+    advanceQuest(ctx, 'main', 6)
+    useGame.getState().patch({ bossBar: null })
+    ctx.endingAt = ctx.time + 1.8
+  }
+  if (ctx.targetEid === e.eid) ctx.targetEid = null
+}
+
+export function onPlayerDeath(ctx: EngineCtx) {
+  ctx.player.alive = false
+  ctx.toast('Ты пал... Но Смотрители не умирают так просто.', 'warn')
+  sfx('death')
+  setTimeout(() => {
+    if (ctx.destroyed) return
+    ctx.player.alive = true
+    ctx.player.pos = { ...PLAYER_SPAWN }
+    ctx.player.dest = null
+    ctx.hp = Math.round(ctx.maxHp * 0.6)
+    ctx.player.hp = ctx.hp
+    ctx.stamina = ctx.maxStamina
+    ctx.gold = Math.max(0, ctx.gold - 30)
+    for (const e of ctx.entities) {
+      if (e.kind === 'companion' && !e.alive) {
+        e.alive = true
+        e.downT = 0
+        e.hp = Math.round(e.maxHp * 0.5)
+        e.pos = { x: ctx.player.pos.x - 26, y: ctx.player.pos.y + 18 }
+      }
+      if (e.kind === 'enemy' && e.alive) e.aiState = 'return'
+    }
+    ctx.targetEid = null
+    ctx.camera.x = ctx.player.pos.x
+    ctx.camera.y = ctx.player.pos.y
+    ctx.toast('Ты очнулся в Хеймхолле. −30 золота на лечение.', 'info')
+    ctx.syncUi()
+  }, 1800)
+}
+
+// ---------------- Способности игрока ----------------
+
+export function castAbility(ctx: EngineCtx, id: string) {
+  if (ctx.isFrozen() || ctx.tacticalPaused || !ctx.player.alive) return
+  const ab = ABILITY_MAP[id]
+  if (!ab) return
+  if (ab.kind === 'potion') {
+    if (ctx.player.cds['potion'] > 0) return
+    const inv = ctx.inventory.find((i) => i.item === id)
+    if (!inv || inv.qty <= 0) {
+      ctx.toast('Ничего выпить нет.', 'warn')
+      return
+    }
+    const def = ITEMS[id]
+    if (def.heal) {
+      ctx.hp = Math.min(ctx.maxHp, ctx.hp + def.heal)
+      ctx.player.hp = ctx.hp
+      floater(ctx, ctx.player.pos, '+' + def.heal, '#8fbf7f', 15)
+    }
+    if (def.stamina) {
+      ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + def.stamina)
+      floater(ctx, ctx.player.pos, '+' + def.stamina + ' ОВ', '#bfe3ea', 13)
+    }
+    removeItem(ctx, id, 1)
+    ctx.player.cds['potion'] = ab.cooldown
+    sfx('potion')
+    ctx.syncUi()
+    return
+  }
+  if (id === 'shout' && !ctx.signs.shout.unlocked) return
+  if (ab.kind === 'sign' && !ctx.signs[id as SignId]?.unlocked) return
+  if (ctx.player.cds[id] > 0) return
+  if (ctx.stamina < ab.staminaCost) {
+    floater(ctx, ctx.player.pos, 'Нет сил!', '#9a9a90', 12)
+    return
+  }
+  ctx.stamina -= ab.staminaCost
+  ctx.player.cds[id] = ab.cooldown
+  ctx.player.castT = 0.25
+  const signLevel = ctx.signs[id as SignId]?.level ?? 1
+  const power = signPower(ctx)
+  const target = ctx.targetEid ? ctx.entities.find((e) => e.eid === ctx.targetEid) : null
+
+  if (id === 'igni') {
+    if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
+    sfx('fire')
+    coneParticles(ctx, ctx.player.pos, ctx.player.facing, 150, '#e08a3a')
+    for (const e of enemiesInCone(ctx, 150, 0.62)) {
+      const weak = FIRE_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
+      damage(ctx, e, Math.round(d(6) * 2 * power * weak), { color: '#e08a3a' })
+      e.burnT = 4
+      e.burnTick = 0.5
+    }
+  } else if (id === 'aard') {
+    if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
+    sfx('shield')
+    coneParticles(ctx, ctx.player.pos, ctx.player.facing, 160, '#d9e3ea')
+    for (const e of enemiesInCone(ctx, 160, 0.95)) {
+      damage(ctx, e, Math.round(d(4) * power), { color: '#d9e3ea' })
+      e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
+      const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
+      ctx.kb.set(e.eid, { x: Math.cos(a) * 300, y: Math.sin(a) * 300 })
+    }
+  } else if (id === 'quen') {
+    const sh = Math.round((25 + 12 * ctx.level) * power)
+    ctx.player.shield = sh
+    floater(ctx, ctx.player.pos, 'Квен: ' + sh, '#d9a441', 14)
+    ring(ctx, ctx.player.pos, '#d9a441', 40, 0.6)
+    sfx('shield')
+  } else if (id === 'axii') {
+    const t =
+      target && target.alive && Math.hypot(target.pos.x - ctx.player.pos.x, target.pos.y - ctx.player.pos.y) < 240
+        ? target
+        : nearestEnemyOf(ctx, ctx.player, 240)
+    sfx('mind')
+    if (t) {
+      const dur = (2.4 + signLevel * 0.5) * (STUN_WEAK.has(t.enemyType ?? 'wolf') ? 1.6 : 1)
+      t.stunT = Math.max(t.stunT, dur)
+      floater(ctx, t.pos, 'Аксий!', '#c9a3e8', 14)
+      ring(ctx, t.pos, '#c9a3e8', 24, 0.5)
+    } else {
+      floater(ctx, ctx.player.pos, 'Никого рядом', '#9a9a90', 12)
+    }
+  } else if (id === 'shout') {
+    sfx('shout')
+    ctx.shake = 12
+    ring(ctx, ctx.player.pos, '#f5c96b', 210, 0.8)
+    for (const e of ctx.entities) {
+      if (e.kind !== 'enemy' || !e.alive) continue
+      if (Math.hypot(e.pos.x - ctx.player.pos.x, e.pos.y - ctx.player.pos.y) < 210) {
+        damage(ctx, e, d(6) * 3 * power, { color: '#f5c96b' })
+        e.stunT = Math.max(e.stunT, 1.2)
+        const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
+        ctx.kb.set(e.eid, { x: Math.cos(a) * 360, y: Math.sin(a) * 360 })
+      }
+    }
+  }
+  ctx.syncUi()
+}
+
+export function enemiesInCone(ctx: EngineCtx, range: number, halfAngle: number): Entity[] {
+  return ctx.entities.filter((e) => {
+    if (e.kind !== 'enemy' || !e.alive) return false
+    const dist = Math.hypot(e.pos.x - ctx.player.pos.x, e.pos.y - ctx.player.pos.y)
+    if (dist > range + e.radius) return false
+    const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
+    return angleDiff(a, ctx.player.facing) < halfAngle
+  })
+}
+
+// ---------------- Статусы ----------------
+
+export function updateStatuses(ctx: EngineCtx, e: Entity, dt: number) {
+  if (!e.alive) return
+  if (e.stunT > 0) e.stunT -= dt
+  if (e.slowT > 0) e.slowT -= dt
+  if (e.burnT > 0) {
+    e.burnT -= dt
+    e.burnTick -= dt
+    if (e.burnTick <= 0) {
+      e.burnTick = 0.5
+      damage(ctx, e, Math.max(1, Math.round(2 * signPower(ctx))), {
+        silent: true,
+        color: '#e08a3a',
+      })
+    }
+  }
+}
+
+// ---------------- Эффекты ----------------
 
 export function floater(ctx: EngineCtx, pos: Vec, text: string, color: string, size: number) {
   ctx.floaters.push({

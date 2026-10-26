@@ -3,7 +3,6 @@ import {
   Entity,
   Faction,
   Floater,
-  InteractableDef,
   InventoryEntry,
   Particle,
   QuestState,
@@ -12,19 +11,13 @@ import {
   Stance,
   Vec,
 } from './types'
-import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from './data/abilities'
-import { ITEMS, MERCHANT_STOCK, SELL_RATE } from './data/items'
-import { QUESTS, QUEST_MAP } from './data/quests'
-import { DIALOGUES, PORTRAITS } from './data/dialogues'
+import { ABILITY_MAP } from './data/abilities'
+import { QUESTS } from './data/quests'
 import {
-  AREAS,
   INTERACTABLES,
   LAKE,
-  NPCS,
   PLAYER_SPAWN,
   PROPS,
-  SPAWN_ZONES,
-  UNIQUE_SPAWNS,
   WORLD,
 } from './data/world'
 import {
@@ -42,12 +35,10 @@ import {
   PanelId,
   PartyHud,
   QuestHud,
-  TrainerHudState,
   useGame,
-  writeSave,
 } from './store'
-import { ABILITY_BAR_IDS, ATTR_NAMES, BESTIARY_INFO, ENEMY_NAME } from './data/tables'
-import { angleDiff, Collider, d, rndRange } from './core/util'
+import { ABILITY_BAR_IDS, BESTIARY_INFO } from './data/tables'
+import { Collider, rndRange } from './core/util'
 import { EngineCtx, ToastKind } from './core/ctx'
 import { applySave, saveGame as saveGameSys, toTitle as toTitleSys } from './systems/save'
 import {
@@ -61,25 +52,28 @@ import {
   useItem as applyUseItem,
 } from './systems/inventory'
 import {
-  gainXp as gainXpSys,
-  openShop as openShopSys,
   openTrainer as openTrainerSys,
-  playerAc as playerAcSys,
-  playerAtk as playerAtkSys,
   recalcStats as recalcStatsSys,
-  signPower as signPowerSys,
   spendLp as spendLpSys,
   trainOption as trainOptionSys,
   xpNext as xpNextSys,
 } from './systems/progression'
 import {
-  beam as beamSys,
-  coneParticles as coneParticlesSys,
-  floater as floaterSys,
-  ring as ringSys,
+  castCompanionAbility as castCompanionAbilitySys,
+  createPlayer as createPlayerSys,
+  spawnCompanion as spawnCompanionSys,
+  spawnWorld as spawnWorldSys,
+  updateCompanion as updateCompanionSys,
+  updateEnemy as updateEnemySys,
+} from './systems/ai'
+import {
+  castAbility as castAbilitySys,
+  meleeAttack as meleeAttackSys,
   tickCds,
   updateParticles as updateParticlesSys,
+  updateStatuses as updateStatusesSys,
 } from './systems/combat'
+import { nearestEnemyOf as nearestEnemyOfSys } from './core/entity'
 import {
   advanceQuest as advanceQuestSys,
   checkProof as checkProofSys,
@@ -215,216 +209,18 @@ export class GameEngine implements EngineCtx {
     this.spawnWorld()
   }
 
-  private makeEntity(base: Partial<Entity>): Entity {
-    return {
-      id: base.id ?? 'e',
-      eid: this.eidSeq++,
-      kind: base.kind ?? 'enemy',
-      name: base.name ?? '',
-      role: base.role,
-      pos: base.pos ?? { x: 0, y: 0 },
-      vel: { x: 0, y: 0 },
-      radius: base.radius ?? 14,
-      facing: base.facing ?? 0,
-      color: base.color ?? '#8a7a54',
-      hp: base.hp ?? 30,
-      maxHp: base.maxHp ?? base.hp ?? 30,
-      alive: base.alive ?? true,
-      team: base.team ?? 'hostile',
-      speed: base.speed ?? 110,
-      atkBonus: base.atkBonus ?? 3,
-      ac: base.ac ?? 11,
-      dmgDice: base.dmgDice ?? 1,
-      dmgSides: base.dmgSides ?? 6,
-      dmgMod: base.dmgMod ?? 0,
-      attackCd: base.attackCd ?? 1.3,
-      attackRange: base.attackRange ?? 44,
-      ranged: base.ranged,
-      enemyType: base.enemyType,
-      boss: base.boss,
-      aiState: base.aiState ?? 'idle',
-      home: base.home ? { ...base.home } : { ...(base.pos ?? { x: 0, y: 0 }) },
-      aggroR: base.aggroR ?? 200,
-      leashR: base.leashR ?? 600,
-      wanderT: 0,
-      stunT: 0,
-      burnT: 0,
-      burnTick: 0,
-      slowT: 0,
-      shield: 0,
-      targetEid: null,
-      attackT: 0,
-      hitT: 0,
-      castT: 0,
-      cds: { atk: 0 },
-      respawnAt: undefined,
-      summonStage: 0,
-      slamT: 0,
-      walkPhase: 0,
-      downT: 0,
-      dest: null,
-      stance: base.stance,
-      zoneId: base.zoneId,
-      npc: base.npc,
-    }
-  }
+  // ---------------- Спавн (делегаты systems/ai) ----------------
 
   createPlayer(pos: Vec) {
-    this.player = this.makeEntity({
-      id: 'player',
-      kind: 'player',
-      name: 'Смотритель',
-      pos: { ...pos },
-      color: '#c46a2b',
-      radius: 13,
-      hp: this.hp,
-      maxHp: this.maxHp,
-      team: 'party',
-      speed: 160,
-      atkBonus: playerAtkSys(this).atkBonus,
-      ac: playerAcSys(this),
-      dmgDice: 1,
-      dmgSides: 6,
-      dmgMod: playerAtkSys(this).mod,
-      attackCd: 0.9,
-      attackRange: 52,
-      aggroR: 0,
-      leashR: 99999,
-    })
-    this.entities.push(this.player)
+    createPlayerSys(this, pos)
   }
 
   spawnWorld() {
-    for (const n of NPCS) {
-      if (n.id === 'kaya' && this.companionIds.kaya) continue
-      if (n.id === 'torvald_npc' && this.companionIds.torvald) continue
-      this.entities.push(
-        this.makeEntity({
-          id: n.id,
-          kind: 'npc',
-          name: n.name,
-          role: n.role,
-          pos: { ...n.pos },
-          color: n.color,
-          radius: 13,
-          hp: 1,
-          maxHp: 1,
-          team: 'village',
-          speed: 0,
-          npc: n,
-        }),
-      )
-    }
-    for (const z of SPAWN_ZONES) {
-      for (let i = 0; i < z.max; i++) this.spawnZoneEnemy(z)
-    }
-    for (const u of UNIQUE_SPAWNS) {
-      if (u.enemy === 'alpha' && this.flags.alphaDead) continue
-      if (u.enemy === 'captain' && this.flags.captainDead) continue
-      if (u.enemy === 'boss' && this.flags.bossDead) continue
-      this.spawnUnique(u.enemy, u.pos)
-    }
-    if (this.companionIds.kaya) this.spawnCompanion('kaya')
-    if (this.companionIds.torvald) this.spawnCompanion('torvald')
-    if (this.flags.gateOpen) {
-      this.removedProps.add('barrier')
-      this.removedProps.add('barrier2')
-      this.removedProps.add('barrier3')
-    }
-    for (let i = 1; i <= 4; i++) {
-      if (this.flags['herb_herb' + i]) this.removedProps.add('herb' + i)
-    }
-  }
-
-  private spawnZoneEnemy(z: (typeof SPAWN_ZONES)[number]) {
-    const st = ENEMY_STATS[z.enemy]
-    const a = Math.random() * Math.PI * 2
-    const rr = Math.random() * z.radius
-    const pos = { x: z.center.x + Math.cos(a) * rr, y: z.center.y + Math.sin(a) * rr }
-    const e = this.makeEntity({
-      id: z.enemy,
-      name: ENEMY_NAME[z.enemy],
-      pos,
-      radius: st.radius,
-      hp: st.hp,
-      maxHp: st.hp,
-      speed: st.speed,
-      atkBonus: st.atk,
-      ac: st.ac,
-      dmgDice: st.dmgDice,
-      dmgSides: st.dmgSides,
-      dmgMod: st.dmgMod,
-      attackCd: st.attackCd,
-      attackRange: st.attackRange,
-      ranged: st.ranged,
-      enemyType: z.enemy,
-      aggroR: st.aggroR,
-      leashR: st.leashR,
-    })
-    e.zoneId = z.id
-    e.home = { ...pos }
-    this.entities.push(e)
-  }
-
-  private spawnUnique(type: 'alpha' | 'captain' | 'boss', pos: Vec) {
-    const st = ENEMY_STATS[type]
-    const e = this.makeEntity({
-      id: type,
-      name: ENEMY_NAME[type],
-      pos: { ...pos },
-      radius: st.radius,
-      hp: st.hp,
-      maxHp: st.hp,
-      speed: st.speed,
-      atkBonus: st.atk,
-      ac: st.ac,
-      dmgDice: st.dmgDice,
-      dmgSides: st.dmgSides,
-      dmgMod: st.dmgMod,
-      attackCd: st.attackCd,
-      attackRange: st.attackRange,
-      ranged: st.ranged,
-      enemyType: type,
-      boss: type === 'boss',
-      aggroR: type === 'boss' ? 0 : st.aggroR,
-      leashR: st.leashR,
-    })
-    this.entities.push(e)
+    spawnWorldSys(this)
   }
 
   spawnCompanion(id: 'kaya' | 'torvald') {
-    if (this.companionIds[id]) return
-    this.companionIds[id] = true
-    const npcDef = NPCS.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
-    const isKaya = id === 'kaya'
-    const e = this.makeEntity({
-      id,
-      kind: 'companion',
-      name: npcDef?.name ?? id,
-      role: npcDef?.role ?? '',
-      pos: { x: this.player.pos.x - 26, y: this.player.pos.y + 18 },
-      color: isKaya ? '#9fb8a4' : '#7a8a4a',
-      radius: 13,
-      hp: (isKaya ? 70 : 110) + (this.level - 1) * 10,
-      maxHp: (isKaya ? 70 : 110) + (this.level - 1) * 10,
-      team: 'party',
-      speed: 158,
-      atkBonus: isKaya ? 4 : 5,
-      ac: isKaya ? 12 : 13,
-      dmgDice: 1,
-      dmgSides: isKaya ? 6 : 8,
-      dmgMod: isKaya ? 2 : 3,
-      attackCd: isKaya ? 1.8 : 1.1,
-      attackRange: isKaya ? 220 : 46,
-      ranged: isKaya ? 240 : undefined,
-      aggroR: 0,
-      leashR: 99999,
-      stance: 'follow',
-    })
-    this.entities.push(e)
-    this.entities = this.entities.filter(
-      (x) => !(x.kind === 'npc' && x.id === (id === 'torvald' ? 'torvald_npc' : id)),
-    )
+    spawnCompanionSys(this, id)
   }
 
   // ---------------- Ввод ----------------
@@ -597,10 +393,10 @@ export class GameEngine implements EngineCtx {
   private update(dt: number) {
     this.updatePlayer(dt)
     for (const e of this.entities) {
-      if (e.kind === 'companion') this.updateCompanion(e, dt)
-      else if (e.kind === 'enemy') this.updateEnemy(e, dt)
+      if (e.kind === 'companion') updateCompanionSys(this, e, dt)
+      else if (e.kind === 'enemy') updateEnemySys(this, e, dt)
       else if (e.kind === 'npc') e.walkPhase += dt * 0.5
-      this.updateStatuses(e, dt)
+      updateStatusesSys(this, e, dt)
       tickCds(e, dt)
     }
     this.separate()
@@ -619,24 +415,7 @@ export class GameEngine implements EngineCtx {
     this.camera.y = Math.max(Math.min(vh / 2, WORLD.h / 2), Math.min(this.camera.y, WORLD.h - vh / 2))
   }
 
-  private updateStatuses(e: Entity, dt: number) {
-    if (!e.alive) return
-    if (e.stunT > 0) e.stunT -= dt
-    if (e.slowT > 0) e.slowT -= dt
-    if (e.burnT > 0) {
-      e.burnT -= dt
-      e.burnTick -= dt
-      if (e.burnTick <= 0) {
-        e.burnTick = 0.5
-        this.damage(e, Math.max(1, Math.round(2 * signPowerSys(this))), {
-          silent: true,
-          color: '#e08a3a',
-        })
-      }
-    }
-  }
-
-  private moveWithCollisions(e: Entity, vx: number, vy: number, dt: number) {
+  moveWithCollisions(e: Entity, vx: number, vy: number, dt: number) {
     const kbi = this.kb.get(e.eid)
     let nx = e.pos.x + (vx + (kbi?.x ?? 0)) * dt
     let ny = e.pos.y + (vy + (kbi?.y ?? 0)) * dt
@@ -690,34 +469,6 @@ export class GameEngine implements EngineCtx {
     }
   }
 
-  private nearestParty(from: Vec, maxDist = 1e9): Entity | null {
-    let best: Entity | null = null
-    let bd = maxDist
-    for (const e of this.entities) {
-      if ((e.kind !== 'player' && e.kind !== 'companion') || !e.alive) continue
-      const dist = Math.hypot(e.pos.x - from.x, e.pos.y - from.y)
-      if (dist < bd) {
-        bd = dist
-        best = e
-      }
-    }
-    return best
-  }
-
-  private nearestEnemyOf(from: Entity, maxDist: number): Entity | null {
-    let best: Entity | null = null
-    let bd = maxDist
-    for (const e of this.entities) {
-      if (e.kind !== 'enemy' || !e.alive) continue
-      const dist = Math.hypot(e.pos.x - from.pos.x, e.pos.y - from.pos.y)
-      if (dist < bd) {
-        bd = dist
-        best = e
-      }
-    }
-    return best
-  }
-
   private updatePlayer(dt: number) {
     const p = this.player
     if (!p.alive) return
@@ -749,610 +500,25 @@ export class GameEngine implements EngineCtx {
         p.dest = { ...target.pos }
       } else if (dist <= p.attackRange + target.radius * 0.6) {
         p.dest = null
-        if (p.cds['atk'] <= 0) this.meleeAttack(p, target)
+        if (p.cds['atk'] <= 0) meleeAttackSys(this, p, target)
       }
     } else if (moving) {
       p.facing = Math.atan2(p.vel.y, p.vel.x)
     }
     this.moveWithCollisions(p, p.vel.x, p.vel.y, dt)
     p.walkPhase += dt * (Math.hypot(p.vel.x, p.vel.y) > 4 ? 1 : 0.2)
-    const inCombat = this.nearestEnemyOf(p, 320) !== null
+    const inCombat = nearestEnemyOfSys(this, p, 320) !== null
     this.stamina = Math.min(this.maxStamina, this.stamina + (inCombat ? 6 : 14) * dt)
   }
 
-  private updateCompanion(e: Entity, dt: number) {
-    if (!e.alive) {
-      e.downT -= dt
-      if (e.downT <= 0) {
-        e.alive = true
-        e.hp = Math.round(e.maxHp * 0.45)
-        this.floater(e.pos, 'На ноги!', '#8fbf7f', 14)
-      }
-      return
-    }
-    const stance: Stance = e.stance ?? 'follow'
-    const player = this.player
-    let desired: Vec | null = null
-    let target: Entity | null = null
+  // ---------------- Способности игрока (делегат systems/combat) ----------------
 
-    if (stance === 'hold') {
-      if (Math.hypot(e.home.x - e.pos.x, e.home.y - e.pos.y) > 14) desired = { ...e.home }
-      target = this.nearestEnemyOf(e, 260)
-    } else if (stance === 'aggressive') {
-      target = this.nearestEnemyOf(e, 460)
-      if (!target) desired = { x: player.pos.x - 20, y: player.pos.y + 16 }
-    } else {
-      const t = this.targetEid ? this.entities.find((x) => x.eid === this.targetEid) : null
-      if (t && t.alive && Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) < 400) target = t
-      else target = this.nearestEnemyOf(e, 240)
-      const off = e.id === 'torvald' ? { x: -30, y: 22 } : { x: -26, y: -26 }
-      desired = { x: player.pos.x + off.x, y: player.pos.y + off.y }
-    }
-    if (target) {
-      const dist = Math.hypot(target.pos.x - e.pos.x, target.pos.y - e.pos.y)
-      const stopAt = e.ranged ? e.ranged * 0.75 : e.attackRange + target.radius * 0.6
-      desired = dist > stopAt ? { ...target.pos } : null
-      e.facing = Math.atan2(target.pos.y - e.pos.y, target.pos.x - e.pos.x)
-      if (dist <= (e.ranged ?? e.attackRange) + target.radius * 0.6 && e.cds['atk'] <= 0) {
-        if (e.ranged) this.rangedAttack(e, target)
-        else this.meleeAttack(e, target)
-      }
-      if (e.id === 'torvald') {
-        if (e.cds['shieldbash'] <= 0 && dist < 70) this.castCompanionAbility(e.eid, 'shieldbash', target.eid)
-        if (e.cds['warcry'] <= 0 && dist < 300) this.castCompanionAbility(e.eid, 'warcry', target.eid)
-      }
-      if (e.id === 'kaya' && e.cds['frostbolt'] <= 0 && dist < 260) {
-        this.castCompanionAbility(e.eid, 'frostbolt', target.eid)
-      }
-    }
-    if (e.id === 'kaya' && e.cds['mend'] <= 0) this.castCompanionAbility(e.eid, 'mend', null)
-
-    if (desired) {
-      const dx = desired.x - e.pos.x
-      const dy = desired.y - e.pos.y
-      const dist = Math.hypot(dx, dy)
-      if (dist > 10) {
-        const sp = e.speed * (e.slowT > 0 ? 0.5 : 1)
-        e.vel = { x: (dx / dist) * sp, y: (dy / dist) * sp }
-      } else e.vel = { x: 0, y: 0 }
-    } else {
-      e.vel = { x: 0, y: 0 }
-    }
-    if (!target && Math.hypot(e.vel.x, e.vel.y) > 4) {
-      e.facing = Math.atan2(e.vel.y, e.vel.x)
-    }
-    this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
-    e.walkPhase += dt * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1 : 0.2)
+  castAbility(id: string) {
+    castAbilitySys(this, id)
   }
 
   castCompanionAbility(eid: number, abilityId: string, targetEid: number | null) {
-    const e = this.entities.find((x) => x.eid === eid)
-    if (!e || !e.alive) return
-    if ((e.cds[abilityId] ?? 0) > 0) return
-    const target = targetEid ? this.entities.find((x) => x.eid === targetEid) : null
-    switch (abilityId) {
-      case 'shieldbash': {
-        const t = target ?? this.nearestEnemyOf(e, 70)
-        if (!t) return
-        e.cds['shieldbash'] = ABILITY_MAP['shieldbash'].cooldown
-        t.stunT = Math.max(t.stunT, 1.3)
-        this.damage(t, d(6) + 2, { color: '#c9c4bc' })
-        this.floater(t.pos, 'Оглушён!', '#c9c4bc', 12)
-        sfx('hit')
-        break
-      }
-      case 'warcry': {
-        e.cds['warcry'] = ABILITY_MAP['warcry'].cooldown
-        this.buffT = 6
-        this.ring(e.pos, '#d9a441', 60, 0.6)
-        this.floater(e.pos, 'Клич!', '#d9a441', 14)
-        sfx('shield')
-        break
-      }
-      case 'frostbolt': {
-        const t = target ?? this.nearestEnemyOf(e, 260)
-        if (!t) return
-        e.cds['frostbolt'] = ABILITY_MAP['frostbolt'].cooldown
-        this.damage(t, d(4) + d(4) + 2, { color: '#bfe3ea' })
-        t.slowT = 2.5
-        this.beam(e.pos, t.pos, '#bfe3ea')
-        sfx('frost')
-        break
-      }
-      case 'mend': {
-        let lowAlly: Entity | null = null
-        let lowRatio = 0.6
-        for (const a of this.entities) {
-          if (a.team !== 'party' || !a.alive) continue
-          const r = a.hp / a.maxHp
-          if (r < lowRatio && Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < 280) {
-            lowRatio = r
-            lowAlly = a
-          }
-        }
-        if (!lowAlly) return
-        e.cds['mend'] = ABILITY_MAP['mend'].cooldown
-        const amount = Math.round(lowAlly.maxHp * 0.3)
-        lowAlly.hp = Math.min(lowAlly.maxHp, lowAlly.hp + amount)
-        if (lowAlly.kind === 'player') this.hp = lowAlly.hp
-        this.floater(lowAlly.pos, '+' + amount, '#8fbf7f', 14)
-        this.ring(lowAlly.pos, '#8fbf7f', 30, 0.5)
-        sfx('heal')
-        break
-      }
-    }
-    this.syncUi()
-  }
-
-  private updateEnemy(e: Entity, dt: number) {
-    if (!e.alive) {
-      if (e.respawnAt !== undefined && this.time >= e.respawnAt) {
-        if (Math.hypot(this.player.pos.x - e.home.x, this.player.pos.y - e.home.y) > 500) {
-          e.alive = true
-          e.hp = e.maxHp
-          e.aiState = 'idle'
-          e.burnT = 0
-          e.stunT = 0
-          const zone = SPAWN_ZONES.find((z) => z.id === e.zoneId)
-          if (zone) {
-            const a = Math.random() * Math.PI * 2
-            const rr = Math.random() * zone.radius
-            e.pos = { x: zone.center.x + Math.cos(a) * rr, y: zone.center.y + Math.sin(a) * rr }
-            e.home = { ...e.pos }
-          }
-          e.respawnAt = undefined
-        }
-      }
-      return
-    }
-    // Интро босса
-    if (e.boss && !this.flags.bossIntroDone) {
-      if (Math.hypot(this.player.pos.x - e.pos.x, this.player.pos.y - e.pos.y) < 340) {
-        this.flags.bossIntroDone = true
-        e.aggroR = 400
-        this.openDialogue('boss_intro')
-        return
-      }
-    }
-    if (e.stunT > 0) {
-      e.vel = { x: 0, y: 0 }
-      this.moveWithCollisions(e, 0, 0, dt)
-      return
-    }
-    const prey = this.nearestParty(e.pos, e.aiState === 'idle' || e.aiState === 'wander' ? e.aggroR : 1e9)
-    const homeDist = Math.hypot(e.pos.x - e.home.x, e.pos.y - e.home.y)
-
-    // поводок: слишком далеко от дома — возвращаемся
-    if (e.aiState === 'chase' && homeDist > e.leashR) {
-      e.aiState = 'return'
-    }
-
-    if (e.aiState === 'return') {
-      if (homeDist < 20) {
-        e.aiState = 'idle'
-        e.hp = e.maxHp
-      } else {
-        const dx = e.home.x - e.pos.x
-        const dy = e.home.y - e.pos.y
-        const l = Math.hypot(dx, dy)
-        e.vel = { x: (dx / l) * e.speed, y: (dy / l) * e.speed }
-        e.facing = Math.atan2(dy, dx)
-        this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
-        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.12 * dt)
-        e.walkPhase += dt
-      }
-      return
-    }
-
-    if (!prey) {
-      if (e.aiState === 'chase' || e.aiState === 'attack') {
-        e.aiState = 'return'
-      } else {
-        e.wanderT -= dt
-        if (e.wanderT <= 0) {
-          e.wanderT = rndRange(1.5, 4)
-          const a = Math.random() * Math.PI * 2
-          const rr = rndRange(0, 60)
-          e.dest = { x: e.home.x + Math.cos(a) * rr, y: e.home.y + Math.sin(a) * rr }
-        }
-        if (e.dest) {
-          const dx = e.dest.x - e.pos.x
-          const dy = e.dest.y - e.pos.y
-          const l = Math.hypot(dx, dy)
-          if (l < 6) e.dest = null
-          else {
-            e.vel = { x: (dx / l) * e.speed * 0.35, y: (dy / l) * e.speed * 0.35 }
-            e.facing = Math.atan2(e.vel.y, e.vel.x)
-            this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
-            e.walkPhase += dt
-            return
-          }
-        }
-        e.vel = { x: 0, y: 0 }
-      }
-      return
-    }
-
-    e.aiState = 'chase'
-    const dist = Math.hypot(prey.pos.x - e.pos.x, prey.pos.y - e.pos.y)
-    e.facing = Math.atan2(prey.pos.y - e.pos.y, prey.pos.x - e.pos.x)
-
-    if (e.boss) this.bossLogic(e, dist)
-
-    const isRanged = !!e.ranged
-    const wantRange = isRanged ? e.ranged! * 0.85 : e.attackRange + prey.radius * 0.6
-    let vx = 0
-    let vy = 0
-    if (isRanged && dist < wantRange * 0.6) {
-      vx = -Math.cos(e.facing) * e.speed
-      vy = -Math.sin(e.facing) * e.speed
-    } else if (dist > wantRange) {
-      vx = Math.cos(e.facing) * e.speed
-      vy = Math.sin(e.facing) * e.speed
-    }
-    const spd = e.slowT > 0 ? 0.5 : 1
-    this.moveWithCollisions(e, vx * spd, vy * spd, dt)
-    e.walkPhase += dt * (Math.hypot(vx, vy) > 4 ? 1 : 0.2)
-
-    if (e.cds['atk'] <= 0) {
-      if (isRanged && dist < e.ranged!) this.rangedAttack(e, prey)
-      else if (!isRanged && dist <= e.attackRange + prey.radius * 0.6) this.meleeAttack(e, prey)
-    }
-  }
-
-  private bossLogic(e: Entity, dist: number) {
-    if (e.slamT > 0) {
-      e.slamT -= 0.016
-      if (e.slamT <= 0) {
-        this.ring(e.pos, '#c94f3d', 170, 0.7, 'slam')
-        this.shake = 10
-        sfx('boss')
-        for (const a of this.entities) {
-          if (a.team !== 'party' || !a.alive) continue
-          if (Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < 175) {
-            this.damage(a, d(8) + d(8) + e.dmgMod, { color: '#e0653a' })
-            this.kb.set(a.eid, { x: (a.pos.x - e.pos.x) * 4, y: (a.pos.y - e.pos.y) * 4 })
-          }
-        }
-      }
-      return
-    }
-    if (e.cds['slam'] === undefined) e.cds['slam'] = 4
-    if (e.cds['slam'] <= 0 && dist < 200) {
-      e.cds['slam'] = 7
-      e.slamT = 0.9
-      this.floater(e.pos, 'Буря близко!', '#a06bd9', 16)
-      return
-    }
-    const ratio = e.hp / e.maxHp
-    if (ratio < 0.66 && e.summonStage < 1) {
-      e.summonStage = 1
-      this.summonHorrors(e)
-    }
-    if (ratio < 0.33 && e.summonStage < 2) {
-      e.summonStage = 2
-      this.summonHorrors(e)
-    }
-  }
-
-  private summonHorrors(e: Entity) {
-    for (let i = 0; i < 2; i++) {
-      const st = ENEMY_STATS.horror
-      const a = Math.random() * Math.PI * 2
-      const h = this.makeEntity({
-        id: 'horror',
-        name: ENEMY_NAME.horror,
-        pos: { x: e.pos.x + Math.cos(a) * 60, y: e.pos.y + Math.sin(a) * 60 },
-        radius: st.radius,
-        hp: st.hp,
-        maxHp: st.hp,
-        speed: st.speed,
-        atkBonus: st.atk,
-        ac: st.ac,
-        dmgDice: st.dmgDice,
-        dmgSides: st.dmgSides,
-        dmgMod: st.dmgMod,
-        attackCd: st.attackCd,
-        attackRange: st.attackRange,
-        enemyType: 'horror',
-        aggroR: st.aggroR,
-        leashR: 9999,
-        aiState: 'chase',
-      })
-      this.entities.push(h)
-      this.ring(h.pos, '#a06bd9', 40, 0.6)
-    }
-    this.floater(e.pos, 'Разлом извергает слуг!', '#a06bd9', 15)
-    sfx('boss')
-  }
-
-  // ---------------- Бой ----------------
-
-  private meleeAttack(a: Entity, t: Entity) {
-    a.cds['atk'] = a.attackCd
-    a.attackT = 0.28
-    sfx('swing')
-    const buff = a.team === 'party' && this.buffT > 0 ? 2 : 0
-    const roll = d(20)
-    const total = roll + a.atkBonus + buff
-    if (roll === 20 || (roll !== 1 && total >= t.ac)) {
-      const crit = roll === 20
-      const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
-      this.damage(t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
-      if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
-    } else {
-      this.floater(t.pos, 'Промах', '#9a9a90', 12)
-    }
-  }
-
-  private rangedAttack(a: Entity, t: Entity) {
-    a.cds['atk'] = a.attackCd
-    a.attackT = 0.25
-    const buff = a.team === 'party' && this.buffT > 0 ? 2 : 0
-    const roll = d(20)
-    const total = roll + a.atkBonus + buff
-    if (roll === 20 || (roll !== 1 && total >= t.ac)) {
-      const crit = roll === 20
-      const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
-      this.damage(t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
-      this.beam(a.pos, t.pos, a.team === 'party' ? '#bfe3ea' : '#d9c04f')
-      if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
-    } else {
-      this.floater(t.pos, 'Промах', '#9a9a90', 12)
-      this.beam(a.pos, t.pos, 'rgba(200,200,190,0.4)')
-    }
-  }
-
-  private damage(t: Entity, amount: number, opts: { crit?: boolean; silent?: boolean; color?: string } = {}) {
-    if (!t.alive) return
-    let amt = amount
-    if (t.shield > 0) {
-      const absorbed = Math.min(t.shield, amt)
-      t.shield -= absorbed
-      amt -= absorbed
-      if (absorbed > 0) this.floater(t.pos, 'Квен −' + absorbed, '#d9a441', 12)
-    }
-    if (amt > 0) {
-      t.hp -= amt
-      t.hitT = 0.15
-      if (!opts.silent) {
-        this.floater(
-          t.pos,
-          opts.crit ? 'КРИТ ' + amt : String(amt),
-          opts.color ?? (t.team === 'party' ? '#e0653a' : '#f5c96b'),
-          opts.crit ? 20 : 15,
-        )
-      }
-      if (t.kind === 'player') this.hp = t.hp
-      if (t.kind === 'player' || t.kind === 'companion') sfx('hit')
-    }
-    if (t.team === 'hostile' && t.aiState === 'idle') t.aiState = 'chase'
-    if (t.hp <= 0) {
-      t.hp = 0
-      t.alive = false
-      if (t.kind === 'enemy') this.onEnemyKilled(t)
-      else if (t.kind === 'companion') {
-        t.downT = 12
-        this.floater(t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
-      } else if (t.kind === 'player') this.onPlayerDeath()
-    }
-  }
-
-  private onEnemyKilled(e: Entity) {
-    const type = e.enemyType!
-    this.kills++
-    sfx('death')
-    if (e.zoneId) {
-      const z = SPAWN_ZONES.find((zz) => zz.id === e.zoneId)
-      if (z) e.respawnAt = this.time + z.respawnSec
-    }
-    const st = ENEMY_STATS[type]
-    gainXpSys(this, st.xp)
-    let goldLoot = 0
-    if (type === 'wolf') {
-      if (Math.random() < 0.6) this.addItem('wolf_pelt', 1)
-      if (Math.random() < 0.4) this.addItem('wolf_fang', 1)
-    } else if (type === 'bandit' || type === 'archer') {
-      goldLoot = 8 + Math.floor(Math.random() * 14)
-    } else if (type === 'alpha') {
-      this.addItem('alpha_pelt', 1)
-      goldLoot = 40
-    } else if (type === 'horror') {
-      if (Math.random() < 0.5) this.addItem('rift_shard', 1)
-    } else if (type === 'captain') {
-      goldLoot = 60
-    } else if (type === 'boss') {
-      goldLoot = 150
-      this.addItem('rift_shard', 3)
-    }
-    if (goldLoot > 0) {
-      this.gold += goldLoot
-      this.floater(e.pos, '+' + goldLoot + ' золота', '#e8d5a8', 13)
-    }
-    if (!this.bestiary.has(type)) {
-      this.bestiary.add(type)
-      this.toast('Бестиарий: ' + BESTIARY_INFO[type].name, 'quest')
-    }
-    if (type === 'wolf' && this.quests.main.stage === 2 && !this.quests.main.done) {
-      this.quests.main.counter++
-      if (this.quests.main.counter >= 4) advanceQuestSys(this, 'main', 3)
-      else this.toast(`Волки: ${this.quests.main.counter}/4`, 'info')
-    }
-    if (type === 'alpha') {
-      this.flags.alphaDead = true
-      if (this.quests.contract.stage === 1) advanceQuestSys(this, 'contract', 2)
-      checkProofSys(this)
-    }
-    if (type === 'captain') {
-      this.flags.captainDead = true
-      if (this.quests.flame.stage === 1) advanceQuestSys(this, 'flame', 2)
-      checkProofSys(this)
-    }
-    if (type === 'boss') {
-      this.flags.bossDead = true
-      advanceQuestSys(this, 'main', 6)
-      useGame.getState().patch({ bossBar: null })
-      this.endingAt = this.time + 1.8
-    }
-    if (this.targetEid === e.eid) this.targetEid = null
-  }
-
-  private onPlayerDeath() {
-    this.player.alive = false
-    this.toast('Ты пал... Но Смотрители не умирают так просто.', 'warn')
-    sfx('death')
-    setTimeout(() => {
-      if (this.destroyed) return
-      this.player.alive = true
-      this.player.pos = { ...PLAYER_SPAWN }
-      this.player.dest = null
-      this.hp = Math.round(this.maxHp * 0.6)
-      this.player.hp = this.hp
-      this.stamina = this.maxStamina
-      this.gold = Math.max(0, this.gold - 30)
-      for (const e of this.entities) {
-        if (e.kind === 'companion' && !e.alive) {
-          e.alive = true
-          e.downT = 0
-          e.hp = Math.round(e.maxHp * 0.5)
-          e.pos = { x: this.player.pos.x - 26, y: this.player.pos.y + 18 }
-        }
-        if (e.kind === 'enemy' && e.alive) e.aiState = 'return'
-      }
-      this.targetEid = null
-      this.camera.x = this.player.pos.x
-      this.camera.y = this.player.pos.y
-      this.toast('Ты очнулся в Хеймхолле. −30 золота на лечение.', 'info')
-      this.syncUi()
-    }, 1800)
-  }
-
-  // ---------------- Способности игрока ----------------
-
-  castAbility(id: string) {
-    if (this.isFrozen() || this.tacticalPaused || !this.player.alive) return
-    const ab = ABILITY_MAP[id]
-    if (!ab) return
-    if (ab.kind === 'potion') {
-      if (this.player.cds['potion'] > 0) return
-      const inv = this.inventory.find((i) => i.item === id)
-      if (!inv || inv.qty <= 0) {
-        this.toast('Ничего выпить нет.', 'warn')
-        return
-      }
-      const def = ITEMS[id]
-      if (def.heal) {
-        this.hp = Math.min(this.maxHp, this.hp + def.heal)
-        this.player.hp = this.hp
-        this.floater(this.player.pos, '+' + def.heal, '#8fbf7f', 15)
-      }
-      if (def.stamina) {
-        this.stamina = Math.min(this.maxStamina, this.stamina + def.stamina)
-        this.floater(this.player.pos, '+' + def.stamina + ' ОВ', '#bfe3ea', 13)
-      }
-      this.removeItem(id, 1)
-      this.player.cds['potion'] = ab.cooldown
-      sfx('potion')
-      this.syncUi()
-      return
-    }
-    if (id === 'shout' && !this.signs.shout.unlocked) return
-    if (ab.kind === 'sign' && !this.signs[id as SignId]?.unlocked) return
-    if (this.player.cds[id] > 0) return
-    if (this.stamina < ab.staminaCost) {
-      this.floater(this.player.pos, 'Нет сил!', '#9a9a90', 12)
-      return
-    }
-    this.stamina -= ab.staminaCost
-    this.player.cds[id] = ab.cooldown
-    this.player.castT = 0.25
-    const signLevel = this.signs[id as SignId]?.level ?? 1
-    const power = signPowerSys(this)
-    const target = this.targetEid ? this.entities.find((e) => e.eid === this.targetEid) : null
-
-    if (id === 'igni') {
-      if (target?.alive) this.player.facing = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x)
-      sfx('fire')
-      this.coneParticles(this.player.pos, this.player.facing, 150, '#e08a3a')
-      for (const e of this.enemiesInCone(150, 0.62)) {
-        const weak = FIRE_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
-        this.damage(e, Math.round(d(6) * 2 * power * weak), { color: '#e08a3a' })
-        e.burnT = 4
-        e.burnTick = 0.5
-      }
-    } else if (id === 'aard') {
-      if (target?.alive) this.player.facing = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x)
-      sfx('shield')
-      this.coneParticles(this.player.pos, this.player.facing, 160, '#d9e3ea')
-      for (const e of this.enemiesInCone(160, 0.95)) {
-        this.damage(e, Math.round(d(4) * power), { color: '#d9e3ea' })
-        e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
-        const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
-        this.kb.set(e.eid, { x: Math.cos(a) * 300, y: Math.sin(a) * 300 })
-      }
-    } else if (id === 'quen') {
-      const sh = Math.round((25 + 12 * this.level) * power)
-      this.player.shield = sh
-      this.floater(this.player.pos, 'Квен: ' + sh, '#d9a441', 14)
-      this.ring(this.player.pos, '#d9a441', 40, 0.6)
-      sfx('shield')
-    } else if (id === 'axii') {
-      const t =
-        target && target.alive && Math.hypot(target.pos.x - this.player.pos.x, target.pos.y - this.player.pos.y) < 240
-          ? target
-          : this.nearestEnemyOf(this.player, 240)
-      sfx('mind')
-      if (t) {
-        const dur = (2.4 + signLevel * 0.5) * (STUN_WEAK.has(t.enemyType ?? 'wolf') ? 1.6 : 1)
-        t.stunT = Math.max(t.stunT, dur)
-        this.floater(t.pos, 'Аксий!', '#c9a3e8', 14)
-        this.ring(t.pos, '#c9a3e8', 24, 0.5)
-      } else {
-        this.floater(this.player.pos, 'Никого рядом', '#9a9a90', 12)
-      }
-    } else if (id === 'shout') {
-      sfx('shout')
-      this.shake = 12
-      this.ring(this.player.pos, '#f5c96b', 210, 0.8)
-      for (const e of this.entities) {
-        if (e.kind !== 'enemy' || !e.alive) continue
-        if (Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y) < 210) {
-          this.damage(e, d(6) * 3 * power, { color: '#f5c96b' })
-          e.stunT = Math.max(e.stunT, 1.2)
-          const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
-          this.kb.set(e.eid, { x: Math.cos(a) * 360, y: Math.sin(a) * 360 })
-        }
-      }
-    }
-    this.syncUi()
-  }
-
-  private enemiesInCone(range: number, halfAngle: number): Entity[] {
-    return this.entities.filter((e) => {
-      if (e.kind !== 'enemy' || !e.alive) return false
-      const dist = Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y)
-      if (dist > range + e.radius) return false
-      const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
-      return angleDiff(a, this.player.facing) < halfAngle
-    })
-  }
-
-  // ---------------- Эффекты (делегаты systems/combat) ----------------
-
-  private floater(pos: Vec, text: string, color: string, size: number) {
-    floaterSys(this, pos, text, color, size)
-  }
-
-  private ring(pos: Vec, color: string, size: number, life: number, kind: Particle['kind'] = 'ring') {
-    ringSys(this, pos, color, size, life, kind)
-  }
-
-  private beam(a: Vec, b: Vec, color: string) {
-    beamSys(this, a, b, color)
-  }
-
-  private coneParticles(pos: Vec, facing: number, range: number, color: string) {
-    coneParticlesSys(this, pos, facing, range, color)
+    castCompanionAbilitySys(this, eid, abilityId, targetEid)
   }
 
   // ---------------- Диалоги/квесты/интеракты (делегаты systems/quest) ----------------
