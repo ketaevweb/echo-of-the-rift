@@ -259,11 +259,14 @@ export class Avatar {
   private hpBar: HpBar
   private deadTilt = 0
   private eid: number
+  /** Модель собрана «мордой по +X» (звери/хоррор) — формула поворота другая. */
+  private forwardX = false
 
   constructor(e: Entity) {
     this.eid = e.eid
+    const arch = this.archetype(e)
     let built: { group: THREE.Group; refs: object }
-    switch (this.archetype(e)) {
+    switch (arch) {
       case 'player':
         built = buildHumanoid(e.color, 0xc9a07a, { hood: true, sword: true })
         break
@@ -307,6 +310,7 @@ export class Avatar {
     }
     this.group.scale.copy(built.group.scale)
     this.refs = built.refs as Avatar['refs']
+    this.forwardX = arch === 'wolf' || arch === 'alpha' || arch === 'horror'
     this.mats = collectMats(this.group)
     this.hpBar = new HpBar()
     this.group.add(this.hpBar.obj)
@@ -346,9 +350,11 @@ export class Avatar {
     const speed = Math.hypot(e.vel.x, e.vel.y)
     const moving = speed > 6
 
-    // Позиция и поворот (facing — угол в плоскости мира)
+    // Позиция и поворот (facing — угол в плоскости мира).
+    // Humanoid смотрит по локальной +Z (поворот π/2 − facing),
+    // звери/хоррор — по локальной +X (поворот −facing), иначе бегут боком.
     this.group.position.set(e.pos.x, h, e.pos.y)
-    const targetRot = Math.PI / 2 - e.facing
+    const targetRot = this.forwardX ? -e.facing : Math.PI / 2 - e.facing
     let dr = targetRot - this.group.rotation.y
     while (dr > Math.PI) dr -= Math.PI * 2
     while (dr < -Math.PI) dr += Math.PI * 2
@@ -363,9 +369,9 @@ export class Avatar {
     // Шаг
     const swing = moving ? Math.sin(e.walkPhase * 7) * 0.55 : Math.sin(time * 1.6) * 0.05
     if (this.refs.legs) {
-      // зверь
+      // зверь: лапы качаются вдоль корпуса (вокруг локальной Z, морда по +X)
       this.refs.legs.forEach((leg, i) => {
-        leg.rotation.x = moving ? Math.sin(e.walkPhase * 9 + (i % 2 ? Math.PI : 0)) * 0.6 : 0
+        leg.rotation.z = moving ? Math.sin(e.walkPhase * 9 + (i % 2 ? Math.PI : 0)) * 0.6 : 0
       })
       if (this.refs.body) this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 9)) * 1.1 : 0
     } else if (this.refs.legL && this.refs.legR) {

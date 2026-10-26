@@ -8,6 +8,7 @@
 import * as THREE from 'three'
 import { INTERACTABLES, PROPS } from '../data/world'
 import { PropDef } from '../types'
+import { seedRot } from '../core/util'
 import { heightAt } from './heightmap'
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -20,11 +21,6 @@ function place(group: THREE.Group, obj: THREE.Object3D, x: number, y: number, z 
   obj.position.set(x, heightAt(x, y) + z, y)
   obj.rotation.y = rotY
   group.add(obj)
-}
-
-/** Случайный поворот по seed — детерминированный. */
-function seedRot(seed: number): number {
-  return ((seed * 137.508) % 360) * (Math.PI / 180)
 }
 
 export class Props3d {

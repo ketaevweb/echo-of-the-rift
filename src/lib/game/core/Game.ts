@@ -45,6 +45,15 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   ctx.camera.y = Math.max(Math.min(vh / 2, WORLD.h / 2), Math.min(ctx.camera.y, WORLD.h - vh / 2))
 }
 
+// ---------------- Косметика (идёт даже при паузе) ----------------
+
+/** Частицы, флоатеры и тряска затухают даже при открытой панели/диалоге/такт-паузе —
+ * иначе боевой текст зависает в воздухе до закрытия панели. */
+export function stepCosmetics(ctx: EngineCtx, dt: number): void {
+  updateParticles(ctx, dt)
+  ctx.shake = Math.max(0, ctx.shake - dt * 26)
+}
+
 // ---------------- Цикл кадров ----------------
 
 /** Хост цикла: минимальный набор, необходимый rAF-обвязке. */
@@ -54,6 +63,8 @@ export interface LoopHost {
   tacticalPaused: boolean
   isFrozen(): boolean
   update(dt: number): void
+  /** Косметика (частицы/флоатеры/тряска) — тикает и во время паузы/панелей. */
+  updateCosmetics(dt: number): void
   render(): void
   syncUi(): void
   renderMinimap(): void
@@ -79,6 +90,8 @@ export class GameLoop {
       if (!this.host.isFrozen() && !this.host.tacticalPaused) {
         this.host.playtime += dt
         this.host.update(dt)
+      } else {
+        this.host.updateCosmetics(dt)
       }
       this.host.render()
       this.syncT -= dt

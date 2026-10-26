@@ -23,9 +23,9 @@ import {
 import { LAKE, PLAYER_SPAWN, PROPS } from './data/world'
 import { sfx } from './sfx'
 import { PanelId, useGame } from './store'
-import { Collider } from './core/util'
+import { Collider, seedRot } from './core/util'
 import { EngineCtx, RenderMode, ToastKind } from './core/ctx'
-import { GameLoop, stepWorld } from './core/Game'
+import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
 import { Renderer3d } from './render3d/Renderer3d'
@@ -174,13 +174,30 @@ export class GameEngine implements EngineCtx {
     this.colliders = [{ x: LAKE.x, y: LAKE.y, r: LAKE.r - 5, propId: 'lake' }]
     for (const p of this.props) {
       if (!p.solid) continue
-      const r =
-        p.kind === 'house'
-          ? Math.max(p.w ?? 100, p.h ?? 60) * 0.36
-          : p.kind === 'tent'
-            ? (p.w ?? 60) * 0.4
-            : (p.r ?? 10)
-      this.colliders.push({ x: p.pos.x, y: p.pos.y, r, propId: p.id })
+      if (p.kind === 'house') {
+        // Дома — прямоугольный OBB-коллайдер точно по футпринту корпуса
+        // (раньше круг r = max(w,h)*0.36 был вдвое меньше — игрок проходил сквозь стены)
+        const hw = (p.w ?? 120) / 2
+        const hd = (p.h ?? 70) / 2
+        this.colliders.push({
+          x: p.pos.x,
+          y: p.pos.y,
+          r: Math.hypot(hw, hd),
+          hw,
+          hd,
+          rot: seedRot(p.seed ?? 1) * 0.2, // тот же поворот, что у меша в Props3d
+          propId: p.id,
+        })
+      } else if (p.kind === 'stall') {
+        const hw = (p.w ?? 70) / 2 + 4
+        const hd = (p.h ?? 42) / 2 + 4
+        this.colliders.push({ x: p.pos.x, y: p.pos.y, r: Math.hypot(hw, hd), hw, hd, rot: 0, propId: p.id })
+      } else if (p.kind === 'tent') {
+        // Конус-палатка: радиус меша w*0.42
+        this.colliders.push({ x: p.pos.x, y: p.pos.y, r: (p.w ?? 60) * 0.45, propId: p.id })
+      } else {
+        this.colliders.push({ x: p.pos.x, y: p.pos.y, r: p.r ?? 10, propId: p.id })
+      }
     }
   }
 
@@ -263,6 +280,11 @@ export class GameEngine implements EngineCtx {
   /** Порядок систем симуляции — см. core/Game.stepWorld. */
   update(dt: number) {
     stepWorld(this, dt)
+  }
+
+  /** Косметика (частицы/флоатеры/тряска) — тикает даже при паузе/панелях. */
+  updateCosmetics(dt: number) {
+    stepCosmetics(this, dt)
   }
 
   // ---------------- Способности (делегаты systems/combat, ai) ----------------

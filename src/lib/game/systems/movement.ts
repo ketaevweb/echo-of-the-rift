@@ -23,15 +23,54 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   }
   nx = Math.max(30, Math.min(WORLD.w - 30, nx))
   ny = Math.max(30, Math.min(WORLD.h - 30, ny))
+  const er = e.radius * 0.7
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue
-    const dx = nx - c.x
-    const dy = ny - c.y
-    const dist = Math.hypot(dx, dy)
-    const min = c.r + e.radius * 0.7
-    if (dist < min && dist > 0.001) {
-      nx = c.x + (dx / dist) * min
-      ny = c.y + (dy / dist) * min
+    if (c.hw !== undefined && c.hd !== undefined) {
+      // Прямоугольный (OBB) коллайдер — дома/лавки: круг против повёрнутого бокса.
+      const cos = Math.cos(c.rot ?? 0)
+      const sin = Math.sin(c.rot ?? 0)
+      const dx = nx - c.x
+      const dy = ny - c.y
+      // мир → локальные оси бокса (соответствие rotation.y Three.js)
+      const lx = dx * cos - dy * sin
+      const lz = dx * sin + dy * cos
+      const qx = Math.max(-c.hw, Math.min(c.hw, lx))
+      const qz = Math.max(-c.hd, Math.min(c.hd, lz))
+      let ex = lx - qx
+      let ez = lz - qz
+      const dist = Math.hypot(ex, ez)
+      if (dist < er) {
+        if (dist > 0.0001) {
+          // снаружи: вытолкнуть по нормали от ближайшей точки бокса
+          const k = (er - dist) / dist
+          ex *= k
+          ez *= k
+        } else {
+          // центр внутри бокса: вытолкнуть через ближайшую грань
+          const penX = c.hw + er - Math.abs(lx)
+          const penZ = c.hd + er - Math.abs(lz)
+          if (penX < penZ) {
+            ex = lx >= 0 ? penX : -penX
+            ez = 0
+          } else {
+            ex = 0
+            ez = lz >= 0 ? penZ : -penZ
+          }
+        }
+        // локальный вынос → мир
+        nx += ex * cos + ez * sin
+        ny += -ex * sin + ez * cos
+      }
+    } else {
+      const dx = nx - c.x
+      const dy = ny - c.y
+      const dist = Math.hypot(dx, dy)
+      const min = c.r + er
+      if (dist < min && dist > 0.001) {
+        nx = c.x + (dx / dist) * min
+        ny = c.y + (dy / dist) * min
+      }
     }
   }
   e.pos.x = nx
@@ -68,12 +107,21 @@ export function separate(ctx: EngineCtx) {
 export function updatePlayer(ctx: EngineCtx, dt: number) {
   const p = ctx.player
   if (!p.alive) return
-  let mx = 0
-  let my = 0
-  if (ctx.keys.has('w') || ctx.keys.has('arrowup') || ctx.keys.has('ц')) my -= 1
-  if (ctx.keys.has('s') || ctx.keys.has('arrowdown') || ctx.keys.has('ы')) my += 1
-  if (ctx.keys.has('a') || ctx.keys.has('arrowleft') || ctx.keys.has('ф')) mx -= 1
-  if (ctx.keys.has('d') || ctx.keys.has('arrowright') || ctx.keys.has('в')) mx += 1
+  // WASD относительно камеры: W — от камеры (вперёд по экрану), S — к камере,
+  // A/D — влево/вправо по экрану. В 2D (yaw = 0) совпадает со старыми осями.
+  const yaw = ctx.renderMode === '3d' && ctx.view3d ? ctx.view3d.getCameraYaw() : 0
+  const fx = -Math.sin(yaw) // вперёд (от камеры к цели)
+  const fy = -Math.cos(yaw)
+  const rx = Math.cos(yaw) // вправо по экрану
+  const ry = -Math.sin(yaw)
+  let fw = 0
+  let sd = 0
+  if (ctx.keys.has('w') || ctx.keys.has('arrowup') || ctx.keys.has('ц')) fw += 1
+  if (ctx.keys.has('s') || ctx.keys.has('arrowdown') || ctx.keys.has('ы')) fw -= 1
+  if (ctx.keys.has('d') || ctx.keys.has('arrowright') || ctx.keys.has('в')) sd += 1
+  if (ctx.keys.has('a') || ctx.keys.has('arrowleft') || ctx.keys.has('ф')) sd -= 1
+  const mx = fx * fw + rx * sd
+  const my = fy * fw + ry * sd
   const moving = mx !== 0 || my !== 0
   if (moving) {
     const l = Math.hypot(mx, my)

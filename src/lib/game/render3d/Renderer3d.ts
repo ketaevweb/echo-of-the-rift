@@ -121,6 +121,11 @@ export class Renderer3d {
 
   // ---------------- Орбита камеры ----------------
 
+  /** Азимут орбиты (рад) — движок использует для WASD относительно камеры. */
+  getCameraYaw(): number {
+    return this.yaw
+  }
+
   private bindOrbit() {
     const c = this.canvas
     c.addEventListener('pointerdown', this.onOrbitDown)

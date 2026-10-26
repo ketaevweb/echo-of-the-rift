@@ -40,6 +40,8 @@ export interface View3dBridge {
     enemyType?: Entity['enemyType']
     npcDialogue?: string
   } | null
+  /** Азимут орбиты камеры (рад) — для WASD относительно камеры. */
+  getCameraYaw(): number
   resize(): void
   dispose(): void
 }
@@ -114,6 +116,8 @@ export interface EngineCtx {
   syncUi(): void
   castAbility(id: string): void
   isFrozen(): boolean
+  /** Косметический тик (частицы/флоатеры/тряска) — идёт даже при паузе/панелях. */
+  updateCosmetics(dt: number): void
   moveWithCollisions(e: Entity, vx: number, vy: number, dt: number): void
   openPanel(p: PanelId): void
   closePanel(): void
