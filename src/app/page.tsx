@@ -1,31 +1,16 @@
 'use client'
 
+import { useEffect } from 'react'
+import { readSave, useGame } from '@/lib/game/store'
+import TitleScreen from '@/components/game/TitleScreen'
+import GameView from '@/components/game/GameView'
+
 export default function Home() {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      gap: '2rem',
-      padding: '1rem'
-    }}>
-      <div style={{
-        position: 'relative',
-        width: '6rem',
-        height: '6rem'
-      }}>
-        <img
-          src="/logo.svg"
-          alt="Z.ai Logo"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain'
-          }}
-        />
-      </div>
-    </div>
-  )
+  const screen = useGame((s) => s.screen)
+
+  useEffect(() => {
+    useGame.getState().setHasSave(!!readSave())
+  }, [])
+
+  return screen === 'game' ? <GameView /> : <TitleScreen />
 }
