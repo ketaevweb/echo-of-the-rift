@@ -205,7 +205,18 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 340, ac: 13, atk: 6, dmgDice: 2, dmgSides: 6, dmgMod: 3,
     speed: 94, aggroR: 260, leashR: 950, attackRange: 52, attackCd: 1.5, xp: 400, radius: 26, ranged: 260,
   },
+  // ---------------- Фаза 6: Гранитная Долина ----------------
+  scorpion: {
+    hp: 42, ac: 12, atk: 4, dmgDice: 1, dmgSides: 6, dmgMod: 2,
+    speed: 148, aggroR: 240, leashR: 640, attackRange: 42, attackCd: 1.0, xp: 50, radius: 14,
+  },
+  pit_master: {
+    hp: 380, ac: 14, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
+    speed: 100, aggroR: 0, leashR: 9999, attackRange: 54, attackCd: 1.5, xp: 550, radius: 24,
+  },
 }
 
 export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling'])
 export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother'])
+/** Фаза 6: панцирь скорпиона трескается от телекинеза — Аард оглушает надолго. */
+export const STUN2_WEAK = new Set<EnemyType>(['scorpion', 'pit_master'])

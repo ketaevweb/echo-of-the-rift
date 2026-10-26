@@ -12,7 +12,7 @@ import { QUESTS, QUEST_MAP } from '../data/quests'
 import { AREAS, INTERACTABLES, NPCS, ASH_MOTHER, VELD_CLUES } from '../data/world'
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO } from '../data/tables'
-import { Entity, Faction, InteractableDef, OriginId, Vec } from '../types'
+import { CareerId, Entity, Faction, InteractableDef, OriginId, Vec } from '../types'
 import { useGame } from '../store'
 import { sfx } from '../sfx'
 import { d } from '../core/util'
@@ -23,6 +23,7 @@ import { saveGame } from './save'
 import { floater } from './combat'
 import { spawnAshMother } from './ai'
 import { approvalOnQuestDone } from './party'
+import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, startPitFight } from './career'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -78,6 +79,17 @@ function evalToken(ctx: EngineCtx, s: string): boolean {
   if (m) return ctx.gold >= parseInt(m[1], 10)
   m = s.match(/^origin:(\w+)$/)
   if (m) return ctx.origin === (m[1] as OriginId)
+  // Фаза 6: карьера Гранита
+  m = s.match(/^career==([\w-]+)$/)
+  if (m) return ctx.career.faction === (m[1] as CareerId)
+  m = s.match(/^!career$/)
+  if (m) return ctx.career.faction === null
+  m = s.match(/^career$/)
+  if (m) return ctx.career.faction !== null
+  m = s.match(/^rank>=(\d+)$/)
+  if (m) return ctx.career.faction !== null && ctx.career.rank[ctx.career.faction] >= parseInt(m[1], 10)
+  m = s.match(/^rep:([\w-]+)>=(\d+)$/)
+  if (m) return ctx.career.rep[m[1] as CareerId] >= parseInt(m[2], 10)
   return true
 }
 
@@ -218,7 +230,7 @@ export function runAction(ctx: EngineCtx, action: string) {
         break
       case 'open':
         closeDialogue(ctx)
-        if (arg1 === 'shop') openShop(ctx, arg2 === 'alra' ? 'alra' : 'grim')
+        if (arg1 === 'shop') openShop(ctx, arg2 === 'alra' ? 'alra' : arg2 === 'brock' ? 'brock' : 'grim')
         if (arg1 === 'trainer') openTrainer(ctx)
         break
       case 'bestiary':
@@ -244,6 +256,25 @@ export function runAction(ctx: EngineCtx, action: string) {
         if (arg1 === 'mist') checkProof(ctx)
         sfx('quest')
         break
+      // Фаза 6: карьера Гранита — вербовка/ранг/слава, ямные бои
+      case 'career':
+        if (arg1 === 'join') joinCareer(ctx, arg2 as CareerId)
+        if (arg1 === 'rank') rankUp(ctx, arg2 as CareerId)
+        break
+      case 'rep':
+        addRep(ctx, arg1 as CareerId, parseInt(arg2, 10))
+        break
+      case 'pit':
+        if (arg1 === 'start') {
+          closeDialogue(ctx)
+          startPitFight(ctx, parseInt(arg2, 10))
+        }
+        break
+      case 'key':
+        // Ключ-осколок домена (Фаза 6): флаг + предмет-трофей
+        ctx.flags[arg1] = true
+        addItem(ctx, arg1 === 'key_granite' ? 'core_key' : arg1, 1)
+        break
       case 'sign':
         if (arg1 === 'shout' && !ctx.signs.shout.unlocked) {
           ctx.signs.shout.unlocked = true
@@ -255,6 +286,22 @@ export function runAction(ctx: EngineCtx, action: string) {
         if (arg1 === 'fight') {
           const boss = ctx.entities.find((e) => e.enemyType === 'boss' && e.alive)
           if (boss) boss.aiState = 'chase'
+        } else if (arg1 === 'fight_pit') {
+          // Фаза 6: вызвать Мастера Ямы
+          const pm = ctx.entities.find((e) => e.enemyType === 'pit_master' && e.alive)
+          if (pm) {
+            pm.aggroR = 420
+            pm.aiState = 'chase'
+            floater(ctx, pm.pos, 'ЯМА ПРИНЯЛА ВЫЗОВ!', '#c9a44a', 16)
+            sfx('boss')
+          }
+        } else if (arg1 === 'weaken_pit') {
+          const pm = ctx.entities.find((e) => e.enemyType === 'pit_master' && e.alive)
+          if (pm) {
+            pm.hp = Math.round(pm.hp * 0.85)
+            pm.dmgMod = Math.max(1, pm.dmgMod - 2)
+            floater(ctx, pm.pos, 'Толпа усмехается Мастеру...', '#c9a44a', 15)
+          }
         } else if (arg1 === 'weaken') {
           const boss = ctx.entities.find((e) => e.enemyType === 'boss' && e.alive)
           if (boss) {
@@ -282,9 +329,24 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
   if (it.action.startsWith('dialogue:')) {
     openDialogue(ctx, it.action.slice(9))
   } else if (it.action.startsWith('portal:')) {
-    // Врата Тумана (Фаза 3): затемнение + телепорт через Хребет
-    const zone = it.action.slice(7) === 'veld' ? 'veld' : 'valley'
-    ctx.travelTo(zone)
+    // Врата Тумана / Врата Гранита (Фаза 3/6): затемнение + телепорт
+    const zone = it.action.slice(7)
+    if (zone === 'veld' || zone === 'valley' || zone === 'granite') ctx.travelTo(zone)
+  } else if (it.action.startsWith('ore:')) {
+    // Гранитные жилы (Фаза 6): добыча руды для кузнеца
+    const item = it.action.slice(4)
+    addItem(ctx, item, 1)
+    ctx.removedProps.add(it.id)
+    ctx.flags['ore_' + it.id] = true
+    sfx('coin')
+    ctx.toast('Добыто: ' + ITEMS[item].name, 'loot')
+    const q = ctx.quests.granite_ore
+    if (q.stage === 1 && !q.done) {
+      q.counter++
+      if (q.counter >= 4) ctx.toast('Руды достаточно — к Броку в Колонию!', 'quest')
+      else ctx.toast(`Гранитная руда: ${q.counter}/4`, 'info')
+    }
+    ctx.syncUi()
   } else if (it.action.startsWith('clue:')) {
     // Следопытство W3 (Фаза 3): цепочка следов ведёт к логову
     const questId = it.action.slice(5)
@@ -388,6 +450,12 @@ export function advanceQuest(ctx: EngineCtx, id: string, stage: number) {
     ctx.removedProps.add('barrier3')
     ctx.toast('Пелена перед Разломом опала!', 'quest')
   }
+  // Фаза 6: главный квест Гранита — стадия 3 открывает выход Мастера Ямы
+  if (id === 'granite' && stage === 3 && !ctx.flags.pitMasterRevealed) {
+    ctx.flags.pitMasterRevealed = true
+    spawnPitMaster(ctx)
+    ctx.toast('Заслон Ямы гремит: Мастер ждёт тебя на арене.', 'warn')
+  }
   ctx.toast(`${def.name}: ${stageText(ctx, id)}`, 'quest')
   sfx('quest')
   saveGame(ctx, false)
@@ -440,12 +508,39 @@ export function questMarker(ctx: EngineCtx): Vec | null {
     if (v.stage === 2) return { ...ASH_MOTHER.pos }
     if (v.stage === 3) return NPCS.find((n) => n.id === 'alra')!.pos
   }
+  // Гранитная Долина (Фаза 6)
+  const g = ctx.quests.granite
+  if (g.stage > 0 && !g.done) {
+    if (g.stage === 1) return NPCS.find((n) => n.id === 'kharan')!.pos
+    if (g.stage === 2) return NPCS.find((n) => n.id === 'kassia')!.pos
+    if (g.stage === 3) return { x: 4380, y: 2050 }
+    if (g.stage === 4) return NPCS.find((n) => n.id === 'kharan')!.pos
+  }
+  const go = ctx.quests.granite_ore
+  if (go.stage > 0 && !go.done) {
+    if (go.stage === 1) {
+      const vein = [
+        { id: 'ore1', pos: { x: 4020, y: 1050 } },
+        { id: 'ore2', pos: { x: 4560, y: 1020 } },
+        { id: 'ore3', pos: { x: 4790, y: 1450 } },
+        { id: 'ore4', pos: { x: 3950, y: 2350 } },
+        { id: 'ore5', pos: { x: 4560, y: 2680 } },
+      ].find((vv) => !ctx.flags['ore_' + vv.id])
+      if (vein) return { ...vein.pos }
+    }
+    return NPCS.find((n) => n.id === 'brock')!.pos
+  }
+  const gs = ctx.quests.granite_scorpions
+  if (gs.stage > 0 && !gs.done) {
+    if (gs.stage === 1) return { x: 4020, y: 2600 }
+    return NPCS.find((n) => n.id === 'finn')!.pos
+  }
   return null
 }
 
 export function updateArea(ctx: EngineCtx) {
-  // Фолбэк по зоне (Фаза 3): юг за Хребтом — Вельд
-  let name = ctx.zone === 'veld' ? 'Вельд' : 'Долина'
+  // Фолбэк по зоне (Фаза 3/6): юг за Хребтом — Вельд, восток за Каменным Хребтом — Гранит
+  let name = ctx.zone === 'veld' ? 'Вельд' : ctx.zone === 'granite' ? 'Гранитная Долина' : 'Долина'
   for (const a of AREAS) {
     if (a.id === 'wilds') continue
     const [x, y, w, h] = a.rect
@@ -501,7 +596,14 @@ export function openEnding(ctx: EngineCtx) {
     )
   }
   epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
+  // Фаза 6: карьера Гранита вписана в судьбу героя
+  if (ctx.career.faction) {
+    epilogue.push(
+      `${CAREER_NAME[ctx.career.faction]} помнит, на чьей стороне ты стоял в войне за барьер — и это значит больше, чем любое золото.`,
+    )
+  }
   const mins = Math.floor(ctx.playtime / 60)
+  const keys = ['key_granite'].filter((k) => ctx.flags[k]).length
   const stats: Array<[string, string]> = [
     ['Уровень', String(ctx.level)],
     ['Убито врагов', String(ctx.kills)],
@@ -510,6 +612,8 @@ export function openEnding(ctx: EngineCtx) {
     ['Фракция', ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель'],
     ['Спутники', `${(ctx.companionIds.kaya ? 1 : 0) + (ctx.companionIds.torvald ? 1 : 0)} из 2`],
     ['Тишь', `${ctx.silence}/100`],
+    ['Карьера Колонии', ctx.career.faction ? `${CAREER_NAME[ctx.career.faction]}, ранг ${heroRank(ctx)}` : 'нет'],
+    ['Ключи-осколки', `${keys}/6`],
   ]
   useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
 }

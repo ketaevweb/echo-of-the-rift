@@ -362,6 +362,92 @@ function buildAshMother(): { group: THREE.Group; refs: { body: THREE.Object3D } 
   return { group, refs: { body } }
 }
 
+// ---------------- Гранит: скорпион / Мастер Ямы (Фаза 6) ----------------
+
+/** Гранитный скорпион: панцирь, клешни, хвост-коса. Морда по +X. */
+function buildScorpion(scale = 1): { group: THREE.Group; refs: { body: THREE.Object3D; tail: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const shell = mat(0x7a7160)
+  const shellDark = mat(0x5c544a)
+  const trunk = new THREE.Mesh(new THREE.SphereGeometry(6.4, 10, 8), shell)
+  trunk.scale.set(1.35, 0.8, 1)
+  trunk.position.y = 4.6
+  trunk.castShadow = true
+  const rump = new THREE.Mesh(new THREE.SphereGeometry(4.6, 8, 6), shellDark)
+  rump.scale.set(1.1, 0.85, 1)
+  rump.position.x = -5.4
+  rump.position.y = 4.2
+  // Клешни
+  for (const sz of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(1.7, 5.4, 3, 5), shell)
+    arm.rotation.x = Math.PI / 2
+    arm.position.set(6.4, 3.4, sz * 4.6)
+    const claw = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.6, 3.4), shellDark)
+    claw.position.set(10.6, 3.4, sz * 5.4)
+    body.add(arm, claw)
+  }
+  // Хвост-коса над спиной
+  const tail = new THREE.Group()
+  let seg = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 5, 3, 5), shellDark)
+  seg.rotation.x = Math.PI / 2
+  seg.position.x = -4
+  tail.add(seg)
+  let prev = tail
+  for (let i = 1; i < 4; i++) {
+    const joint = new THREE.Group()
+    const s = new THREE.Mesh(new THREE.CapsuleGeometry(1.5 - i * 0.14, 4.6, 3, 5), shellDark)
+    s.rotation.x = Math.PI / 2
+    s.position.x = -4.4
+    joint.add(s)
+    joint.position.x = -4.4
+    joint.rotation.z = -0.42 // сегменты загибаются вверх дугой
+    prev.add(joint)
+    prev = joint
+  }
+  const sting = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4, 5), mat(0xd9a441))
+  sting.position.x = -3.4
+  sting.rotation.z = Math.PI / 2
+  prev.add(sting)
+  tail.position.set(-4, 7, 0)
+  tail.rotation.z = 0.55
+  // Глаза
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd9a441 })
+  for (const sz of [-2.2, 2.2]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.9, 6, 4), eyeMat)
+    eye.position.set(5.4, 6.4, sz)
+    body.add(eye)
+  }
+  // Ноги
+  for (const [lx, lz] of [[-2, 5.6], [-2, -5.6], [2.6, 5.2], [2.6, -5.2], [-5, 4.6], [-5, -4.6]]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 4.4, 3, 4), shellDark)
+    leg.position.set(lx, 1.8, lz)
+    body.add(leg)
+  }
+  body.add(trunk, rump, tail)
+  group.add(body)
+  group.scale.setScalar(0.85 * scale)
+  return { group, refs: { body, tail } }
+}
+
+/** Мастер Ямы: кряжистый боец в цепях с импровизированной косой-цепом. */
+function buildPitMaster(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#8a6a3a', 0xb08858, { sword: true, scale: 1.9 })
+  // Наплечники-обрезки + цепь на поясе
+  const iron = mat(0x6a6a70, { metalness: 0.5, roughness: 0.45 })
+  for (const sz of [-1, 1]) {
+    const pad = new THREE.Mesh(new THREE.SphereGeometry(4.4, 8, 6), iron)
+    pad.position.set(sz * 7.6, 21.5, 0)
+    pad.scale.set(1, 0.7, 1)
+    built.group.add(pad)
+  }
+  const chain = new THREE.Mesh(new THREE.TorusGeometry(6.4, 1.1, 6, 18), iron)
+  chain.rotation.x = Math.PI / 2
+  chain.position.y = 14
+  built.group.add(chain)
+  return built
+}
+
 // ---------------- Аватар сущности ----------------
 
 export class Avatar {
@@ -417,6 +503,12 @@ export class Avatar {
       case 'ash_mother':
         built = buildAshMother()
         break
+      case 'scorpion':
+        built = buildScorpion(1)
+        break
+      case 'pit_master':
+        built = buildPitMaster()
+        break
       case 'boss':
         built = buildHumanoid(e.color, 0x6a5a5a, { horns: true, sword: true, scale: 2.5 })
         break
@@ -433,7 +525,8 @@ export class Avatar {
     this.refs = built.refs as Avatar['refs']
     this.forwardX =
       arch === 'wolf' || arch === 'alpha' || arch === 'horror' ||
-      arch === 'bogling' || arch === 'ash_shade' || arch === 'ash_mother'
+      arch === 'bogling' || arch === 'ash_shade' || arch === 'ash_mother' ||
+      arch === 'scorpion'
     this.mats = collectMats(this.group)
     this.hpBar = new HpBar()
     this.group.add(this.hpBar.obj)
@@ -453,6 +546,8 @@ export class Avatar {
     | 'bogling'
     | 'ash_shade'
     | 'ash_mother'
+    | 'scorpion'
+    | 'pit_master'
     | 'boss'
     | 'humanoid' {
     if (e.kind === 'player') return 'player'
@@ -468,6 +563,8 @@ export class Avatar {
       case 'bogling': return 'bogling'
       case 'ash_shade': return 'ash_shade'
       case 'ash_mother': return 'ash_mother'
+      case 'scorpion': return 'scorpion'
+      case 'pit_master': return 'pit_master'
       case 'boss': return 'boss'
       default: return 'humanoid'
     }
@@ -548,6 +645,13 @@ export class Avatar {
     } else if (this.refs.body && e.enemyType === 'bogling') {
       this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 10)) * 3.4 : Math.sin(time * 3 + this.eid) * 0.8
       this.refs.body.rotation.x = moving ? Math.sin(e.walkPhase * 10) * 0.14 : 0
+    } else if (this.refs.body && e.enemyType === 'scorpion') {
+      // Скорпион: семенит низко, хвост покачивается, при замахе хвост заносятся вперёд
+      this.refs.body.position.y = moving ? Math.abs(Math.sin(e.walkPhase * 12)) * 0.9 : Math.sin(time * 2 + this.eid) * 0.4
+      const tail = (this.refs as { tail?: THREE.Object3D }).tail
+      if (tail) {
+        tail.rotation.z = 0.55 + (e.attackT > 0 ? Math.sin((1 - e.attackT / 0.28) * Math.PI) * 0.5 : Math.sin(time * 1.7 + this.eid) * 0.1)
+      }
     }
 
     // Вспышка урона

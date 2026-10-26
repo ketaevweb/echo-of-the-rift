@@ -17,6 +17,9 @@ import { playerAc, playerAtk } from './progression'
 import { beam, damage, floater, meleeAttack, rangedAttack, ring, spawnTelegraph } from './combat'
 import { openDialogue } from './quest'
 import { companionIndex, formationSlot } from './party'
+import { pitMasterLogic, spawnPitMaster } from './career'
+
+export { spawnPitMaster }
 
 // ---------------- Инициализация/спавн ----------------
 
@@ -78,6 +81,10 @@ export function spawnWorld(ctx: EngineCtx) {
   // Вельд (Фаза 3): Пепельная Мать появляется после прочтения всех следов
   if (ctx.flags.ashMotherRevealed && !ctx.flags.ashMotherDead) {
     spawnAshMother(ctx)
+  }
+  // Гранит (Фаза 6): Мастер Ямы выходит, если квест дошёл до вызова
+  if (ctx.flags.pitMasterRevealed && !ctx.flags.pitMasterDead) {
+    spawnPitMaster(ctx)
   }
   for (const c of VELD_CLUES) {
     if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
@@ -447,6 +454,15 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
       return
     }
   }
+  // Интро Мастера Ямы (Фаза 6): таймер-выбор у арены
+  if (e.enemyType === 'pit_master' && !ctx.flags.pitIntroDone) {
+    if (Math.hypot(ctx.player.pos.x - e.pos.x, ctx.player.pos.y - e.pos.y) < 380) {
+      ctx.flags.pitIntroDone = true
+      e.aggroR = 420
+      openDialogue(ctx, 'pit_intro')
+      return
+    }
+  }
   if (e.stunT > 0) {
     e.vel = { x: 0, y: 0 }
     ctx.moveWithCollisions(e, 0, 0, dt)
@@ -515,6 +531,7 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
 
   if (e.boss) bossLogic(ctx, e, dist, dt)
   if (e.enemyType === 'ash_mother') ashMotherLogic(ctx, e, dist, dt)
+  if (e.enemyType === 'pit_master') pitMasterLogic(ctx, e, dist, dt)
 
   // Замах/рывок босса: обычное движение и атаки заблокированы —
   // вся логика внутри bossLogic (return после него не выходим,

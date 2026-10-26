@@ -1,5 +1,5 @@
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
-import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD } from '../data/world'
+import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD } from '../data/world'
 
 // ---------------- Терен (запекается один раз) ----------------
 
@@ -157,6 +157,62 @@ export function bakeTerrain(): HTMLCanvasElement {
     ctx.arc(p.x - p.r * 0.2, p.y - p.r * 0.15, p.r * 0.55, 0, Math.PI * 2)
     ctx.fill()
   }
+
+  // --- Фаза 6: Каменный Хребет и Гранитная Долина ---
+  // Вертикальный хребет — серая полоса гор
+  const gmg = ctx.createLinearGradient(GRIDGE.x - 200, 0, GRIDGE.x + 200, 0)
+  gmg.addColorStop(0, 'rgba(84,82,72,0)')
+  gmg.addColorStop(0.5, 'rgba(94,92,80,0.95)')
+  gmg.addColorStop(1, 'rgba(80,76,62,0)')
+  ctx.fillStyle = gmg
+  ctx.fillRect(GRIDGE.x - 200, 0, 400, WORLD.h)
+  // Пепельная котловина: серая база + пыльные пятна
+  const gg = ctx.createLinearGradient(GRIDGE.x + 100, 0, WORLD.w, 0)
+  gg.addColorStop(0, 'rgba(86,80,66,0.55)')
+  gg.addColorStop(1, 'rgba(64,60,50,0.75)')
+  ctx.fillStyle = gg
+  ctx.fillRect(GRIDGE.x + 100, 0, WORLD.w - GRIDGE.x - 100, WORLD.h)
+  for (let i = 0; i < 420; i++) {
+    const x = GRIDGE.x + 240 + rnd() * (WORLD.w - GRIDGE.x - 320)
+    const y = rnd() * WORLD.h
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(96,88,70,0.28)' : 'rgba(56,52,44,0.3)'
+    ctx.beginPath()
+    ctx.arc(x, y, 16 + rnd() * 50, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // Площадь Колонии
+  ctx.fillStyle = 'rgba(104,88,60,0.85)'
+  ctx.beginPath()
+  ctx.ellipse(COLONY.pos.x, COLONY.pos.y, 185, 130, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(124,104,72,0.9)'
+  ctx.beginPath()
+  ctx.ellipse(COLONY.pos.x, COLONY.pos.y, 118, 82, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Яма: песчаная арена + кольцо частокола
+  ctx.fillStyle = 'rgba(150,124,86,0.55)'
+  ctx.beginPath()
+  ctx.arc(PIT.pos.x, PIT.pos.y, PIT.r + 26, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#a8905e'
+  ctx.beginPath()
+  ctx.arc(PIT.pos.x, PIT.pos.y, PIT.r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(150,124,86,0.5)'
+  ctx.beginPath()
+  ctx.arc(PIT.pos.x - 24, PIT.pos.y - 18, PIT.r * 0.55, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(74,54,38,0.8)'
+  ctx.lineWidth = 5
+  ctx.beginPath()
+  ctx.arc(PIT.pos.x, PIT.pos.y, PIT.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+  // Осколочный барьер — пепельное свечение
+  const sg = ctx.createRadialGradient(SHARD.pos.x, SHARD.pos.y, 10, SHARD.pos.x, SHARD.pos.y, 200)
+  sg.addColorStop(0, 'rgba(180,140,220,0.5)')
+  sg.addColorStop(1, 'rgba(180,140,220,0)')
+  ctx.fillStyle = sg
+  ctx.fillRect(SHARD.pos.x - 200, SHARD.pos.y - 200, 400, 400)
 
   // Тёмная рамка мира
   const edge = 90
@@ -576,6 +632,111 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
       ctx.stroke()
       break
     }
+    // --- Фаза 6: Гранитная Долина ---
+    case 'pit': {
+      // Частокол арены: столбы по кругу + песчаное дно (базовая заливка уже в bake)
+      const r = p.r ?? 120
+      ctx.strokeStyle = '#4a3626'
+      ctx.lineWidth = 4
+      const posts = 22
+      for (let i = 0; i < posts; i++) {
+        const a = (i / posts) * Math.PI * 2
+        const px = pos.x + Math.cos(a) * (r + 14)
+        const py = pos.y + Math.sin(a) * (r + 14)
+        ctx.fillStyle = '#5a422c'
+        ctx.fillRect(px - 3, py - 16, 6, 20)
+        ctx.fillStyle = '#3d2c1c'
+        ctx.fillRect(px - 3, py - 16, 6, 5)
+      }
+      ctx.strokeStyle = 'rgba(74,54,38,0.55)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y, r + 14, 0, Math.PI * 2)
+      ctx.stroke()
+      break
+    }
+    case 'mine': {
+      // Вход в копи: каменная арка с тёмным проёмом
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 6, 44, 12, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#5c5c56'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 40, pos.y + 6)
+      ctx.lineTo(pos.x - 28, pos.y - 52)
+      ctx.quadraticCurveTo(pos.x, pos.y - 74, pos.x + 28, pos.y - 52)
+      ctx.lineTo(pos.x + 40, pos.y + 6)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#141210'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 22, pos.y + 6)
+      ctx.lineTo(pos.x - 16, pos.y - 36)
+      ctx.quadraticCurveTo(pos.x, pos.y - 50, pos.x + 16, pos.y - 36)
+      ctx.lineTo(pos.x + 22, pos.y + 6)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(20,16,12,0.4)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      break
+    }
+    case 'obelisk': {
+      // Осколок Ядра: парящий кристалл с пепельным свечением
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.6 + pos.x)
+      const r = p.r ?? 16
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 4, r * 1.1, r * 0.4, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const g = ctx.createRadialGradient(pos.x, pos.y - r * 2, 2, pos.x, pos.y - r * 2, r * 3)
+      g.addColorStop(0, `rgba(190,150,230,${0.35 + pulse * 0.2})`)
+      g.addColorStop(1, 'rgba(190,150,230,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(pos.x - r * 3, pos.y - r * 5, r * 6, r * 6)
+      ctx.fillStyle = '#5a4a6a'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - r * 0.6, pos.y)
+      ctx.lineTo(pos.x - r * 0.45, pos.y - r * 2.6)
+      ctx.lineTo(pos.x, pos.y - r * 3.4)
+      ctx.lineTo(pos.x + r * 0.5, pos.y - r * 2.4)
+      ctx.lineTo(pos.x + r * 0.65, pos.y)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = `rgba(220,190,255,${0.5 + pulse * 0.4})`
+      ctx.beginPath()
+      ctx.moveTo(pos.x - r * 0.18, pos.y - r * 1.1)
+      ctx.lineTo(pos.x, pos.y - r * 3.2)
+      ctx.lineTo(pos.x + r * 0.2, pos.y - r * 1.2)
+      ctx.closePath()
+      ctx.fill()
+      break
+    }
+    case 'ore': {
+      // Гранитная жила: серые камни с седыми кристаллами
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2 + pos.x)
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 16, 6, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#5e5e56'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 13, pos.y + 2)
+      ctx.lineTo(pos.x - 7, pos.y - 10)
+      ctx.lineTo(pos.x + 6, pos.y - 8)
+      ctx.lineTo(pos.x + 13, pos.y + 2)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = `rgba(216,224,236,${0.55 + pulse * 0.35})`
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 3, pos.y - 2)
+      ctx.lineTo(pos.x, pos.y - 16)
+      ctx.lineTo(pos.x + 4, pos.y - 3)
+      ctx.closePath()
+      ctx.fill()
+      break
+    }
   }
 }
 
@@ -871,6 +1032,51 @@ export function drawEntity(
     case 'boss':
       drawBoss(ctx, e, t)
       break
+    case 'scorpion': {
+      // Гранитный скорпион: панцирь, клешни, хвост-коса
+      const bob = Math.sin(e.walkPhase * 11) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.2 : 0.3)
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+      ctx.save()
+      ctx.translate(e.pos.x, e.pos.y - 6 + bob)
+      ctx.rotate(e.facing)
+      // хвост над спиной (дуга назад-вверх)
+      ctx.strokeStyle = e.hitT > 0 ? '#ffffff' : '#6a6154'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(-e.radius * 0.8, 0)
+      ctx.quadraticCurveTo(-e.radius * 1.9, -10 - bob * 2, -e.radius * 1.1, -18 - bob * 3)
+      ctx.stroke()
+      // жало
+      ctx.fillStyle = '#d9a441'
+      ctx.beginPath()
+      ctx.arc(-e.radius * 1.1, -19 - bob * 3, 2.6, 0, Math.PI * 2)
+      ctx.fill()
+      // панцирь (сегменты)
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#7a7160'
+      ctx.beginPath()
+      ctx.ellipse(0, 0, e.radius * 1.1, e.radius * 0.72, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#5c544a'
+      ctx.beginPath()
+      ctx.ellipse(-e.radius * 0.55, 0, e.radius * 0.5, e.radius * 0.55, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // клешни
+      ctx.fillStyle = '#8a8070'
+      ctx.beginPath()
+      ctx.ellipse(e.radius * 1.15, -e.radius * 0.55, e.radius * 0.42, e.radius * 0.28, 0.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.ellipse(e.radius * 1.15, e.radius * 0.55, e.radius * 0.42, e.radius * 0.28, -0.5, 0, Math.PI * 2)
+      ctx.fill()
+      // глаза
+      ctx.fillStyle = '#d9a441'
+      ctx.beginPath()
+      ctx.arc(e.radius * 0.55, -2.5, 1.6, 0, Math.PI * 2)
+      ctx.arc(e.radius * 0.55, 2.5, 1.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      break
+    }
     default: {
       const weapon =
         e.id === 'kaya'

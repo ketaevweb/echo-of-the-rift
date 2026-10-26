@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Faction, FormationId, InventoryEntry, OriginId, SaveData, SignId, Stance } from './types'
+import { CareerId, Faction, FormationId, InventoryEntry, OriginId, SaveData, SignId, Stance } from './types'
 
 export type Screen = 'title' | 'game'
 export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'ending'
@@ -28,6 +28,16 @@ export interface AbilityHud {
   cdMax: number
   unlocked: boolean
   staminaCost: number
+}
+
+/** Карьера фракции в HUD (Фаза 6). */
+export interface CareerHud {
+  faction: CareerId
+  factionName: string
+  rank: number
+  rankName: string
+  rep: number
+  perks: string[]
 }
 
 export interface PlayerHud {
@@ -210,6 +220,8 @@ interface GameStore {
   zoneFade: ZoneFadeState | null
   // Фаза 4
   formation: FormationId
+  // Фаза 6
+  career: CareerHud | null
   // Фаза 5
   diceRoll: DiceRollHudState | null
   setScreen: (s: Screen) => void
@@ -249,6 +261,7 @@ export const useGame = create<GameStore>((set) => ({
   zoneLabel: 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
   zoneFade: null,
   formation: 'wedge',
+  career: null,
   diceRoll: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),

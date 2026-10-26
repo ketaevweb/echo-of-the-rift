@@ -293,12 +293,17 @@ export class Renderer3d {
   private updateAtmosphere(zone: ZoneId, dayT: number, silenceGoal: number) {
     this.daylight = daylightOf(dayT)
     const veld = zone === 'veld'
+    const granite = zone === 'granite'
     const dl = this.daylight
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
     this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
 
     // Туман
-    if (veld) {
+    if (granite) {
+      // Гранит: пепельно-пылевой туман, тёплый серый
+      this.tmpColor.setRGB(0.24 + dl * 0.42, 0.21 + dl * 0.36, 0.17 + dl * 0.28)
+      this.fog.density += (0.0019 - dl * 0.0007 - this.fog.density) * k
+    } else if (veld) {
       this.tmpColor.setRGB(0.16 + dl * 0.32, 0.19 + dl * 0.33, 0.12 + dl * 0.28) // ночь → день
       this.fog.density += (0.0023 - dl * 0.0008 - this.fog.density) * k
     } else {
@@ -310,7 +315,11 @@ export class Renderer3d {
     // Небо
     const top = this.skyMat.uniforms.top.value as THREE.Color
     const hor = this.skyMat.uniforms.horizon.value as THREE.Color
-    if (veld) {
+    if (granite) {
+      // Пепельное небо Готики: серо-теплый купол, пыльный горизонт
+      this.tmpColor.setRGB(0.20 + dl * 0.30, 0.18 + dl * 0.27, 0.16 + dl * 0.21)
+      this.tmpColor2.setRGB(0.34 + dl * 0.44, 0.29 + dl * 0.38, 0.22 + dl * 0.28)
+    } else if (veld) {
       this.tmpColor.setRGB(0.10 + dl * 0.24, 0.12 + dl * 0.25, 0.10 + dl * 0.19)
       this.tmpColor2.setRGB(0.14 + dl * 0.46, 0.16 + dl * 0.44, 0.12 + dl * 0.38)
     } else {
@@ -321,7 +330,7 @@ export class Renderer3d {
     hor.lerp(this.tmpColor2, k)
 
     // Свет
-    const zoneDim = veld ? 0.78 : 1
+    const zoneDim = granite ? 0.82 : veld ? 0.78 : 1
     this.sun.intensity += ((0.04 + dl * 1.55 * zoneDim) - this.sun.intensity) * k
     // цвет солнца: на низком солнце — тёплый закатный
     const dusk = Math.max(0, 1 - Math.abs(Math.sin((dayT - 0.25) * Math.PI * 2)) * 2.6)
@@ -406,7 +415,7 @@ export class Renderer3d {
     for (const e of this.avatarsSyncedEntities) {
       if (!e.alive && e.kind !== 'npc') continue
       const h = heightAt(e.pos.x, e.pos.y)
-      const headH = e.boss ? 58 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : 28
+      const headH = e.boss ? 58 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : e.enemyType === 'scorpion' ? 15 : e.enemyType === 'pit_master' ? 46 : 28
       // Экранные координаты ног и головы
       this.tmpV.set(e.pos.x, h + 1, e.pos.y)
       this.tmpV.project(this.camera)
@@ -455,7 +464,7 @@ export class Renderer3d {
     if (this.disposed) return
     this.avatarsSyncedEntities = view.entities
 
-    this.updateAtmosphere(view.zone ?? zoneOf(view.player.pos.y), view.dayT ?? 0.4, view.silence ?? 0)
+    this.updateAtmosphere(view.zone ?? zoneOf(view.player.pos.x, view.player.pos.y), view.dayT ?? 0.4, view.silence ?? 0)
 
     const avatars = this.avatars.sync(view.entities)
     for (const e of view.entities) {

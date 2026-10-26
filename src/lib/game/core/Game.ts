@@ -14,6 +14,7 @@ import { updateStatuses } from '../systems/combat'
 import { separate, updatePlayer } from '../systems/movement'
 import { updateParticles } from '../systems/combat'
 import { updateArea, updateEnding } from '../systems/quest'
+import { updatePit } from '../systems/career'
 import type { EngineCtx } from './ctx'
 import { Clock } from './Clock'
 
@@ -32,12 +33,13 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   separate(ctx)
   updateTelegraphs(ctx, dt)
   updateParticles(ctx, dt)
+  updatePit(ctx) // Фаза 6: волны/победа ямы
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
   // Фаза 3: сутки, масло, зона
   ctx.dayClock = (ctx.dayClock + dt / DAY_LENGTH) % 1
   if (ctx.oilT > 0) ctx.oilT = Math.max(0, ctx.oilT - dt)
-  ctx.zone = zoneOf(ctx.player.pos.y)
+  ctx.zone = zoneOf(ctx.player.pos.x, ctx.player.pos.y)
   updateArea(ctx)
   updateEnding(ctx)
   // камера следует за игроком (в 3D кламп не нужен — там своя орбита)

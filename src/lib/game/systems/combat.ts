@@ -6,7 +6,7 @@
 // updateParticles/tickCds).
 // ============================================================
 
-import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from '../data/abilities'
+import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN2_WEAK, STUN_WEAK } from '../data/abilities'
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO, OIL_TARGETS } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
@@ -21,6 +21,7 @@ import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, signPower } from './progression'
 import { advanceQuest, checkProof } from './quest'
 import { approvalOnDowned, approvalOnKill, trySynergyFrostAndFlame, trySynergyWallAndHammer } from './party'
+import { careerRank, endPitFight } from './career'
 
 // ---------------- Атаки ----------------
 
@@ -33,12 +34,15 @@ function heightMod(a: Entity, t: Entity): number {
   return 0
 }
 
-/** Бонус масла (Фаза 3): урон игрока против класса врагов, пока масло активно. */
+/** Бонус масла (Фаза 3): урон игрока против класса врагов, пока масло активно.
+ *  Фаза 6: перк Ковена Ветвей — +2 урона за ранг. */
 function oilBonus(ctx: EngineCtx, a: Entity, t: Entity): number {
   if (a.kind !== 'player' || ctx.oilT <= 0 || !ctx.oilKind) return 0
   const def = ITEMS[ctx.oilKind]
   if (!def?.oil) return 0
-  return OIL_TARGETS[def.oil.targets].has(t.enemyType ?? '') ? def.oil.bonus : 0
+  return OIL_TARGETS[def.oil.targets].has(t.enemyType ?? '')
+    ? def.oil.bonus + careerRank(ctx, 'coven') * 2
+    : 0
 }
 
 export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
@@ -49,8 +53,10 @@ export function meleeAttack(ctx: EngineCtx, a: Entity, t: Entity) {
   const hMod = heightMod(a, t)
   const roll = d(20)
   const total = roll + a.atkBonus + buff + hMod
-  if (roll === 20 || (roll !== 1 && total >= t.ac)) {
-    const crit = roll === 20
+  // Фаза 6: перк «Вольный Дозор» ранг 2+ — 19 тоже считается критом (но не авто-попаданием)
+  const watchCrit = a.kind === 'player' && roll === 19 && careerRank(ctx, 'watch') >= 2
+  if (roll === 20 || watchCrit || (roll !== 1 && total >= t.ac)) {
+    const crit = roll === 20 || watchCrit
     const dmg =
       Math.max(1, Math.round(d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) * (hMod > 0 ? 1.15 : 1)) + a.dmgMod) +
       oilBonus(ctx, a, t)
@@ -152,6 +158,21 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     goldLoot = 120
     addItem(ctx, 'ash_heart', 1)
     if (ctx.quests.veld.stage === 2) advanceQuest(ctx, 'veld', 3)
+  } else if (type === 'scorpion') {
+    if (Math.random() < 0.45) addItem(ctx, 'granite_ore', 1)
+    if (Math.random() < 0.6) addItem(ctx, 'granite_chitin', 1)
+    // Клеймо скорпионов (Фаза 6): счётчик квеста Финна
+    if (ctx.quests.granite_scorpions.stage === 1 && !ctx.quests.granite_scorpions.done) {
+      ctx.quests.granite_scorpions.counter++
+      const c = ctx.quests.granite_scorpions.counter
+      if (c >= 5) ctx.toast('Пять панцирей собраны — к Финну в Колонию!', 'quest')
+      else ctx.toast(`Клеймо скорпионов: ${c}/5`, 'info')
+    }
+  } else if (type === 'pit_master') {
+    ctx.flags.pitMasterDead = true
+    goldLoot = 140
+    if (ctx.quests.granite.stage === 3) advanceQuest(ctx, 'granite', 4)
+    useGame.getState().patch({ bossBar: null })
   } else if (type === 'boss') {
     goldLoot = 150
     addItem(ctx, 'rift_shard', 3)
@@ -190,6 +211,7 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
 
 export function onPlayerDeath(ctx: EngineCtx) {
   ctx.player.alive = false
+  endPitFight(ctx) // Фаза 6: яма не прощает — бой прерван, ставка сгорела
   ctx.toast('Ты пал... Но Смотрители не умирают так просто.', 'warn')
   sfx('death')
   setTimeout(() => {
@@ -233,9 +255,11 @@ export function castAbility(ctx: EngineCtx, id: string) {
     }
     const def = ITEMS[id]
     if (def.heal) {
-      ctx.hp = Math.min(ctx.maxHp, ctx.hp + def.heal)
+      // Фаза 6: перк Ковена Ветвей — зелья лечат на +6 ОЗ за ранг
+      const amount = def.heal + careerRank(ctx, 'coven') * 6
+      ctx.hp = Math.min(ctx.maxHp, ctx.hp + amount)
       ctx.player.hp = ctx.hp
-      floater(ctx, ctx.player.pos, '+' + def.heal, '#8fbf7f', 15)
+      floater(ctx, ctx.player.pos, '+' + amount, '#8fbf7f', 15)
     }
     if (def.stamina) {
       ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + def.stamina)
@@ -258,7 +282,9 @@ export function castAbility(ctx: EngineCtx, id: string) {
   ctx.player.cds[id] = ab.cooldown
   ctx.player.castT = 0.25
   const signLevel = ctx.signs[id as SignId]?.level ?? 1
-  const power = signPower(ctx)
+  // Фаза 6: перк «Орден Пепла» — знаки сильнее на +12% за ранг
+  const orderMult = 1 + 0.12 * careerRank(ctx, 'order')
+  const power = signPower(ctx) * orderMult
   const target = ctx.targetEid ? ctx.entities.find((e) => e.eid === ctx.targetEid) : null
 
   if (id === 'igni') {
@@ -283,7 +309,9 @@ export function castAbility(ctx: EngineCtx, id: string) {
     const cone = enemiesInCone(ctx, 160, 0.95)
     for (const e of cone) {
       damage(ctx, e, Math.round(d(4) * power), { color: '#d9e3ea' })
-      e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
+      // Фаза 6: панцирь трескается — скорпион/Мастер Ямы держат Аард вдвое дольше
+      const stunMult = STUN2_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
+      e.stunT = Math.max(e.stunT, (1.1 + signLevel * 0.15) * stunMult)
       const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
       ctx.kb.set(e.eid, { x: Math.cos(a) * 300, y: Math.sin(a) * 300 })
     }

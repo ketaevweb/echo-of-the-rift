@@ -31,7 +31,7 @@ export interface SceneView {
   telegraphs: Telegraph[]
   playerAlive: boolean
   // Фаза 3: атмосфера
-  zone: 'valley' | 'veld'
+  zone: 'valley' | 'veld' | 'granite'
   dayT: number
   // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
   tactical?: boolean
@@ -172,6 +172,11 @@ export function drawScene(v: SceneView) {
   }
   if (v.zone === 'veld') {
     ctx.fillStyle = 'rgba(58,68,44,0.16)'
+    ctx.fillRect(0, 0, w, h)
+  }
+  // Фаза 6: пепельная пыл в Граните
+  if (v.zone === 'granite') {
+    ctx.fillStyle = 'rgba(78,68,52,0.14)'
     ctx.fillRect(0, 0, w, h)
   }
   // Фаза 5: Тишь — выцветание мира (composite 'saturation' + гаснущий серый)

@@ -9,12 +9,13 @@ import { ABILITY_MAP } from '../data/abilities'
 import { QUESTS } from '../data/quests'
 import { ITEMS } from '../data/items'
 import { ABILITY_BAR_IDS, ENEMY_NAME } from '../data/tables'
-import { AbilityHud, PartyHud, QuestHud, useGame } from '../store'
+import { AbilityHud, CareerHud, PartyHud, QuestHud, useGame } from '../store'
 import { SignId } from '../types'
 import type { EngineCtx } from '../core/ctx'
 import { countItem } from './inventory'
 import { xpNext } from './progression'
 import { nearestInteraction, stageText } from './quest'
+import { CAREER_NAME, CAREER_PERKS, heroRank, RANK_NAME } from './career'
 
 export function syncUi(ctx: EngineCtx): void {
   const st = useGame.getState()
@@ -89,10 +90,25 @@ export function syncUi(ctx: EngineCtx): void {
   const mainQ = quests.find((q) => q.id === 'main')!
   const contractQ = quests.find((q) => q.id === 'contract')!
   const veldQ = quests.find((q) => q.id === 'veld')!
-  const sideQ = [contractQ, veldQ].find((q) => q.stage > 0 && !q.done) ?? null
+  // Фаза 6: гранитные квесты тоже попадают в трекер побочек
+  const graniteQ = quests.find((q) => q.id === 'granite')!
+  const oreQ = quests.find((q) => q.id === 'granite_ore')!
+  const scorpQ = quests.find((q) => q.id === 'granite_scorpions')!
+  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ].find((q) => q.stage > 0 && !q.done) ?? null
   const boss = ctx.entities.find(
-    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother') && e.alive && e.aiState !== 'idle',
+    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother' || e.enemyType === 'pit_master') && e.alive && e.aiState !== 'idle',
   )
+  // Фаза 6: карьера — зеркало HUD
+  const career: CareerHud | null = ctx.career.faction
+    ? {
+        faction: ctx.career.faction,
+        factionName: CAREER_NAME[ctx.career.faction],
+        rank: heroRank(ctx),
+        rankName: RANK_NAME[heroRank(ctx)],
+        rep: ctx.career.rep[ctx.career.faction],
+        perks: CAREER_PERKS[ctx.career.faction],
+      }
+    : null
   const n = ctx.isFrozen() ? null : nearestInteraction(ctx)
   st.patch({
     party,
@@ -125,7 +141,8 @@ export function syncUi(ctx: EngineCtx): void {
     // Фаза 3: масло, сутки, зона
     oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
     daytime: ctx.dayClock,
-    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : ctx.zone === 'granite' ? 'ГРАНИТНАЯ ДОЛИНА' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
     formation: ctx.formation,
+    career,
   })
 }

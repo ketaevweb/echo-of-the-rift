@@ -6,13 +6,14 @@
 // ============================================================
 
 import { ABILITY_MAP } from '../data/abilities'
-import { ALRA_STOCK, ITEMS, MERCHANT_STOCK } from '../data/items'
+import { ALRA_STOCK, BROCK_STOCK, ITEMS, MERCHANT_STOCK } from '../data/items'
 import { ATTR_NAMES } from '../data/tables'
 import { SignId } from '../types'
 import { TrainerHudState, useGame } from '../store'
 import { sfx } from '../sfx'
 import { EngineCtx } from '../core/ctx'
 import { floater, ring } from './combat'
+import { careerRank } from './career'
 
 export function recalcStats(ctx: EngineCtx, full = false) {
   const newMaxHp = 80 + ctx.attributes.vigor * 8 + ctx.skills.vitality * 15 + (ctx.level - 1) * 8
@@ -46,7 +47,9 @@ export function playerAtk(ctx: EngineCtx) {
 
 export function playerAc(ctx: EngineCtx) {
   const a = ctx.armor ? ITEMS[ctx.armor] : null
-  return 10 + (a?.ac ?? 0) + Math.floor(ctx.attributes.vigor / 2)
+  // Фаза 6: перк «Орден Пепла» ранг 3 — +2 к классу брони (дисциплина строя)
+  const orderAc = careerRank(ctx, 'order') >= 3 ? 2 : 0
+  return 10 + (a?.ac ?? 0) + Math.floor(ctx.attributes.vigor / 2) + orderAc
 }
 
 export function signPower(ctx: EngineCtx) {
@@ -92,13 +95,14 @@ export function spendLp(ctx: EngineCtx, attr: 'might' | 'vigor' | 'intellect' | 
 
 // ---------------- Магазин и тренер ----------------
 
-/** Торговцы (Фаза 3): Грим в лавке и Альра-алхимик. */
-const SHOPS: Record<'grim' | 'alra', { name: string; stock: string[] }> = {
+/** Торговцы (Фаза 3/6): Грим в лавке, Альра-алхимик, Брок в Колонии. */
+const SHOPS: Record<'grim' | 'alra' | 'brock', { name: string; stock: string[] }> = {
   grim: { name: 'Грим', stock: MERCHANT_STOCK },
   alra: { name: 'Альра', stock: ALRA_STOCK },
+  brock: { name: 'Брок', stock: BROCK_STOCK },
 }
 
-export function openShop(ctx: EngineCtx, merchant: 'grim' | 'alra' = 'grim') {
+export function openShop(ctx: EngineCtx, merchant: 'grim' | 'alra' | 'brock' = 'grim') {
   const s = SHOPS[merchant]
   useGame.getState().patch({ shop: { merchantName: s.name, stock: [...s.stock] }, panel: 'shop' })
 }

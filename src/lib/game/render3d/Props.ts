@@ -470,32 +470,144 @@ export class Props3d {
         place(this.group, g, x, y, 0, seedRot(p.seed ?? 1))
         break
       }
+
+      // --- Фаза 6: Гранитная Долина ---
+
+      case 'pit': {
+        // Яма Колонии: песчаная чаша + частокол из заострённых брёвен
+        const g = new THREE.Group()
+        const r = p.r ?? 120
+        const sand = new THREE.Mesh(new THREE.CircleGeometry(r, 40), groundMat(0x9a8256, 0.98))
+        sand.rotation.x = -Math.PI / 2
+        sand.position.y = 0.35
+        sand.receiveShadow = true
+        g.add(sand)
+        const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(r + 10, 1.4, 6, 48), groundMat(0x4a3626))
+        ringMesh.rotation.x = -Math.PI / 2
+        ringMesh.position.y = 6
+        g.add(ringMesh)
+        const posts = 26
+        for (let i = 0; i < posts; i++) {
+          const a = (i / posts) * Math.PI * 2
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 2.2, 13, 5), groundMat(0x54402c))
+          post.position.set(Math.cos(a) * (r + 10), 6.5, Math.sin(a) * (r + 10))
+          post.rotation.z = ((i % 3) - 1) * 0.04
+          post.castShadow = true
+          g.add(post)
+          if (i % 4 === 0) {
+            const torch = new THREE.Mesh(
+              new THREE.ConeGeometry(1.4, 4, 6),
+              new THREE.MeshBasicMaterial({ color: 0xe8913a, transparent: true, opacity: 0.9 }),
+            )
+            torch.position.set(Math.cos(a) * (r + 10), 14.5, Math.sin(a) * (r + 10))
+            g.add(torch)
+            const light = new THREE.PointLight(0xff9540, 150, 120, 2)
+            light.position.set(Math.cos(a) * (r + 10), 16, Math.sin(a) * (r + 10))
+            g.add(light)
+            this.fires.push({ light, flame: torch, base: 1 })
+          }
+        }
+        place(this.group, g, x, y)
+        break
+      }
+
+      case 'mine': {
+        // Вход в копи: каменная арка с чёрным проёмом
+        const g = new THREE.Group()
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(30, 9, 8, 20, Math.PI), groundMat(0x6a6a62))
+        arch.position.y = 4
+        arch.castShadow = true
+        const hole = new THREE.Mesh(
+          new THREE.CircleGeometry(26, 20, 0, Math.PI),
+          new THREE.MeshBasicMaterial({ color: 0x0c0a08 }),
+        )
+        hole.position.y = 3
+        g.add(arch, hole)
+        for (const px of [-34, 34]) {
+          const pillar = new THREE.Mesh(new THREE.BoxGeometry(10, 18, 12), groundMat(0x5c5c54))
+          pillar.position.set(px, 9, 0)
+          pillar.castShadow = true
+          g.add(pillar)
+        }
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.3)
+        break
+      }
+
+      case 'obelisk': {
+        // Осколок Ядра: парящий кристалл с пепельным свечением
+        const g = new THREE.Group()
+        const r = p.r ?? 16
+        const crystal = new THREE.Mesh(
+          new THREE.OctahedronGeometry(r * 1.5, 0),
+          new THREE.MeshStandardMaterial({
+            color: 0x4a3a5a,
+            emissive: 0x9a6fd0,
+            emissiveIntensity: 0.9,
+            roughness: 0.3,
+            metalness: 0.15,
+          }),
+        )
+        crystal.scale.set(0.75, 1.7, 0.75)
+        crystal.position.y = r * 2.1
+        crystal.castShadow = true
+        const glow = new THREE.PointLight(0xa86fe0, 260, 260, 2)
+        glow.position.y = r * 2.2
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(r * 1.1, r * 1.35, 26),
+          new THREE.MeshBasicMaterial({ color: 0xc9a3e8, transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
+        )
+        ring.rotation.x = -Math.PI / 2
+        ring.position.y = 0.8
+        g.add(crystal, glow, ring)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1))
+        this.spinners.push(crystal)
+        this.herbPulse.push(ring)
+        break
+      }
     }
   }
 
-  // ---------------- Травы-интерактивы ----------------
+  // ---------------- Травы-интерактивы и гранитные жилы ----------------
 
   private buildHerbs() {
     for (const it of INTERACTABLES) {
-      if (it.kind !== 'herb') continue
-      const g = new THREE.Group()
-      const stem = new THREE.Mesh(new THREE.ConeGeometry(1.6, 9, 5), groundMat(0x7aa06a))
-      stem.position.y = 4.5
-      const glow = new THREE.Mesh(
-        new THREE.SphereGeometry(3.4, 8, 6),
-        new THREE.MeshBasicMaterial({ color: 0xcfe8c0, transparent: true, opacity: 0.75 }),
-      )
-      glow.position.y = 11
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(8, 9.5, 24),
-        new THREE.MeshBasicMaterial({ color: 0x9fb8a4, transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
-      )
-      ring.rotation.x = -Math.PI / 2
-      ring.position.y = 0.6
-      g.add(stem, glow, ring)
-      place(this.group, g, it.pos.x, it.pos.y)
-      this.removable.set(it.id, [g])
-      this.herbPulse.push(ring)
+      if (it.kind === 'herb') {
+        const g = new THREE.Group()
+        const stem = new THREE.Mesh(new THREE.ConeGeometry(1.6, 9, 5), groundMat(0x7aa06a))
+        stem.position.y = 4.5
+        const glow = new THREE.Mesh(
+          new THREE.SphereGeometry(3.4, 8, 6),
+          new THREE.MeshBasicMaterial({ color: 0xcfe8c0, transparent: true, opacity: 0.75 }),
+        )
+        glow.position.y = 11
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(8, 9.5, 24),
+          new THREE.MeshBasicMaterial({ color: 0x9fb8a4, transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
+        )
+        ring.rotation.x = -Math.PI / 2
+        ring.position.y = 0.6
+        g.add(stem, glow, ring)
+        place(this.group, g, it.pos.x, it.pos.y)
+        this.removable.set(it.id, [g])
+        this.herbPulse.push(ring)
+      } else if (it.kind === 'ore') {
+        // Гранитная жила (Фаза 6): серые камни с кристаллами руды
+        const g = new THREE.Group()
+        const base = new THREE.Mesh(new THREE.DodecahedronGeometry(7, 0), groundMat(0x5e5e56))
+        base.position.y = 3.2
+        base.scale.set(1.5, 0.8, 1.1)
+        base.castShadow = true
+        const shardMat = new THREE.MeshStandardMaterial({ color: 0xb8c0cc, emissive: 0x8090a8, emissiveIntensity: 0.7, roughness: 0.35, metalness: 0.2 })
+        for (let i = 0; i < 3; i++) {
+          const shard = new THREE.Mesh(new THREE.OctahedronGeometry(2.6, 0), shardMat)
+          const a = (i / 3) * Math.PI * 2
+          shard.position.set(Math.cos(a) * 4, 7 + i * 1.6, Math.sin(a) * 3)
+          shard.rotation.z = 0.4 * i
+          g.add(shard)
+        }
+        place(this.group, g, it.pos.x, it.pos.y)
+        this.removable.set(it.id, [g])
+      }
     }
   }
 

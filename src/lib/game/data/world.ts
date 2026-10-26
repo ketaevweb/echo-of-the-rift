@@ -11,9 +11,21 @@ import {
   VELD_ROADS,
   VELD_SPAWN_ZONES,
 } from './veld'
+import {
+  GRANITE_AREAS,
+  GRANITE_INTERACTABLES,
+  GRANITE_MARKERS,
+  GRANITE_NPCS,
+  GRANITE_PROPS,
+  GRANITE_ROADS,
+  GRANITE_SPAWN_ZONES,
+  GRIDGE,
+  GR_GATES,
+} from './granite'
 
-/** Мир: долина Хеймхолл на севере + Вельд на юге за Хребтом (Фаза 3). */
-export const WORLD = { w: 3200, h: 4200 }
+/** Мир: долина Хеймхолл на северо-западе, Вельд на юге за Хребтом (Фаза 3),
+ *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6). */
+export const WORLD = { w: 5000, h: 4200 }
 
 /** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
 const VALLEY_BOTTOM = 2380
@@ -31,6 +43,7 @@ export const AREAS: AreaDef[] = [
   { id: 'camp', name: 'Лагерь разбойников', rect: [2380, 1520, 500, 380] },
   { id: 'rift', name: 'Сердце Разлома', rect: [2660, 100, 520, 480] },
   ...VELD_AREAS,
+  ...GRANITE_AREAS,
   { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
@@ -61,6 +74,8 @@ export const ROADS: Vec[][] = [
     { x: 1430, y: 2040 }, { x: 1460, y: 2230 }, { x: 1480, y: 2350 },
   ],
   ...VELD_ROADS,
+  // Тропы Гранитной Долины (Фаза 6)
+  ...GRANITE_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -84,6 +99,8 @@ function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, b
 function blocked(px: number, py: number): boolean {
   // Хребет между долиной и Вельдом — не застраиваем
   if (Math.abs(py - RIDGE.y) < 340) return true
+  // Каменный Хребет к Граниту (Фаза 6)
+  if (Math.abs(px - GRIDGE.x) < 340) return true
   // Деревня, лагерь, озеро, камни, разлом, врата
   if (px > 640 && px < 1380 && py > 1310 && py < 1830) return true
   if (px > 2380 && px < 2900 && py > 1500 && py < 1920) return true
@@ -91,7 +108,8 @@ function blocked(px: number, py: number): boolean {
   if (Math.hypot(px - 2200, py - 650) < 200) return true
   if (px > 2640 && px < 3200 && py > 80 && py < 600) return true
   if (Math.hypot(px - GATES.valley.x, py - GATES.valley.y) < 150) return true
-  // Дороги (включая вельдские)
+  if (Math.hypot(px - GR_GATES.valleySide.x, py - GR_GATES.valleySide.y) < 150) return true
+  // Дороги (включая вельдские и гранитные)
   for (const road of ROADS) {
     for (let i = 0; i < road.length - 1; i++) {
       if (distToSeg(px, py, road[i].x, road[i].y, road[i + 1].x, road[i + 1].y) < 85) return true
@@ -106,7 +124,7 @@ function buildTrees(): PropDef[] {
   let guard = 0
   while (trees.length < 130 && guard < 4000) {
     guard++
-    const x = 60 + rnd() * (WORLD.w - 120)
+    const x = 60 + rnd() * (GRIDGE.x - 240)
     const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (blocked(x, y)) continue
     if (trees.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 90)) continue
@@ -121,7 +139,7 @@ function buildRocks(): PropDef[] {
   let guard = 0
   while (rocks.length < 42 && guard < 2000) {
     guard++
-    const x = 60 + rnd() * (WORLD.w - 120)
+    const x = 60 + rnd() * (GRIDGE.x - 240)
     const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (blocked(x, y)) continue
     if (rocks.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 140)) continue
@@ -147,7 +165,7 @@ function buildShrubsFixed(): PropDef[] {
   let guard = 0
   while (shrubs.length < 90 && guard < 3000) {
     guard++
-    const x = 60 + rnd() * (WORLD.w - 120)
+    const x = 60 + rnd() * (GRIDGE.x - 240)
     const y = 60 + rnd() * (VALLEY_BOTTOM - 120)
     if (inRects(x, y, NO_SHRUB_RECTS)) continue
     if (Math.hypot(x - LAKE.x, y - LAKE.y) < LAKE.r + 30) continue
@@ -200,6 +218,7 @@ export const PROPS: PropDef[] = [
   { kind: 'stone', pos: { x: 1420, y: 2075 }, r: 10, solid: true, seed: 51 },
   { kind: 'stone', pos: { x: 1810, y: 2230 }, r: 10, solid: true, seed: 52 },
   ...VELD_PROPS,
+  ...GRANITE_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -214,6 +233,8 @@ export const NPCS: NpcDef[] = [
   { id: 'selena', name: 'Селена', role: 'Архимаг Ковена', pos: { x: 742, y: 1462 }, color: '#9a7fc0', dialogue: 'recruit_mist' },
   { id: 'kaya', name: 'Кайя', role: 'Магистр-странница', pos: { x: 2150, y: 700 }, color: '#9fb8a4', dialogue: 'stones_kaya' },
   { id: 'torvald_npc', name: 'Торвальд', role: 'Воитель', pos: { x: 2255, y: 705 }, color: '#7a8a4a', dialogue: 'stones_torvald' },
+  // Гранитная Долина (Фаза 6)
+  ...GRANITE_NPCS,
 ]
 
 export const SPAWN_ZONES: SpawnZoneDef[] = [
@@ -223,6 +244,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   { id: 'camp_ranged', enemy: 'archer', center: { x: 2660, y: 1590 }, radius: 110, max: 2, respawnSec: 50 },
   { id: 'rift_a', enemy: 'horror', center: { x: 2860, y: 280 }, radius: 130, max: 3, respawnSec: 60 },
   ...VELD_SPAWN_ZONES,
+  ...GRANITE_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -239,6 +261,7 @@ export const INTERACTABLES: InteractableDef[] = [
   { id: 'herb4', name: 'Лунная трава', pos: { x: 1650, y: 2320 }, r: 34, prompt: 'Собрать', kind: 'herb', action: 'gather:moon_herb' },
   { id: 'barrier_ui', name: 'Пелена Разлома', pos: { x: 2935, y: 470 }, r: 60, prompt: 'Осмотреть', kind: 'barrier', action: 'dialogue:barrier', cond: 'quest.main<5' },
   ...VELD_INTERACTABLES,
+  ...GRANITE_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -249,7 +272,16 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   { pos: { x: 2590, y: 1640 }, label: 'Лагерь' },
   { pos: { x: 2950, y: 280 }, label: 'Разлом' },
   ...VELD_MARKERS,
+  ...GRANITE_MARKERS,
 ]
 
-// Реэкспорты Вельда для движка/рендеров (единая точка импорта мира)
-export { ASH_MOTHER, GATES, POOLS, RIDGE, VELD_CLUES, zoneOf } from './veld'
+// Реэкспорты Вельда/Гранита для движка/рендеров (единая точка импорта мира)
+export { ASH_MOTHER, GATES, POOLS, RIDGE, VELD_CLUES } from './veld'
+export { COLONY, GRIDGE, GR_GATES, MINE, ORE_VEINS, PIT, PIT_MASTER, SHARD } from './granite'
+
+/** Зона по мировой точке: Гранит (восток за Каменным Хребтом) приоритетнее,
+ *  затем Вельд (юг за Хребтом), остальное — долина. */
+export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' {
+  if (x > GRIDGE.x) return 'granite'
+  return y > RIDGE.y ? 'veld' : 'valley'
+}

@@ -6,14 +6,15 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, OriginId, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
+import { Attributes, CareerState, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, OriginId, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
 import { Collider } from './util'
 import type { PanelId } from '../store'
 
 export type ToastKind = 'info' | 'quest' | 'level' | 'warn' | 'loot'
 
-/** Зона мира (Фаза 3): долина на севере, Вельд за Хребтом на юге. */
-export type ZoneId = 'valley' | 'veld'
+/** Зона мира (Фаза 3/6): долина на севере, Вельд за Хребтом на юге,
+ *  Гранитная Долина за Каменным Хребтом на востоке. */
+export type ZoneId = 'valley' | 'veld' | 'granite'
 
 // ---------------- Мост 3D-рендера (Фаза 1) ----------------
 
@@ -147,6 +148,13 @@ export interface EngineCtx {
   cycleFormation(): void
   /** Вкл/выкл тактическую камеру (изометрический отъём). */
   setTactical(on: boolean): void
+
+  // --- Фаза 6: карьера (Gothic) и ямные бои ---
+  /** Карьера фракции: вербовка/ранги в Гранитной Долине, перки в бою. */
+  career: CareerState
+  /** Активный ямный бой: тир (0 — нет боя), текущая волна. */
+  pitTier: number
+  pitWave: number
 
   // --- Фаза 5: происхождение, Тишь, кинокамера диалогов ---
   /** Происхождение героя — источник уникальных реплик (cond: origin:X). */

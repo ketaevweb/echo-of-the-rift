@@ -9,6 +9,7 @@ import { sfx } from '../sfx'
 import { EngineCtx } from '../core/ctx'
 import { recalcStats } from './progression'
 import { floater } from './combat'
+import { careerRank } from './career'
 
 export function addItem(ctx: EngineCtx, id: string, qty: number) {
   const def = ITEMS[id]
@@ -86,11 +87,14 @@ export function useItem(ctx: EngineCtx, id: string) {
   const def = ITEMS[id]
   if (def?.type === 'potion') ctx.castAbility(id)
   else if (def?.type === 'oil' && def.oil) {
-    // Масло на клинок (Фаза 3): бонус против класса врагов на время
+    // Масло на клинок (Фаза 3): бонус против класса врагов на время.
+    // Фаза 6: перк Ковена Ветвей — +25% длительности за ранг.
+    const covenMult = 1 + 0.25 * careerRank(ctx, 'coven')
+    const dur = Math.round(def.oil.dur * covenMult)
     ctx.oilKind = id
-    ctx.oilT = def.oil.dur
+    ctx.oilT = dur
     floater(ctx, ctx.player.pos, def.name, '#d9a441', 13)
-    ctx.toast(`${def.name} нанесено на клинок (${Math.round(def.oil.dur / 60)} мин).`, 'loot')
+    ctx.toast(`${def.name} нанесено на клинок (${Math.round(dur / 60)} мин).`, 'loot')
     sfx('potion')
     ctx.syncUi()
   }

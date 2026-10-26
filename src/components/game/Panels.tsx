@@ -73,6 +73,7 @@ function AttrLine({ name, value, attr, hint }: { name: string; value: number; at
 
 function CharPanel() {
   const player = useGame((s) => s.player)
+  const career = useGame((s) => s.career)
   if (!player) return null
   const signList: Array<{ id: 'igni' | 'aard' | 'quen' | 'axii'; name: string }> = [
     { id: 'igni', name: 'Игни — огонь' },
@@ -144,6 +145,24 @@ function CharPanel() {
               {player.faction === 'flame' ? 'Орден Пламени' : player.faction === 'mist' ? 'Ковен Тумана' : 'Вольный'}
             </span>
           </Row>
+          {career && (
+            <>
+              <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">КАРЬЕРА КОЛОНИИ (ФАЗА 6)</p>
+              <Row>
+                <span className="text-sm text-[#e8d5a8]">{career.factionName}</span>
+                <span className="text-sm text-[#f5c96b]">{career.rankName}</span>
+              </Row>
+              <Row>
+                <span className="text-sm text-[#e8d5a8]">Слава лагеря</span>
+                <span className="text-sm text-[#f5c96b]">{career.rep}/100</span>
+              </Row>
+              {career.perks.map((p) => (
+                <p key={p} className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-1.5 text-xs text-[#b8ab8c]">
+                  ✦ {p}
+                </p>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </Panel>

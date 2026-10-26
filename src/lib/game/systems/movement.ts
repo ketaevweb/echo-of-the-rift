@@ -5,10 +5,11 @@
 // (WASD/клик-движение, автопатака по цели, стамина).
 // ============================================================
 
-import { WORLD, RIDGE } from '../data/world'
+import { WORLD, RIDGE, GRIDGE } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
+import { careerRank } from './career'
 import { meleeAttack } from './combat'
 
 export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: number, dt: number) {
@@ -29,6 +30,12 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   const hi = RIDGE.y + RIDGE.band
   if (ny > lo - er && ny < hi + er) {
     ny = e.pos.y >= RIDGE.y ? Math.max(ny, hi + er) : Math.min(ny, lo - er)
+  }
+  // Каменный Хребет к Граниту непроходим (Фаза 6): переход только через Врата Гранита.
+  const glo = GRIDGE.x - GRIDGE.band
+  const ghi = GRIDGE.x + GRIDGE.band
+  if (nx > glo - er && nx < ghi + er) {
+    nx = e.pos.x >= GRIDGE.x ? Math.max(nx, ghi + er) : Math.min(nx, glo - er)
   }
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue
@@ -155,8 +162,11 @@ export function updatePlayer(ctx: EngineCtx, dt: number) {
   } else if (moving) {
     p.facing = Math.atan2(p.vel.y, p.vel.x)
   }
-  moveWithCollisions(ctx, p, p.vel.x, p.vel.y, dt)
+  // Фаза 6: перк «Вольный Дозор» — +6% к скорости за ранг (лёгкая поступь разведчика)
+  const watchSpd = 1 + 0.06 * careerRank(ctx, 'watch')
+  moveWithCollisions(ctx, p, p.vel.x * watchSpd, p.vel.y * watchSpd, dt)
   p.walkPhase += dt * (Math.hypot(p.vel.x, p.vel.y) > 4 ? 1 : 0.2)
   const inCombat = nearestEnemyOf(ctx, p, 320) !== null
-  ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + (inCombat ? 6 : 14) * dt)
+  // Перк Дозора: регенерация выносливости +2/с за ранг
+  ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + (inCombat ? 6 : 14) * dt + careerRank(ctx, 'watch') * 2 * dt)
 }

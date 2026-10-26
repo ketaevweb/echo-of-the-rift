@@ -148,6 +148,40 @@ export const ITEMS: Record<string, ItemDef> = {
     price: 120,
     icon: 'Flame',
   },
+  // ---------------- Фаза 6: Гранитная Долина ----------------
+  granite_ore: {
+    id: 'granite_ore',
+    name: 'Гранитная руда',
+    desc: 'Тяжёлый камень с сединой жил. Брок платит за неё, а для клинка — тем более.',
+    type: 'misc',
+    price: 18,
+    icon: 'Gem',
+  },
+  granite_chitin: {
+    id: 'granite_chitin',
+    name: 'Хитин скорпиона',
+    desc: 'Серый панцирь, звенит как котёл. Кузнецы и продавцы панцирей любят его.',
+    type: 'misc',
+    price: 16,
+    icon: 'Bug',
+  },
+  colony_blade: {
+    id: 'colony_blade',
+    name: 'Ядровой тесак',
+    desc: 'Ковка Брока из ядровой руды: тяжёл, груб и не знает жалости. Клеймо Колонии на клинке.',
+    type: 'weapon',
+    price: 320,
+    damage: 10,
+    icon: 'Axe',
+  },
+  core_key: {
+    id: 'core_key',
+    name: 'Ключ-осколок: Гранит',
+    desc: 'Тёплый многогранник — отпечаток Ядра из барьера Колонии. Один из шести.',
+    type: 'quest',
+    price: 0,
+    icon: 'Key',
+  },
 }
 
 export const SELL_RATE = 0.4
@@ -166,4 +200,13 @@ export const ALRA_STOCK = [
   'potion_stam',
   'oil_beast',
   'oil_specter',
+]
+
+/** Лавка Колонии (Фаза 6): кузнечный товар Брока + припасы. */
+export const BROCK_STOCK = [
+  'potion_heal',
+  'potion_stam',
+  'oil_beast',
+  'armor_leather',
+  'sword_steel',
 ]

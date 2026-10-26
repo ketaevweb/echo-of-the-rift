@@ -23,7 +23,7 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS, GATES, zoneOf } from './data/world'
+import { LAKE, PLAYER_SPAWN, PROPS, GATES, zoneOf, GR_GATES } from './data/world'
 import { sfx, setAmbient } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
@@ -57,6 +57,7 @@ import { castAbility as castAbilitySys } from './systems/combat'
 import { bindInput as bindInputSys, unbindInput as unbindInputSys } from './systems/input'
 import { moveWithCollisions as moveWithCollisionsSys } from './systems/movement'
 import { cycleFormation as cycleFormationSys } from './systems/party'
+import { endPitFight } from './systems/career'
 import {
   chooseOption as chooseOptionSys,
   closeDialogue as closeDialogueSys,
@@ -65,6 +66,15 @@ import {
   questMarker as questMarkerSys,
 } from './systems/quest'
 import { syncUi as syncUiSys } from './systems/uiSync'
+
+/** Телепорт через врата прерывает ямный бой (арена остаётся в Граните). */
+function endPitFightSafe(ctx: GameEngine) {
+  try {
+    endPitFight(ctx)
+  } catch {
+    /* яма уже пуста */
+  }
+}
 
 export { BESTIARY_INFO } from './data/tables'
 
@@ -167,6 +177,11 @@ export class GameEngine implements EngineCtx {
   origin: OriginId = 'warden'
   silence = 0
   dialogueFocusEid: number | null = null
+
+  // --- Фаза 6: карьера (Gothic) и ямные бои ---
+  career = { faction: null, rep: { order: 0, coven: 0, watch: 0 }, rank: { order: 0, coven: 0, watch: 0 } }
+  pitTier = 0
+  pitWave = 0
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -376,13 +391,17 @@ export class GameEngine implements EngineCtx {
 
   // ---------------- Панели / приказы / сейвы ----------------
 
-  /** Переход через Врата Тумана: затемнение → телепорт партии → проявление. */
+  /** Переход через Врата Тумана / Врата Гранита: затемнение → телепорт партии → проявление. */
   travelTo(zone: ZoneId) {
     if (this.zoneBusy || this.destroyed) return
-    if (zoneOf(this.player.pos.y) === zone) return
+    if (zoneOf(this.player.pos.x, this.player.pos.y) === zone) return
     if (!this.player.alive) return
     this.zoneBusy = true
-    const gate = zone === 'veld' ? GATES.veld : GATES.valley
+    // Фаза 6: из Гранита назад — через врата его стороны; иначе — обычные врата
+    let gate = zone === 'veld' ? GATES.veld : zone === 'granite' ? GR_GATES.granite : GATES.valley
+    if (zone === 'valley' && zoneOf(this.player.pos.x, this.player.pos.y) === 'granite') {
+      gate = GR_GATES.valleySide
+    }
     sfx('portal')
     useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })
     window.setTimeout(() => {
@@ -402,6 +421,7 @@ export class GameEngine implements EngineCtx {
       this.camera = { ...p }
       this.zone = zone
       this.currentArea = '' // заставит updateArea показать плашку зоны
+      endPitFightSafe(this)
       useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'in' } })
       this.syncUi()
       window.setTimeout(() => {
@@ -486,8 +506,8 @@ export class GameEngine implements EngineCtx {
 
   syncUi() {
     syncUiSys(this)
-    // Эмбиент по зоне (Фаза 3)
-    setAmbient(this.zone === 'veld' ? 'veld' : 'valley')
+    // Эмбиент по зоне (Фаза 3/6)
+    setAmbient(this.zone === 'veld' ? 'veld' : this.zone === 'granite' ? 'granite' : 'valley')
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------

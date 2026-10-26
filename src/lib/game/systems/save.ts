@@ -5,7 +5,7 @@
 // перенос тел saveGame/loadFrom из engine.ts.
 // ============================================================
 
-import { QuestState, SaveData, SignId } from '../types'
+import { CareerState, QuestState, SaveData, SignId } from '../types'
 import { QUESTS } from '../data/quests'
 import { useGame, writeSave } from '../store'
 import { EngineCtx } from '../core/ctx'
@@ -79,6 +79,8 @@ export function collectSave(ctx: EngineCtx): SaveData {
     // Фаза 5: происхождение и Тишь (старые сейвы получат дефолты в applySave)
     origin: ctx.origin,
     silence: ctx.silence,
+    // Фаза 6: карьера фракции Гранита
+    career: JSON.parse(JSON.stringify(ctx.career)) as CareerState,
   }
 }
 
@@ -128,6 +130,21 @@ export function applySave(ctx: EngineCtx, s: SaveData) {
   // Фаза 5: происхождение/Тишь — дефолты для сейвов до Фазы 5
   ctx.origin = s.origin === 'exile' || s.origin === 'ember' ? s.origin : 'warden'
   ctx.silence = typeof s.silence === 'number' ? Math.max(0, Math.min(100, s.silence)) : 0
+  // Фаза 6: карьера — дефолты для сейвов до Фазы 6
+  const c = s.career
+  ctx.career = {
+    faction: c?.faction === 'order' || c?.faction === 'coven' || c?.faction === 'watch' ? c.faction : null,
+    rep: {
+      order: typeof c?.rep?.order === 'number' ? c.rep.order : 0,
+      coven: typeof c?.rep?.coven === 'number' ? c.rep.coven : 0,
+      watch: typeof c?.rep?.watch === 'number' ? c.rep.watch : 0,
+    },
+    rank: {
+      order: typeof c?.rank?.order === 'number' ? c.rank.order : 0,
+      coven: typeof c?.rank?.coven === 'number' ? c.rank.coven : 0,
+      watch: typeof c?.rank?.watch === 'number' ? c.rank.watch : 0,
+    },
+  }
   ctx.createPlayer({ ...s.pos })
   ctx.spawnWorld()
 }

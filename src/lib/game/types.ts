@@ -11,6 +11,15 @@ export interface Vec {
 
 export type Faction = 'none' | 'flame' | 'mist'
 export type Stance = 'follow' | 'hold' | 'aggressive'
+
+/** Карьера фракции (Фаза 6, Gothic): Орден Пепла / Ковен Ветвей / Вольный Дозор.
+ *  Вербовка и ранги — в Гранитной Долине, «война за барьер». */
+export type CareerId = 'order' | 'coven' | 'watch'
+export interface CareerState {
+  faction: CareerId | null
+  rep: { order: number; coven: number; watch: number }
+  rank: { order: number; coven: number; watch: number }
+}
 /** Строй отряда (Фаза 4): клин — Торвальд впереди-сбоку, Кайя позади;
  *  линия — оба флангах сзади. */
 export type FormationId = 'wedge' | 'line'
@@ -178,6 +187,11 @@ export interface PropDef {
     | 'deadtree'
     | 'reed'
     | 'stump'
+    // Фаза 6 (Гранитная Долина):
+    | 'pit'
+    | 'mine'
+    | 'obelisk'
+    | 'ore'
   pos: Vec
   w?: number
   h?: number
@@ -217,6 +231,9 @@ export type EnemyType =
   | 'bogling'
   | 'ash_shade'
   | 'ash_mother'
+  // Фаза 6 (Гранитная Долина):
+  | 'scorpion'
+  | 'pit_master'
 
 export interface InteractableDef {
   id: string
@@ -224,7 +241,7 @@ export interface InteractableDef {
   pos: Vec
   r: number
   prompt: string
-  kind: 'altar' | 'herb' | 'barrier' | 'clue' | 'portal' | 'board'
+  kind: 'altar' | 'herb' | 'barrier' | 'clue' | 'portal' | 'board' | 'ore'
   action: string
   cond?: string
 }
@@ -394,4 +411,6 @@ export interface SaveData {
   // --- Фаза 5: происхождение и счётчик Тишины (в старых сейвах нет — дефолты) ---
   origin: OriginId
   silence: number
+  // --- Фаза 6: карьера фракции Гранитной Долины (в старых сейвах нет — дефолты) ---
+  career: CareerState
 }

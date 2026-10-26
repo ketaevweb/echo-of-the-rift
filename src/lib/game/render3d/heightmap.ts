@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -79,6 +79,11 @@ const VILLAGE = { x: 960, y: 1560, rx: 300, ry: 210 }
 export const RIFT = { x: 2950, y: 280, r: 420 }
 const CAMP = { x: 2590, y: 1650, r: 170 }
 const STONES = { x: 2200, y: 660, r: 160 }
+// Фаза 6: ключевые точки Гранита (колония/яма/рудник/барьер)
+const COLONY_FLAT = { x: 4260, y: 1420, rx: 260, ry: 190 }
+const PIT_FLAT = { x: 4300, y: 1980, r: 150 }
+const MINE_FLAT = { x: 4650, y: 830, r: 130 }
+const SHARD_FLAT = { x: 4330, y: 560, r: 150 }
 
 export const WATER_LEVEL = -1.6
 
@@ -149,6 +154,13 @@ export function heightAt(x: number, y: number): number {
     const t = falloff(dr, 70, 260)
     h += t * t * (56 + jag)
   }
+  // --- Фаза 6: Каменный Хребет к Граниту (вертикальная стена по x) ---
+  const dg = Math.abs(x - GRIDGE.x)
+  if (dg < 330) {
+    const jag = (fbm(x / 110 + 83, y / 110 + 29, 2) - 0.5) * 11
+    const t = falloff(dg, 70, 260)
+    h += t * t * (58 + jag)
+  }
   // Вельд: болотистая низина с омутами
   if (y > RIDGE.y + 40) {
     const sw = falloff(y - (RIDGE.y + 40), 0, 240)
@@ -163,11 +175,38 @@ export function heightAt(x: number, y: number): number {
       }
     }
   }
+  // Гранитная Долина (Фаза 6): суше и плоше, каменные кочки
+  if (x > GRIDGE.x + 40) {
+    const gz = falloff(x - (GRIDGE.x + 40), 0, 320)
+    const rocky = (fbm(x / 300 + 71, y / 300 + 43, 3) - 0.5) * 9 + 2.6
+    h = h * (1 - gz) + rocky * gz
+    // Яма — чаша арены
+    const tp = Math.hypot(x - PIT_FLAT.x, y - PIT_FLAT.y)
+    const fpit = falloff(tp, PIT_FLAT.r * 0.62, PIT_FLAT.r * 0.55)
+    if (fpit > 0) {
+      const bowl = 1.2 - 2.6 * (1 - Math.min(1, tp / PIT_FLAT.r))
+      h = h * (1 - fpit) + bowl * fpit
+    }
+  }
+  // Плоские пятачки: колония, рудник, барьер, врата (обе зоны)
+  const tcol = inEllipse(x, y, COLONY_FLAT.x, COLONY_FLAT.y, COLONY_FLAT.rx, COLONY_FLAT.ry)
+  const fcol = falloff(tcol, 0.75, 0.55)
+  h = h * (1 - fcol) + 3.0 * fcol
+  const fmine = falloff(Math.hypot(x - MINE_FLAT.x, y - MINE_FLAT.y), MINE_FLAT.r * 0.7, MINE_FLAT.r * 0.6)
+  h = h * (1 - fmine) + 4.2 * fmine
+  const fshard = falloff(Math.hypot(x - SHARD_FLAT.x, y - SHARD_FLAT.y), SHARD_FLAT.r * 0.7, SHARD_FLAT.r * 0.6)
+  h = h * (1 - fshard) + 6.0 * fshard
   // Плоские пятачки у Врат Тумана (по обе стороны хребта)
   for (const g of [GATES.valley, GATES.veld]) {
     const tg = Math.hypot(x - g.x, y - g.y)
     const fg = falloff(tg, 90, 80)
     h = h * (1 - fg) + 1.6 * fg
+  }
+  // Плоские пятачки у Врат Гранита (Фаза 6)
+  for (const g of [GR_GATES.valleySide, GR_GATES.granite]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    h = h * (1 - fg) + 1.8 * fg
   }
 
   return h
@@ -192,6 +231,11 @@ const C_PEAT2: [number, number, number] = [0.14, 0.16, 0.10]
 const C_MURK: [number, number, number] = [0.25, 0.27, 0.16]
 const C_DEAD: [number, number, number] = [0.33, 0.32, 0.25]
 const C_MUD: [number, number, number] = [0.22, 0.18, 0.12]
+// Палитра Гранита (Фаза 6): пепельная котловина, серый срез камня
+const C_ASHGRASS: [number, number, number] = [0.30, 0.28, 0.22]
+const C_ASHGRASS2: [number, number, number] = [0.24, 0.23, 0.19]
+const C_GRAYSTONE: [number, number, number] = [0.38, 0.37, 0.34]
+const C_DUST: [number, number, number] = [0.44, 0.40, 0.33]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -243,6 +287,35 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
   const drg = Math.abs(y - RIDGE.y)
   if (drg < 320) {
     lerp3(tmpA, C_ROCK, falloff(drg, 70, 250) * 0.85, tmpA)
+  }
+  // Каменный Хребет к Граниту — голый камень (Фаза 6)
+  const dgg = Math.abs(x - GRIDGE.x)
+  if (dgg < 320) {
+    lerp3(tmpA, C_GRAYSTONE, falloff(dgg, 70, 250) * 0.9, tmpA)
+  }
+  // Гранит — пепельная трава, серые срезы, пыль (Фаза 6)
+  if (x > GRIDGE.x - 120) {
+    const gz = falloff(x - (GRIDGE.x - 120), 0, 300)
+    if (gz > 0) {
+      const ash = fbm(x / 190 + 61, y / 190 + 37, 3)
+      const base = ash > 0.52 ? C_ASHGRASS : C_ASHGRASS2
+      lerp3(tmpA, base, gz, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      // каменные срезы на возвышенностях
+      if (h > 18) lerp3(tmpA, C_GRAYSTONE, Math.min(1, (h - 18) / 24) * 0.8 * gz, tmpA)
+      // пыльные пятна
+      lerp3(tmpA, C_DUST, Math.max(0, 0.55 - ash) * 0.7 * gz, tmpA)
+    }
+    // Яма — утоптанный песок арены
+    const tp = Math.hypot(x - PIT_FLAT.x, y - PIT_FLAT.y)
+    if (tp < PIT_FLAT.r + 24) {
+      lerp3(tmpA, C_SAND, falloff(tp, PIT_FLAT.r * 0.7, PIT_FLAT.r * 0.5) * 0.9, tmpA)
+    }
+    // Площадь Колонии — вытоптанная пыль
+    const tcol = inEllipse(x, y, COLONY_FLAT.x, COLONY_FLAT.y, 175, 125)
+    lerp3(tmpA, C_DIRT, falloff(tcol, 0.72, 0.45), tmpA)
   }
 
   // Разлом — пепел и тлеющие трещины
