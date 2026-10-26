@@ -17,6 +17,9 @@ import { Fx3d, OrderLine } from './Fx'
 import { daylightOf } from '../data/tables'
 import type { ZoneId } from '../core/ctx'
 
+// Цвета колец рунных камней (Фаза 6.2): заяц — бледный мох, волк — янтарь, луна — серебро
+const RUNE_COLORS = [0x9fb8a4, 0xd9a441, 0xd8dde2]
+
 // ---------------- Снимок состояния движка ----------------
 
 export interface SceneView3d {
@@ -40,6 +43,8 @@ export interface SceneView3d {
   dialogueFocus: number | null
   /** Фаза 5: Тишь 0..100 — выцветание мира. */
   silence: number
+  /** Фаза 6.2: символы рунных камней пещеры. */
+  runes: { rs1: number; rs2: number; rs3: number }
 }
 
 export interface EntityPick {
@@ -75,6 +80,9 @@ export class Renderer3d {
   private sunDusk = new THREE.Color(0xff9a50)
   /** Фаза 5: текущая Тишь 0..1 (лерпится к цели — мир выцветает плавно). */
   private silenceAmt = 0
+  /** Фаза 6.2: снегопад Пределья (Points-облако над камерой). */
+  private snow: THREE.Points
+  private snowMat: THREE.PointsMaterial
 
   // Орбита камеры (Фаза 4): user-значения правит ввод, pitch/dist —
   // анимируемые текущие (лерп к целям, тактика отъезжает в изометрию)
@@ -145,6 +153,29 @@ export class Renderer3d {
     this.avatars = new AvatarFactory(this.entityGroup)
     this.fx = new Fx3d()
     this.scene.add(this.fx.group)
+
+    // Фаза 6.2: снегопад — статичное облако точек, заворачивается по высоте
+    const snowGeo = new THREE.BufferGeometry()
+    const N = 850
+    const arr = new Float32Array(N * 3)
+    for (let i = 0; i < N; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 800
+      arr[i * 3 + 1] = Math.random() * 90
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 800
+    }
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(arr, 3))
+    this.snowMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 1.5,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      sizeAttenuation: true,
+    })
+    this.snow = new THREE.Points(snowGeo, this.snowMat)
+    this.snow.visible = false
+    this.snow.frustumCulled = false
+    this.scene.add(this.snow)
 
     this.bindOrbit()
     this.resize()
@@ -294,12 +325,17 @@ export class Renderer3d {
     this.daylight = daylightOf(dayT)
     const veld = zone === 'veld'
     const granite = zone === 'granite'
+    const frost = zone === 'frost'
     const dl = this.daylight
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
     this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
 
     // Туман
-    if (granite) {
+    if (frost) {
+      // Пределье: белёсая метель — светло-серый туман, гуще к ночи
+      this.tmpColor.setRGB(0.42 + dl * 0.38, 0.47 + dl * 0.36, 0.46 + dl * 0.34)
+      this.fog.density += (0.0026 - dl * 0.0009 - this.fog.density) * k
+    } else if (granite) {
       // Гранит: пепельно-пылевой туман, тёплый серый
       this.tmpColor.setRGB(0.24 + dl * 0.42, 0.21 + dl * 0.36, 0.17 + dl * 0.28)
       this.fog.density += (0.0019 - dl * 0.0007 - this.fog.density) * k
@@ -315,7 +351,11 @@ export class Renderer3d {
     // Небо
     const top = this.skyMat.uniforms.top.value as THREE.Color
     const hor = this.skyMat.uniforms.horizon.value as THREE.Color
-    if (granite) {
+    if (frost) {
+      // Небо Пределья: серо-белый купол, бледный горизонт (без синевы)
+      this.tmpColor.setRGB(0.44 + dl * 0.34, 0.48 + dl * 0.33, 0.47 + dl * 0.31)
+      this.tmpColor2.setRGB(0.58 + dl * 0.36, 0.61 + dl * 0.33, 0.58 + dl * 0.30)
+    } else if (granite) {
       // Пепельное небо Готики: серо-теплый купол, пыльный горизонт
       this.tmpColor.setRGB(0.20 + dl * 0.30, 0.18 + dl * 0.27, 0.16 + dl * 0.21)
       this.tmpColor2.setRGB(0.34 + dl * 0.44, 0.29 + dl * 0.38, 0.22 + dl * 0.28)
@@ -330,14 +370,18 @@ export class Renderer3d {
     hor.lerp(this.tmpColor2, k)
 
     // Свет
-    const zoneDim = granite ? 0.82 : veld ? 0.78 : 1
+    const zoneDim = frost ? 0.94 : granite ? 0.82 : veld ? 0.78 : 1
     this.sun.intensity += ((0.04 + dl * 1.55 * zoneDim) - this.sun.intensity) * k
     // цвет солнца: на низком солнце — тёплый закатный
     const dusk = Math.max(0, 1 - Math.abs(Math.sin((dayT - 0.25) * Math.PI * 2)) * 2.6)
     this.tmpColor.copy(this.sunDay).lerp(this.sunDusk, dusk * 0.8)
     this.sun.color.lerp(this.tmpColor, k)
     this.hemi.intensity += ((0.16 + dl * 0.58) - this.hemi.intensity) * k
-    this.hemi.color.lerp(this.tmpColor.setRGB(0.28 + dl * 0.57, 0.32 + dl * 0.54, 0.30 + dl * 0.47), k)
+    if (frost) {
+      this.hemi.color.lerp(this.tmpColor.setRGB(0.62 + dl * 0.32, 0.66 + dl * 0.30, 0.64 + dl * 0.28), k)
+    } else {
+      this.hemi.color.lerp(this.tmpColor.setRGB(0.28 + dl * 0.57, 0.32 + dl * 0.54, 0.30 + dl * 0.47), k)
+    }
     this.amb.intensity += ((0.07 + dl * 0.16) - this.amb.intensity) * k
 
     // Фаза 5: Тишь — выцветание (desaturation) и гаснущий свет
@@ -415,7 +459,7 @@ export class Renderer3d {
     for (const e of this.avatarsSyncedEntities) {
       if (!e.alive && e.kind !== 'npc') continue
       const h = heightAt(e.pos.x, e.pos.y)
-      const headH = e.boss ? 58 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : e.enemyType === 'scorpion' ? 15 : e.enemyType === 'pit_master' ? 46 : 28
+      const headH = e.boss && e.enemyType !== 'dragon' ? 58 : e.enemyType === 'dragon' ? 76 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : e.enemyType === 'scorpion' ? 15 : e.enemyType === 'pit_master' ? 46 : e.enemyType === 'frost_troll' ? 42 : 28
       // Экранные координаты ног и головы
       this.tmpV.set(e.pos.x, h + 1, e.pos.y)
       this.tmpV.project(this.camera)
@@ -476,7 +520,7 @@ export class Renderer3d {
 
     this.terrain.update(view.time)
     // Тишь гасит огни мира (костры/факелы) — «гаснут костры» по GDD 01
-    this.props.update(view.time, view.removedProps, Math.min(1, 1 - this.daylight + this.silenceAmt * 0.5))
+    this.props.update(view.time, view.removedProps, Math.min(1, 1 - this.daylight + this.silenceAmt * 0.5), view.runes)
     const target = view.targetEid ? view.entities.find((x) => x.eid === view.targetEid) ?? null : null
     this.fx.update(view.particles, view.floaters, view.telegraphs, target, view.time)
 
@@ -494,6 +538,20 @@ export class Renderer3d {
     }
 
     this.updateCamera(view)
+
+    // Фаза 6.2: снегопад Пределья — облако следует за целью кадра, падает, opacity по зоне
+    const snowGoal = view.zone === 'frost' ? 0.85 : 0
+    this.snowMat.opacity += (snowGoal - this.snowMat.opacity) * 0.05
+    this.snow.visible = this.snowMat.opacity > 0.02
+    if (this.snow.visible) {
+      this.snow.position.set(
+        Math.round(this.camTarget.x / 100) * 100,
+        30 - ((view.time * 13) % 50),
+        Math.round(this.camTarget.z / 100) * 100,
+      )
+      this.snow.position.x += Math.sin(view.time * 0.6) * 6
+    }
+
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -509,6 +567,8 @@ export class Renderer3d {
     this.props.dispose()
     this.avatars.dispose()
     this.fx.dispose()
+    this.snow.geometry.dispose()
+    this.snowMat.dispose()
     this.renderer.dispose()
   }
 }

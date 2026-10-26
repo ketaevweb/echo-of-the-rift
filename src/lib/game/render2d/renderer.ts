@@ -1,5 +1,5 @@
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
-import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD } from '../data/world'
+import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD, FRIDGE, HAVEN, ROOST } from '../data/world'
 
 // ---------------- Терен (запекается один раз) ----------------
 
@@ -213,6 +213,43 @@ export function bakeTerrain(): HTMLCanvasElement {
   sg.addColorStop(1, 'rgba(180,140,220,0)')
   ctx.fillStyle = sg
   ctx.fillRect(SHARD.pos.x - 200, SHARD.pos.y - 200, 400, 400)
+
+  // --- Фаза 6.2: Стылый Хребет и Стылое Пределье ---
+  // Вертикальный хребет — снежные скалы
+  const fmg = ctx.createLinearGradient(FRIDGE.x - 200, 0, FRIDGE.x + 200, 0)
+  fmg.addColorStop(0, 'rgba(120,122,116,0)')
+  fmg.addColorStop(0.5, 'rgba(168,172,168,0.95)')
+  fmg.addColorStop(1, 'rgba(140,146,142,0)')
+  ctx.fillStyle = fmg
+  ctx.fillRect(FRIDGE.x - 200, 0, 400, WORLD.h)
+  // Снежная тундра: белая база + проталины
+  const fg2 = ctx.createLinearGradient(FRIDGE.x + 100, 0, WORLD.w, 0)
+  fg2.addColorStop(0, 'rgba(196,204,202,0.75)')
+  fg2.addColorStop(1, 'rgba(214,220,218,0.9)')
+  ctx.fillStyle = fg2
+  ctx.fillRect(FRIDGE.x + 100, 0, WORLD.w - FRIDGE.x - 100, WORLD.h)
+  for (let i = 0; i < 380; i++) {
+    const x = FRIDGE.x + 240 + rnd() * (WORLD.w - FRIDGE.x - 320)
+    const y = rnd() * WORLD.h
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(158,166,160,0.3)' : 'rgba(228,234,232,0.5)'
+    ctx.beginPath()
+    ctx.arc(x, y, 16 + rnd() * 50, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // Площадь Приюта — вытоптанный снег
+  ctx.fillStyle = 'rgba(148,140,120,0.6)'
+  ctx.beginPath()
+  ctx.ellipse(HAVEN.pos.x, HAVEN.pos.y, 165, 115, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Драконий Дол — выжженный уголь
+  const ro = ctx.createRadialGradient(ROOST.pos.x, ROOST.pos.y, 40, ROOST.pos.x, ROOST.pos.y, ROOST.r)
+  ro.addColorStop(0, 'rgba(38,32,28,0.9)')
+  ro.addColorStop(0.7, 'rgba(52,44,38,0.55)')
+  ro.addColorStop(1, 'rgba(52,44,38,0)')
+  ctx.fillStyle = ro
+  ctx.beginPath()
+  ctx.arc(ROOST.pos.x, ROOST.pos.y, ROOST.r, 0, Math.PI * 2)
+  ctx.fill()
 
   // Тёмная рамка мира
   const edge = 90
@@ -737,6 +774,100 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
       ctx.fill()
       break
     }
+    // --- Фаза 6.2: Стылое Пределье ---
+    case 'cave': {
+      // Вход пещеры: ледяная арка с тёмным проёмом
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 5, 40, 14, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#7a8482'
+      ctx.lineWidth = 8
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y + 6, 30, Math.PI, Math.PI * 2)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(191,212,214,0.8)'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y + 6, 34, Math.PI + 0.1, Math.PI * 2 - 0.1)
+      ctx.stroke()
+      ctx.fillStyle = '#0a0d0c'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 4, 24, 20, 0, Math.PI, Math.PI * 2)
+      ctx.fill()
+      ctx.fillRect(pos.x - 24, pos.y - 6, 48, 10)
+      break
+    }
+    case 'runestone': {
+      // Рунный камень: монолит со светящейся руной
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + pos.x)
+      const runeColors = ['#9fb8a4', '#d9a441', '#d8dde2']
+      const idx = ((p.seed ?? 0) % 3 + 3) % 3
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 4, 14, 5, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#6e7672'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 6, pos.y + 2)
+      ctx.lineTo(pos.x - 5, pos.y - 20)
+      ctx.lineTo(pos.x + 5, pos.y - 22)
+      ctx.lineTo(pos.x + 7, pos.y + 2)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = runeColors[idx]
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.6 + pulse * 0.4
+      ctx.strokeRect(pos.x - 3, pos.y - 16, 6, 12)
+      ctx.globalAlpha = 1
+      break
+    }
+    case 'wordwall': {
+      // Стена Слова: тёмная стена с тлеющей полосой рун
+      const w = p.w ?? 150
+      const isFrost = (p.seed ?? 0) === 502
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2 + pos.y)
+      ctx.fillStyle = '#5e6662'
+      ctx.fillRect(pos.x - w / 2, pos.y - 34, w, 34)
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+      ctx.fillRect(pos.x - w / 2, pos.y - 34, w, 6)
+      ctx.fillStyle = isFrost ? `rgba(191,227,234,${0.55 + pulse * 0.35})` : `rgba(245,201,107,${0.55 + pulse * 0.35})`
+      ctx.fillRect(pos.x - w * 0.31, pos.y - 26, w * 0.62, 7)
+      break
+    }
+    case 'rune_door': {
+      // Рунная пелена: ледяная завеса поперёк прохода
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + pos.x)
+      ctx.fillStyle = `rgba(159,216,210,${0.35 + pulse * 0.2})`
+      ctx.fillRect(pos.x - 8, pos.y - 26, 16, 30)
+      ctx.fillStyle = '#5e6662'
+      ctx.fillRect(pos.x - 10, pos.y - 30, 20, 5)
+      break
+    }
+    case 'snowtree': {
+      // Снежная ель: тёмная хвоя под шапкой снега
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 13, 5, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#3c3226'
+      ctx.fillRect(pos.x - 2, pos.y - 8, 4, 10)
+      ctx.fillStyle = '#2a3a28'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 11, pos.y - 6)
+      ctx.lineTo(pos.x, pos.y - 30)
+      ctx.lineTo(pos.x + 11, pos.y - 6)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#d8dee0'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 6, pos.y - 22)
+      ctx.lineTo(pos.x, pos.y - 31)
+      ctx.lineTo(pos.x + 6, pos.y - 22)
+      ctx.closePath()
+      ctx.fill()
+      break
+    }
   }
 }
 
@@ -985,6 +1116,56 @@ export function drawEntity(
     case 'horror':
       drawHorror(ctx, e, t)
       break
+    case 'draugr':
+      // Пределье 2D: мёртвый воин в истлевшей броне
+      drawHumanoid(ctx, e, t, '#6a7a6a', 'sword')
+      break
+    case 'frost_troll':
+      // Стылый тролль: белошёрстная громила
+      drawHumanoid(ctx, e, t, '#d8dcd4', 'sword')
+      break
+    case 'dragon': {
+      // Иммолтакс 2D: крылатая тень в полёте/на земле
+      const alt = e.cds['alt'] ?? 0
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * (1 + alt * 0.35))
+      ctx.save()
+      ctx.translate(e.pos.x, e.pos.y - 10 - alt * 46)
+      ctx.rotate(e.facing)
+      const flap = Math.sin(t * (alt > 0.5 ? 7.5 : 1.4)) * (alt > 0.5 ? 0.5 : 0.08)
+      // крылья
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#55322c'
+      for (const sz of [-1, 1]) {
+        ctx.save()
+        ctx.rotate(sz * flap)
+        ctx.beginPath()
+        ctx.moveTo(-6, sz * 4)
+        ctx.quadraticCurveTo(2, sz * 26, 16, sz * 20)
+        ctx.quadraticCurveTo(6, sz * 12, 10, sz * 4)
+        ctx.closePath()
+        ctx.fill()
+        ctx.restore()
+      }
+      // корпус
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a3230'
+      ctx.beginPath()
+      ctx.ellipse(0, 0, e.radius * 1.25, e.radius * 0.62, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // голова/хвост
+      ctx.beginPath()
+      ctx.ellipse(e.radius * 1.3, -e.radius * 0.3, e.radius * 0.5, e.radius * 0.32, -0.2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#33221f'
+      ctx.beginPath()
+      ctx.ellipse(-e.radius * 1.5, e.radius * 0.1, e.radius * 0.9, e.radius * 0.24, 0.1, 0, Math.PI * 2)
+      ctx.fill()
+      // угли в пасти
+      ctx.fillStyle = '#ffb04a'
+      ctx.beginPath()
+      ctx.arc(e.radius * 1.7, -e.radius * 0.3, 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      break
+    }
     case 'bogling': {
       // Вельд 2D: присосистый ком тины
       shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)

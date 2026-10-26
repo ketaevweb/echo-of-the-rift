@@ -80,6 +80,34 @@ export const ABILITIES: AbilityDef[] = [
     maxLevel: 1,
   },
   {
+    id: 'shout_force',
+    name: 'Крик: Сила',
+    desc: "Ту'ум. Слово СИЛЫ — волна голоса сбивает врагов с ног перед тобой. Слово можно взять у Стены Слова в Пещере Рун.",
+    icon: 'Wind',
+    hotkey: 'R',
+    kind: 'shout',
+    cooldown: 13,
+    staminaCost: 26,
+    range: 190,
+    owner: 'player',
+    startUnlocked: false,
+    maxLevel: 2,
+  },
+  {
+    id: 'shout_frost',
+    name: 'Крик: Мороз',
+    desc: "Ту'ум. Ледяное дыхание: конус стужи замедляет и жжёт холодом. Слово — на Стене Слова на снежном плато Пределья.",
+    icon: 'Snowflake',
+    hotkey: 'T',
+    kind: 'shout',
+    cooldown: 16,
+    staminaCost: 28,
+    range: 180,
+    owner: 'player',
+    startUnlocked: false,
+    maxLevel: 2,
+  },
+  {
     id: 'potion_heal',
     name: 'Зелье лечения',
     desc: 'Выпить зелье лечения (+45 ОЗ). Общий откат с эликсиром.',
@@ -214,9 +242,24 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 380, ac: 14, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
     speed: 100, aggroR: 0, leashR: 9999, attackRange: 54, attackCd: 1.5, xp: 550, radius: 24,
   },
+  // ---------------- Фаза 6.2: Стылое Пределье ----------------
+  draugr: {
+    hp: 64, ac: 13, atk: 5, dmgDice: 1, dmgSides: 8, dmgMod: 2,
+    speed: 92, aggroR: 240, leashR: 640, attackRange: 46, attackCd: 1.4, xp: 70, radius: 14,
+  },
+  frost_troll: {
+    hp: 150, ac: 12, atk: 6, dmgDice: 2, dmgSides: 6, dmgMod: 3,
+    speed: 84, aggroR: 230, leashR: 700, attackRange: 50, attackCd: 1.6, xp: 160, radius: 18,
+  },
+  dragon: {
+    hp: 560, ac: 14, atk: 8, dmgDice: 2, dmgSides: 8, dmgMod: 4,
+    speed: 118, aggroR: 0, leashR: 9999, attackRange: 60, attackCd: 1.7, xp: 900, radius: 30,
+  },
 }
 
-export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling'])
+export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll'])
 export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother'])
 /** Фаза 6: панцирь скорпиона трескается от телекинеза — Аард оглушает надолго. */
 export const STUN2_WEAK = new Set<EnemyType>(['scorpion', 'pit_master'])
+/** Фаза 6.2: крики Ту'ум расшатывают мёртвую волю драугров. */
+export const SHOUT_WEAK = new Set<EnemyType>(['draugr'])

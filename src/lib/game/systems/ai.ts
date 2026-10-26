@@ -18,6 +18,7 @@ import { beam, damage, floater, meleeAttack, rangedAttack, ring, spawnTelegraph 
 import { openDialogue } from './quest'
 import { companionIndex, formationSlot } from './party'
 import { pitMasterLogic, spawnPitMaster } from './career'
+import { spawnDragon } from './frost'
 
 export { spawnPitMaster }
 
@@ -85,6 +86,14 @@ export function spawnWorld(ctx: EngineCtx) {
   // Гранит (Фаза 6): Мастер Ямы выходит, если квест дошёл до вызова
   if (ctx.flags.pitMasterRevealed && !ctx.flags.pitMasterDead) {
     spawnPitMaster(ctx)
+  }
+  // Пределье (Фаза 6.2): бой с драконом, прерванный загрузкой сейва, продолжается
+  if (
+    ctx.quests.frost_dragon?.stage === 3 &&
+    !ctx.flags.dragonDead &&
+    ctx.player.pos.x > 5500
+  ) {
+    spawnDragon(ctx)
   }
   for (const c of VELD_CLUES) {
     if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
@@ -445,8 +454,8 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
     }
     return
   }
-  // Интро босса
-  if (e.boss && !ctx.flags.bossIntroDone) {
+  // Интро босса (дракон Стылого Пределья интроится через событие Дола)
+  if (e.boss && e.enemyType !== 'dragon' && !ctx.flags.bossIntroDone) {
     if (Math.hypot(ctx.player.pos.x - e.pos.x, ctx.player.pos.y - e.pos.y) < 340) {
       ctx.flags.bossIntroDone = true
       e.aggroR = 400
@@ -529,9 +538,11 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
     e.facing = Math.atan2(prey.pos.y - e.pos.y, prey.pos.x - e.pos.x)
   }
 
-  if (e.boss) bossLogic(ctx, e, dist, dt)
+  if (e.boss && e.enemyType !== 'dragon') bossLogic(ctx, e, dist, dt)
   if (e.enemyType === 'ash_mother') ashMotherLogic(ctx, e, dist, dt)
   if (e.enemyType === 'pit_master') pitMasterLogic(ctx, e, dist, dt)
+  // Фаза 6.2: дракон управляет собой полностью (полёт/стрейф/посадка)
+  if (e.enemyType === 'dragon') return
 
   // Замах/рывок босса: обычное движение и атаки заблокированы —
   // вся логика внутри bossLogic (return после него не выходим,

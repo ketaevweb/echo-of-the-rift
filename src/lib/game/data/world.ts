@@ -22,10 +22,22 @@ import {
   GRIDGE,
   GR_GATES,
 } from './granite'
+import {
+  FROST_AREAS,
+  FROST_INTERACTABLES,
+  FROST_MARKERS,
+  FROST_NPCS,
+  FROST_PROPS,
+  FROST_ROADS,
+  FROST_SPAWN_ZONES,
+  FRIDGE,
+  FR_GATES,
+} from './frost'
 
 /** Мир: долина Хеймхолл на северо-западе, Вельд на юге за Хребтом (Фаза 3),
- *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6). */
-export const WORLD = { w: 5000, h: 4200 }
+ *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6),
+ *  Стылое Пределье за Стылым Хребтом (Фаза 6.2). */
+export const WORLD = { w: 6360, h: 4200 }
 
 /** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
 const VALLEY_BOTTOM = 2380
@@ -44,6 +56,7 @@ export const AREAS: AreaDef[] = [
   { id: 'rift', name: 'Сердце Разлома', rect: [2660, 100, 520, 480] },
   ...VELD_AREAS,
   ...GRANITE_AREAS,
+  ...FROST_AREAS,
   { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
@@ -76,6 +89,8 @@ export const ROADS: Vec[][] = [
   ...VELD_ROADS,
   // Тропы Гранитной Долины (Фаза 6)
   ...GRANITE_ROADS,
+  // Тропы Стылого Пределья (Фаза 6.2)
+  ...FROST_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -101,6 +116,8 @@ function blocked(px: number, py: number): boolean {
   if (Math.abs(py - RIDGE.y) < 340) return true
   // Каменный Хребет к Граниту (Фаза 6)
   if (Math.abs(px - GRIDGE.x) < 340) return true
+  // Стылый Хребет к Пределью (Фаза 6.2)
+  if (Math.abs(px - FRIDGE.x) < 340) return true
   // Деревня, лагерь, озеро, камни, разлом, врата
   if (px > 640 && px < 1380 && py > 1310 && py < 1830) return true
   if (px > 2380 && px < 2900 && py > 1500 && py < 1920) return true
@@ -109,6 +126,7 @@ function blocked(px: number, py: number): boolean {
   if (px > 2640 && px < 3200 && py > 80 && py < 600) return true
   if (Math.hypot(px - GATES.valley.x, py - GATES.valley.y) < 150) return true
   if (Math.hypot(px - GR_GATES.valleySide.x, py - GR_GATES.valleySide.y) < 150) return true
+  if (Math.hypot(px - FR_GATES.graniteSide.x, py - FR_GATES.graniteSide.y) < 150) return true
   // Дороги (включая вельдские и гранитные)
   for (const road of ROADS) {
     for (let i = 0; i < road.length - 1; i++) {
@@ -219,6 +237,7 @@ export const PROPS: PropDef[] = [
   { kind: 'stone', pos: { x: 1810, y: 2230 }, r: 10, solid: true, seed: 52 },
   ...VELD_PROPS,
   ...GRANITE_PROPS,
+  ...FROST_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -235,6 +254,8 @@ export const NPCS: NpcDef[] = [
   { id: 'torvald_npc', name: 'Торвальд', role: 'Воитель', pos: { x: 2255, y: 705 }, color: '#7a8a4a', dialogue: 'stones_torvald' },
   // Гранитная Долина (Фаза 6)
   ...GRANITE_NPCS,
+  // Стылое Пределье (Фаза 6.2)
+  ...FROST_NPCS,
 ]
 
 export const SPAWN_ZONES: SpawnZoneDef[] = [
@@ -245,6 +266,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   { id: 'rift_a', enemy: 'horror', center: { x: 2860, y: 280 }, radius: 130, max: 3, respawnSec: 60 },
   ...VELD_SPAWN_ZONES,
   ...GRANITE_SPAWN_ZONES,
+  ...FROST_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -262,6 +284,7 @@ export const INTERACTABLES: InteractableDef[] = [
   { id: 'barrier_ui', name: 'Пелена Разлома', pos: { x: 2935, y: 470 }, r: 60, prompt: 'Осмотреть', kind: 'barrier', action: 'dialogue:barrier', cond: 'quest.main<5' },
   ...VELD_INTERACTABLES,
   ...GRANITE_INTERACTABLES,
+  ...FROST_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -273,15 +296,34 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   { pos: { x: 2950, y: 280 }, label: 'Разлом' },
   ...VELD_MARKERS,
   ...GRANITE_MARKERS,
+  ...FROST_MARKERS,
 ]
 
-// Реэкспорты Вельда/Гранита для движка/рендеров (единая точка импорта мира)
+// Реэкспорты Вельда/Гранита/Пределья для движка/рендеров (единая точка импорта мира)
 export { ASH_MOTHER, GATES, POOLS, RIDGE, VELD_CLUES } from './veld'
 export { COLONY, GRIDGE, GR_GATES, MINE, ORE_VEINS, PIT, PIT_MASTER, SHARD } from './granite'
+export {
+  BARROW,
+  FROST_CLUES,
+  FRIDGE,
+  FR_GATES,
+  HAVEN,
+  ROOST,
+  RUNE_CAVE,
+  RUNE_DOOR,
+  RUNE_INIT,
+  RUNE_SOLUTION,
+  RUNE_STONES,
+  RUNE_SYMBOLS,
+  WORD_WALL_FORCE,
+  WORD_WALL_FROST,
+} from './frost'
 
-/** Зона по мировой точке: Гранит (восток за Каменным Хребтом) приоритетнее,
- *  затем Вельд (юг за Хребтом), остальное — долина. */
-export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' {
+/** Зона по мировой точке: Пределье (восток за Стылым Хребтом) приоритетнее,
+ *  затем Гранит (восток за Каменным Хребтом), затем Вельд (юг за Хребтом),
+ *  остальное — долина. */
+export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' {
+  if (x > FRIDGE.x) return 'frost'
   if (x > GRIDGE.x) return 'granite'
   return y > RIDGE.y ? 'veld' : 'valley'
 }

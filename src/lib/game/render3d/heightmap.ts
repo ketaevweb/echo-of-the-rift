@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -84,6 +84,13 @@ const COLONY_FLAT = { x: 4260, y: 1420, rx: 260, ry: 190 }
 const PIT_FLAT = { x: 4300, y: 1980, r: 150 }
 const MINE_FLAT = { x: 4650, y: 830, r: 130 }
 const SHARD_FLAT = { x: 4330, y: 560, r: 150 }
+// Фаза 6.2: ключевые точки Стылого Пределья
+const HAVEN_FLAT = { x: HAVEN.pos.x, y: HAVEN.pos.y, rx: 220, ry: 160 }
+const CAVE_FLAT = { x: RUNE_CAVE.pos.x, y: RUNE_CAVE.pos.y, r: 150 }
+const WALLF_FLAT = { x: WORD_WALL_FORCE.pos.x, y: WORD_WALL_FORCE.pos.y, r: 120 }
+const WALL2_FLAT = { x: WORD_WALL_FROST.pos.x, y: WORD_WALL_FROST.pos.y, r: 120 }
+const ROOST_FLAT = { x: ROOST.pos.x, y: ROOST.pos.y, r: 250 }
+const BARROW_FLAT = { x: BARROW.pos.x, y: BARROW.pos.y, r: 110 }
 
 export const WATER_LEVEL = -1.6
 
@@ -161,6 +168,13 @@ export function heightAt(x: number, y: number): number {
     const t = falloff(dg, 70, 260)
     h += t * t * (58 + jag)
   }
+  // --- Фаза 6.2: Стылый Хребет к Пределью (вертикальная стена по x) ---
+  const df = Math.abs(x - FRIDGE.x)
+  if (df < 330) {
+    const jag = (fbm(x / 110 + 97, y / 110 + 41, 2) - 0.5) * 12
+    const t = falloff(df, 70, 260)
+    h += t * t * (62 + jag)
+  }
   // Вельд: болотистая низина с омутами
   if (y > RIDGE.y + 40) {
     const sw = falloff(y - (RIDGE.y + 40), 0, 240)
@@ -188,6 +202,19 @@ export function heightAt(x: number, y: number): number {
       h = h * (1 - fpit) + bowl * fpit
     }
   }
+  // Стылое Пределье (Фаза 6.2): снежная тундра с наледями — глубже в зону, тем снежнее
+  if (x > FRIDGE.x + 40) {
+    const fz = 1 - falloff(x - (FRIDGE.x + 40), 0, 320)
+    const tundra = (fbm(x / 320 + 57, y / 320 + 11, 3) - 0.5) * 8 + 2.2
+    h = h * (1 - fz) + tundra * fz
+    // Драконий Дол — выжженная чаша
+    const tro = Math.hypot(x - ROOST_FLAT.x, y - ROOST_FLAT.y)
+    const fro = falloff(tro, ROOST_FLAT.r * 0.7, ROOST_FLAT.r * 0.5)
+    if (fro > 0) {
+      const bowl = 2.4 - 1.8 * (1 - Math.min(1, tro / ROOST_FLAT.r))
+      h = h * (1 - fro) + bowl * fro
+    }
+  }
   // Плоские пятачки: колония, рудник, барьер, врата (обе зоны)
   const tcol = inEllipse(x, y, COLONY_FLAT.x, COLONY_FLAT.y, COLONY_FLAT.rx, COLONY_FLAT.ry)
   const fcol = falloff(tcol, 0.75, 0.55)
@@ -204,6 +231,24 @@ export function heightAt(x: number, y: number): number {
   }
   // Плоские пятачки у Врат Гранита (Фаза 6)
   for (const g of [GR_GATES.valleySide, GR_GATES.granite]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    h = h * (1 - fg) + 1.8 * fg
+  }
+  // Плоские пятачки Пределья (Фаза 6.2): хаб, пещера, стены, курган
+  const thav = inEllipse(x, y, HAVEN_FLAT.x, HAVEN_FLAT.y, HAVEN_FLAT.rx, HAVEN_FLAT.ry)
+  const fhav = falloff(thav, 0.75, 0.55)
+  h = h * (1 - fhav) + 2.8 * fhav
+  const fcave = falloff(Math.hypot(x - CAVE_FLAT.x, y - CAVE_FLAT.y), CAVE_FLAT.r * 0.7, CAVE_FLAT.r * 0.6)
+  h = h * (1 - fcave) + 5.2 * fcave
+  const fwf = falloff(Math.hypot(x - WALLF_FLAT.x, y - WALLF_FLAT.y), WALLF_FLAT.r * 0.7, WALLF_FLAT.r * 0.6)
+  h = h * (1 - fwf) + 5.6 * fwf
+  const fw2 = falloff(Math.hypot(x - WALL2_FLAT.x, y - WALL2_FLAT.y), WALL2_FLAT.r * 0.7, WALL2_FLAT.r * 0.6)
+  h = h * (1 - fw2) + 6.4 * fw2
+  const fbar = falloff(Math.hypot(x - BARROW_FLAT.x, y - BARROW_FLAT.y), BARROW_FLAT.r * 0.7, BARROW_FLAT.r * 0.6)
+  h = h * (1 - fbar) + 4.6 * fbar
+  // Плоские пятачки у Врат Пределья (обе стороны Стылого Хребта)
+  for (const g of [FR_GATES.graniteSide, FR_GATES.frost]) {
     const tg = Math.hypot(x - g.x, y - g.y)
     const fg = falloff(tg, 90, 80)
     h = h * (1 - fg) + 1.8 * fg
@@ -236,6 +281,11 @@ const C_ASHGRASS: [number, number, number] = [0.30, 0.28, 0.22]
 const C_ASHGRASS2: [number, number, number] = [0.24, 0.23, 0.19]
 const C_GRAYSTONE: [number, number, number] = [0.38, 0.37, 0.34]
 const C_DUST: [number, number, number] = [0.44, 0.40, 0.33]
+// Палитра Стылого Пределья (Фаза 6.2): вечный снег, наледь, выжженный уголь
+const C_SNOW2: [number, number, number] = [0.82, 0.85, 0.84]
+const C_SNOWDIRT: [number, number, number] = [0.62, 0.63, 0.56]
+const C_ICE: [number, number, number] = [0.63, 0.74, 0.74]
+const C_SCORCH: [number, number, number] = [0.16, 0.14, 0.13]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -316,6 +366,39 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
     // Площадь Колонии — вытоптанная пыль
     const tcol = inEllipse(x, y, COLONY_FLAT.x, COLONY_FLAT.y, 175, 125)
     lerp3(tmpA, C_DIRT, falloff(tcol, 0.72, 0.45), tmpA)
+  }
+  // Стылый Хребет — голый камень (Фаза 6.2)
+  const dfg = Math.abs(x - FRIDGE.x)
+  if (dfg < 320) {
+    lerp3(tmpA, C_ROCK, falloff(dfg, 70, 250) * 0.9, tmpA)
+  }
+  // Стылое Пределье — вечный снег с наледями (Фаза 6.2)
+  if (x > FRIDGE.x - 120) {
+    const fz = 1 - falloff(x - (FRIDGE.x - 120), 0, 520)
+    if (fz > 0.01) {
+      const sn = fbm(x / 210 + 91, y / 210 + 53, 3)
+      const base = sn > 0.55 ? C_SNOW : C_SNOW2
+      lerp3(tmpA, base, fz, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      // проталины и наледи
+      lerp3(tmpA, C_SNOWDIRT, Math.max(0, 0.42 - sn) * 1.1 * fz, tmpA)
+      lerp3(tmpA, C_ICE, Math.max(0, sn - 0.68) * 1.4 * fz, tmpA)
+      // Драконий Дол — выжженный уголь под снегом
+      const tro = Math.hypot(x - ROOST.pos.x, y - ROOST.pos.y)
+      if (tro < ROOST.r * 0.75) {
+        const scorch = falloff(tro, ROOST.r * 0.35, ROOST.r * 0.4) * 0.85
+        lerp3(tmpA, C_SCORCH, scorch, tmpB)
+        tmpA[0] = tmpB[0]
+        tmpA[1] = tmpB[1]
+        tmpA[2] = tmpB[2]
+        lerp3(tmpA, C_SNOW, Math.max(0, 0.35 - scorch), tmpA)
+      }
+      // Площадь Приюта — вытоптанный снег
+      const thav = inEllipse(x, y, HAVEN_FLAT.x, HAVEN_FLAT.y, 150, 110)
+      lerp3(tmpA, C_SNOWDIRT, falloff(thav, 0.72, 0.45), tmpA)
+    }
   }
 
   // Разлом — пепел и тлеющие трещины

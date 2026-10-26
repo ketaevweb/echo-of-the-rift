@@ -182,6 +182,33 @@ export const ITEMS: Record<string, ItemDef> = {
     price: 0,
     icon: 'Key',
   },
+  // ---------------- Фаза 6.2: Стылое Пределье ----------------
+  frost_blade: {
+    id: 'frost_blade',
+    name: 'Стылый клинок',
+    desc: 'Сталь, закалённая в вечных снегах Пределья. Руна мороза тлеет на лезвии даже в драку.',
+    type: 'weapon',
+    price: 340,
+    damage: 9,
+    icon: 'Sword',
+  },
+  cloak_frost: {
+    id: 'cloak_frost',
+    name: 'Плащ Стылого Пределья',
+    desc: 'Сшит Ингрид из шкур снежных волков. Метель за спиной — не повод отступать.',
+    type: 'armor',
+    price: 300,
+    ac: 3,
+    icon: 'Shirt',
+  },
+  frost_fang: {
+    id: 'frost_fang',
+    name: 'Клык Иммолтакса',
+    desc: 'Огромный зуб длиной с предплечье. Грим даст за него цену, а сказители — славу.',
+    type: 'misc',
+    price: 140,
+    icon: 'Bone',
+  },
 }
 
 export const SELL_RATE = 0.4

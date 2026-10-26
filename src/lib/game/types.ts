@@ -192,6 +192,12 @@ export interface PropDef {
     | 'mine'
     | 'obelisk'
     | 'ore'
+    // Фаза 6.2 (Стылое Пределье):
+    | 'cave'
+    | 'runestone'
+    | 'wordwall'
+    | 'rune_door'
+    | 'snowtree'
   pos: Vec
   w?: number
   h?: number
@@ -234,6 +240,10 @@ export type EnemyType =
   // Фаза 6 (Гранитная Долина):
   | 'scorpion'
   | 'pit_master'
+  // Фаза 6.2 (Стылое Пределье):
+  | 'draugr'
+  | 'frost_troll'
+  | 'dragon'
 
 export interface InteractableDef {
   id: string
@@ -327,6 +337,9 @@ export interface Entity {
   dashT?: number // активный рывок
   dashDir?: number
   dashHits?: Set<number> // кого уже задел текущий рывок
+  // --- Фаза 6.2: дракон (транзитные, в сейв не пишутся) ---
+  bombX?: number // точка падения огненной бомбы
+  bombY?: number
 }
 
 // ---------------- Телеграфы АоЕ (Фаза 2) ----------------
@@ -413,4 +426,7 @@ export interface SaveData {
   silence: number
   // --- Фаза 6: карьера фракции Гранитной Долины (в старых сейвах нет — дефолты) ---
   career: CareerState
+  // --- Фаза 6.2: слова силы (0 — не открыт, 1 — слово, 2 — два слова) и руны пещеры ---
+  shoutLv: { force: number; frost: number }
+  runes: { rs1: number; rs2: number; rs3: number }
 }

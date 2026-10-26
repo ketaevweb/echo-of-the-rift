@@ -430,6 +430,141 @@ function buildScorpion(scale = 1): { group: THREE.Group; refs: { body: THREE.Obj
   return { group, refs: { body, tail } }
 }
 
+// ---------------- Пределье: драугр / тролль / дракон (Фаза 6.2) ----------------
+
+/** Драугр: мёртвый воин в истлевшей броне с тусклым клинком. */
+function buildDraugr(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#6a7a6a', 0x9aa89a, { helmet: true, sword: true })
+  // Гнилые лохмотья-накидка
+  const rag = new THREE.Mesh(
+    new THREE.ConeGeometry(7.4, 16, 8, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x3c443c, roughness: 0.98, side: THREE.DoubleSide }),
+  )
+  rag.position.y = 9
+  built.group.add(rag)
+  // Ледяные глаза
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xbfe3ea })
+  for (const sz of [-1.7, 1.7]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 4), eyeMat)
+    eye.position.set(0, 29.4, sz)
+    built.group.add(eye)
+  }
+  return built
+}
+
+/** Стылый тролль: гора белой шерсти на двух кулаках. */
+function buildFrostTroll(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#d8dcd4', 0xb8b4a4, { scale: 1.55 })
+  // Шерстяная грива
+  const mane = new THREE.Mesh(new THREE.SphereGeometry(6.4, 9, 7), mat(0xe4e8e0))
+  mane.position.set(0, 28.5, -1.4)
+  mane.scale.set(1.15, 0.8, 1)
+  built.group.add(mane)
+  // Морозные наросты на плечах
+  const iceMat = new THREE.MeshStandardMaterial({ color: 0xc8dfe2, emissive: 0x9fd8d8, emissiveIntensity: 0.25, roughness: 0.3 })
+  for (const sz of [-1, 1]) {
+    const shard = new THREE.Mesh(new THREE.ConeGeometry(1.6, 6, 5), iceMat)
+    shard.position.set(sz * 9.4, 27, 0)
+    shard.rotation.z = sz * 0.5
+    built.group.add(shard)
+  }
+  return built
+}
+
+/** Иммолтакс: крылатая тень Стылого Пределья. Морда по +X, тело — refs.body (высота полёта правит движок). */
+function buildDragon(): { group: THREE.Group; refs: { body: THREE.Object3D; wingL: THREE.Object3D; wingR: THREE.Object3D; tail: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const scaleMat = mat(0x4a3230, { roughness: 0.72 })
+  const scaleDark = mat(0x33221f)
+  const emberMat = new THREE.MeshStandardMaterial({ color: 0x6a2a20, emissive: 0xd05a20, emissiveIntensity: 0.5, roughness: 0.5 })
+
+  // Корпус
+  const trunk = new THREE.Mesh(new THREE.CapsuleGeometry(7.2, 20, 4, 9), scaleMat)
+  trunk.rotation.x = Math.PI / 2
+  trunk.position.y = 14
+  trunk.castShadow = true
+  // Шея вверх-вперёд
+  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(3.1, 13, 3, 7), scaleMat)
+  neck.position.set(13, 22, 0)
+  neck.rotation.z = -0.7
+  // Голова с пастью и рогами
+  const head = new THREE.Mesh(new THREE.ConeGeometry(3.4, 11, 7), scaleMat)
+  head.position.set(21, 28, 0)
+  head.rotation.z = -Math.PI / 2 + 0.12
+  head.castShadow = true
+  const jaw = new THREE.Mesh(new THREE.ConeGeometry(2.2, 6, 6), scaleDark)
+  jaw.position.set(23.5, 26, 0)
+  jaw.rotation.z = -Math.PI / 2 - 0.2
+  const glow = new THREE.PointLight(0xd05a20, 110, 130, 2)
+  glow.position.set(24, 27, 0)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffb04a })
+  for (const sz of [-2.2, 2.2]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.8, 6, 4), eyeMat)
+    eye.position.set(19.5, 29.5, sz)
+    body.add(eye)
+  }
+  for (const sz of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.9, 5.5, 5), scaleDark)
+    horn.position.set(18, 31.5, sz * 2.2)
+    horn.rotation.z = -0.5
+    horn.rotation.x = sz * 0.4
+    body.add(horn)
+  }
+  // Хвост: сегменты назад
+  const tail = new THREE.Group()
+  let prev: THREE.Object3D = tail
+  for (let i = 0; i < 4; i++) {
+    const joint = new THREE.Group()
+    const s = new THREE.Mesh(new THREE.CapsuleGeometry(2.4 - i * 0.5, 7 - i * 0.8, 3, 6), i % 2 ? scaleDark : scaleMat)
+    s.rotation.x = Math.PI / 2
+    s.position.x = -4.4
+    joint.add(s)
+    joint.position.x = i === 0 ? -12 : -7.6
+    prev.add(joint)
+    prev = joint
+  }
+  const tailFin = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4.5, 4), emberMat)
+  tailFin.rotation.z = Math.PI / 2
+  tailFin.position.x = -3
+  prev.add(tailFin)
+  tail.position.y = 15
+  // Крылья: кожистая перепонка на костях
+  const wingMat = new THREE.MeshStandardMaterial({ color: 0x55322c, roughness: 0.85, side: THREE.DoubleSide })
+  const makeWing = (side: 1 | -1) => {
+    const wing = new THREE.Group()
+    const bone1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 12, 3, 5), scaleDark)
+    bone1.rotation.x = Math.PI / 2
+    bone1.position.set(-2, 0, side * 6)
+    const bone2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 10, 3, 5), scaleDark)
+    bone2.rotation.x = Math.PI / 2
+    bone2.rotation.z = side * 0.55
+    bone2.position.set(-4, 0.5, side * 12)
+    const membrane = new THREE.Mesh(new THREE.PlaneGeometry(22, 15), wingMat)
+    membrane.rotation.x = -Math.PI / 2
+    membrane.rotation.z = side * 0.35
+    membrane.position.set(-5, 0.6, side * 10.5)
+    wing.add(bone1, bone2, membrane)
+    wing.position.set(3, 19, 0)
+    return wing
+  }
+  const wingL = makeWing(-1)
+  const wingR = makeWing(1)
+  // Лапы
+  for (const [lx, lz] of [[6, 4.6], [6, -4.6], [-4, 5], [-4, -5]]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(1.7, 7, 3, 6), scaleDark)
+    leg.position.set(lx, 6, lz)
+    body.add(leg)
+  }
+  // Грудное свечение (древний огонь внутри)
+  const core = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 6), emberMat)
+  core.position.set(4, 14, 0)
+  body.add(trunk, neck, head, jaw, glow, tail, core, wingL, wingR)
+  group.add(body)
+  group.scale.setScalar(1.35)
+  return { group, refs: { body, wingL, wingR, tail } }
+}
+
 /** Мастер Ямы: кряжистый боец в цепях с импровизированной косой-цепом. */
 function buildPitMaster(): { group: THREE.Group; refs: HumanoidRefs } {
   const built = buildHumanoid('#8a6a3a', 0xb08858, { sword: true, scale: 1.9 })
@@ -459,6 +594,8 @@ export class Avatar {
   private eid: number
   /** Модель собрана «мордой по +X» (звери/хоррор) — формула поворота другая. */
   private forwardX = false
+  /** Текущая высота полёта дракона (для плавного захода на посадку). */
+  private dragonAlt = 1
 
   constructor(e: Entity) {
     this.eid = e.eid
@@ -509,6 +646,15 @@ export class Avatar {
       case 'pit_master':
         built = buildPitMaster()
         break
+      case 'draugr':
+        built = buildDraugr()
+        break
+      case 'frost_troll':
+        built = buildFrostTroll()
+        break
+      case 'dragon':
+        built = buildDragon()
+        break
       case 'boss':
         built = buildHumanoid(e.color, 0x6a5a5a, { horns: true, sword: true, scale: 2.5 })
         break
@@ -526,7 +672,7 @@ export class Avatar {
     this.forwardX =
       arch === 'wolf' || arch === 'alpha' || arch === 'horror' ||
       arch === 'bogling' || arch === 'ash_shade' || arch === 'ash_mother' ||
-      arch === 'scorpion'
+      arch === 'scorpion' || arch === 'dragon'
     this.mats = collectMats(this.group)
     this.hpBar = new HpBar()
     this.group.add(this.hpBar.obj)
@@ -548,6 +694,9 @@ export class Avatar {
     | 'ash_mother'
     | 'scorpion'
     | 'pit_master'
+    | 'draugr'
+    | 'frost_troll'
+    | 'dragon'
     | 'boss'
     | 'humanoid' {
     if (e.kind === 'player') return 'player'
@@ -565,6 +714,9 @@ export class Avatar {
       case 'ash_mother': return 'ash_mother'
       case 'scorpion': return 'scorpion'
       case 'pit_master': return 'pit_master'
+      case 'draugr': return 'draugr'
+      case 'frost_troll': return 'frost_troll'
+      case 'dragon': return 'dragon'
       case 'boss': return 'boss'
       default: return 'humanoid'
     }
@@ -652,6 +804,20 @@ export class Avatar {
       if (tail) {
         tail.rotation.z = 0.55 + (e.attackT > 0 ? Math.sin((1 - e.attackT / 0.28) * Math.PI) * 0.5 : Math.sin(time * 1.7 + this.eid) * 0.1)
       }
+    }
+
+    // Фаза 6.2: дракон — высота полёта по cds['alt'] (лерп движка), взмахи крыльев, хвост
+    if (this.refs.body && e.enemyType === 'dragon') {
+      const alt = e.cds['alt'] ?? 0
+      this.dragonAlt += (alt - this.dragonAlt) * 0.12
+      const hover = 14 + this.dragonAlt * 40
+      this.refs.body.position.y = hover + (this.dragonAlt > 0.5 ? Math.sin(time * 2.4) * 1.6 : 0)
+      const flap = this.dragonAlt > 0.5 ? Math.sin(time * 7.5) * 0.55 : Math.sin(time * 1.4) * 0.06
+      const wings = this.refs as unknown as { wingL?: THREE.Object3D; wingR?: THREE.Object3D }
+      if (wings.wingL) wings.wingL.rotation.z = flap
+      if (wings.wingR) wings.wingR.rotation.z = -flap
+      const tailRef = (this.refs as unknown as { tail?: THREE.Object3D }).tail
+      if (tailRef) tailRef.rotation.z = Math.sin(time * 1.6) * 0.14
     }
 
     // Вспышка урона

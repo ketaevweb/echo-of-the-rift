@@ -78,6 +78,21 @@ export const BESTIARY_INFO: Record<string, { name: string; text: string; weaknes
     text: 'Хозяин арены Колонии и голос культа Осколка. Говорит, что слышит Ядро сквозь барьер. В днищах цепей — имена бывших чемпионов.',
     weakness: 'Цеп-слэм читается по кругу-телеграфу. На 60% здоровья зовёт скорпионов — прибереги АоЕ.',
   },
+  draugr: {
+    name: 'Драугр',
+    text: 'Мёртвый воин древних, что жили до Разлома. Не гниёт, не спит, не отступает. Стережёт пещеры и курганы Пределья уже тысячи лет.',
+    weakness: "Крики Ту'ум расшатывают мёртвую волю — Аксий и Сила держат его дольше. Масло против спектров берёт.",
+  },
+  frost_troll: {
+    name: 'Стылый тролль',
+    text: 'Гора белой шерсти и мышц. Регенерирует на глазах, если не добить. Стережёт Стены Слов, будто понимает их ценность.',
+    weakness: 'Морозный зверь боится огня — Игни наносит двойной урон и мешает регенерации.',
+  },
+  dragon: {
+    name: 'Иммолтакс',
+    text: 'Крылатая тень Стылого Пределья. Говорит на древнем языке, и от его слов вспыхивает снег. Душа его — лоно слов силы.',
+    weakness: 'На земле уязвим как зверь; в воздухе достают только знаки, лук Кайи и крики. Читай огненные бомбы по кругам на снегу.',
+  },
 }
 
 export const ENEMY_NAME: Record<string, string> = {
@@ -93,14 +108,17 @@ export const ENEMY_NAME: Record<string, string> = {
   ash_mother: 'Пепельная Мать',
   scorpion: 'Гранитный скорпион',
   pit_master: 'Мастер Ямы',
+  draugr: 'Драугр',
+  frost_troll: 'Стылый тролль',
+  dragon: 'Иммолтакс',
 }
 
 // ---------------- Масла (Фаза 3) ----------------
 
 /** Классы врагов для масел: «звери» и «спектры». */
 export const OIL_TARGETS: Record<'beast' | 'specter', Set<string>> = {
-  beast: new Set(['wolf', 'alpha', 'bogling', 'scorpion']),
-  specter: new Set(['horror', 'ash_shade', 'ash_mother']),
+  beast: new Set(['wolf', 'alpha', 'bogling', 'scorpion', 'frost_troll', 'dragon']),
+  specter: new Set(['horror', 'ash_shade', 'ash_mother', 'draugr']),
 }
 
 export const ATTR_NAMES: Record<string, string> = {

@@ -5,7 +5,7 @@
 // (WASD/клик-движение, автопатака по цели, стамина).
 // ============================================================
 
-import { WORLD, RIDGE, GRIDGE } from '../data/world'
+import { WORLD, RIDGE, GRIDGE, FRIDGE } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
@@ -36,6 +36,12 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   const ghi = GRIDGE.x + GRIDGE.band
   if (nx > glo - er && nx < ghi + er) {
     nx = e.pos.x >= GRIDGE.x ? Math.max(nx, ghi + er) : Math.min(nx, glo - er)
+  }
+  // Стылый Хребет к Пределью непроходим (Фаза 6.2): переход только через Врата Пределья.
+  const flo2 = FRIDGE.x - FRIDGE.band
+  const fhi = FRIDGE.x + FRIDGE.band
+  if (nx > flo2 - er && nx < fhi + er) {
+    nx = e.pos.x >= FRIDGE.x ? Math.max(nx, fhi + er) : Math.min(nx, flo2 - er)
   }
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue

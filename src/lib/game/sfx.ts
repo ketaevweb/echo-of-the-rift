@@ -157,7 +157,7 @@ export function sfx(name: SfxName) {
 
 // ---------------- Эмбиент (Фаза 3): петля ветра/топей ----------------
 
-type AmbientMode = 'valley' | 'veld' | 'granite' | 'off'
+type AmbientMode = 'valley' | 'veld' | 'granite' | 'frost' | 'off'
 interface AmbientNodes {
   src: AudioBufferSourceNode
   filter: BiquadFilterNode
@@ -170,6 +170,7 @@ const AMBIENT_PARAMS: Record<AmbientMode, { freq: number; q: number; gain: numbe
   valley: { freq: 850, q: 0.5, gain: 0.022 },
   veld: { freq: 260, q: 1.1, gain: 0.042 },
   granite: { freq: 520, q: 1.8, gain: 0.034 }, // сухой пыльный свист над котловиной
+  frost: { freq: 1250, q: 2.4, gain: 0.046 }, // высокий свист метели над тундрой
   off: { freq: 400, q: 0.7, gain: 0 },
 }
 

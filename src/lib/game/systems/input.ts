@@ -79,6 +79,9 @@ function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
     return
   }
   if (k === 'f' || k === 'а') doInteract(ctx)
+  // Фаза 6.2: крики Ту'ум (R — Сила, T — Мороз; рус. раскладка К/Е)
+  if (k === 'r' || k === 'к') ctx.castAbility('shout_force')
+  if (k === 't' || k === 'е') ctx.castAbility('shout_frost')
   if (k === 'c' || k === 'с') ctx.openPanel('char')
   if (k === 'i' || k === 'ш') ctx.openPanel('inv')
   if (k === 'j' || k === 'о') ctx.openPanel('journal')

@@ -7,6 +7,7 @@
 
 import { CareerState, QuestState, SaveData, SignId } from '../types'
 import { QUESTS } from '../data/quests'
+import { RUNE_INIT } from '../data/frost'
 import { useGame, writeSave } from '../store'
 import { EngineCtx } from '../core/ctx'
 
@@ -81,6 +82,9 @@ export function collectSave(ctx: EngineCtx): SaveData {
     silence: ctx.silence,
     // Фаза 6: карьера фракции Гранита
     career: JSON.parse(JSON.stringify(ctx.career)) as CareerState,
+    // Фаза 6.2: слова силы и руны пещеры
+    shoutLv: { ...ctx.shoutLv },
+    runes: { ...ctx.runes },
   }
 }
 
@@ -144,6 +148,16 @@ export function applySave(ctx: EngineCtx, s: SaveData) {
       coven: typeof c?.rank?.coven === 'number' ? c.rank.coven : 0,
       watch: typeof c?.rank?.watch === 'number' ? c.rank.watch : 0,
     },
+  }
+  // Фаза 6.2: слова силы/руны — дефолты для сейвов до Фазы 6.2
+  ctx.shoutLv = {
+    force: typeof s.shoutLv?.force === 'number' ? Math.max(0, Math.min(2, s.shoutLv.force)) : 0,
+    frost: typeof s.shoutLv?.frost === 'number' ? Math.max(0, Math.min(2, s.shoutLv.frost)) : 0,
+  }
+  ctx.runes = {
+    rs1: typeof s.runes?.rs1 === 'number' ? Math.max(0, Math.min(2, s.runes.rs1)) : RUNE_INIT.rs1,
+    rs2: typeof s.runes?.rs2 === 'number' ? Math.max(0, Math.min(2, s.runes.rs2)) : RUNE_INIT.rs2,
+    rs3: typeof s.runes?.rs3 === 'number' ? Math.max(0, Math.min(2, s.runes.rs3)) : RUNE_INIT.rs3,
   }
   ctx.createPlayer({ ...s.pos })
   ctx.spawnWorld()

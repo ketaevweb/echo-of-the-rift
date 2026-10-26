@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Heart, Map, Moon, ScrollText, Shield, Sun, User, Volume2, VolumeX, X } from 'lucide-react'
+import { Heart, Map, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
@@ -112,6 +112,7 @@ export default function Hud() {
   const daytime = useGame((s) => s.daytime)
   const zoneLabel = useGame((s) => s.zoneLabel)
   const formation = useGame((s) => s.formation)
+  const shouts = useGame((s) => s.shouts)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -312,6 +313,54 @@ export default function Hud() {
       {player && (
         <div className="pointer-events-auto absolute bottom-3 left-1/2 -translate-x-1/2">
           <div className="flex items-end gap-1.5 rounded border border-[#5a4632]/70 bg-[#181410]/85 p-2 backdrop-blur-sm">
+            {/* Фаза 6.2: крики Ту'ум (R/T) — слева от бара умений */}
+            {shouts.map((sh) => {
+              const cdPct = sh.cdMax > 0 ? (sh.cd / sh.cdMax) * 100 : 0
+              const open = sh.lv > 0
+              return (
+                <button
+                  key={sh.id}
+                  onClick={() => getEngine()?.castAbility(sh.id)}
+                  disabled={!open || sh.cd > 0}
+                  className={`relative h-12 w-12 overflow-hidden rounded border ${
+                    open
+                      ? 'border-[#f5c96b]/50 bg-[#1c1a10]'
+                      : 'border-[#3a2e20] bg-[#181410] opacity-40'
+                  }`}
+                  title={
+                    open
+                      ? `${sh.name} [${sh.hotkey}] — слово «${sh.word}» ${sh.lv >= 2 ? 'II' : 'I'}${sh.cd > 0 ? ` — откат ${sh.cd.toFixed(1)}с` : ''}`
+                      : `${sh.name} — слово не открыто. Ищи Стены Слов в Стылом Пределье.`
+                  }
+                >
+                  {sh.id === 'shout_force' ? (
+                    <Wind className="mx-auto mt-2 h-6 w-6 text-[#f5c96b]" />
+                  ) : (
+                    <Snowflake className="mx-auto mt-2 h-6 w-6 text-[#bfe3ea]" />
+                  )}
+                  <span className="absolute left-1 top-0.5 text-[9px] font-bold text-[#d9a441]">{sh.hotkey}</span>
+                  {open && (
+                    <span className="absolute bottom-0.5 left-1 text-[8px] font-bold text-[#f5c96b]">
+                      {sh.lv >= 2 ? 'II' : 'I'}
+                    </span>
+                  )}
+                  {sh.cd > 0 && (
+                    <>
+                      <span className="absolute inset-x-0 bottom-0 bg-black/70" style={{ height: `${cdPct}%` }} />
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+                        {sh.cd.toFixed(0)}
+                      </span>
+                    </>
+                  )}
+                  {!open && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <Shield className="h-4 w-4 text-[#8a8068]" />
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+            <div className="mx-0.5 h-10 w-px bg-[#3a2e20]" />
             {abilities.map((a) => {
               const cdPct = a.cdMax > 0 ? (a.cd / a.cdMax) * 100 : 0
               return (

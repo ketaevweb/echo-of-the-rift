@@ -31,7 +31,7 @@ export interface SceneView {
   telegraphs: Telegraph[]
   playerAlive: boolean
   // Фаза 3: атмосфера
-  zone: 'valley' | 'veld' | 'granite'
+  zone: 'valley' | 'veld' | 'granite' | 'frost'
   dayT: number
   // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
   tactical?: boolean
@@ -178,6 +178,21 @@ export function drawScene(v: SceneView) {
   if (v.zone === 'granite') {
     ctx.fillStyle = 'rgba(78,68,52,0.14)'
     ctx.fillRect(0, 0, w, h)
+  }
+  // Фаза 6.2: белёсая метель Стылого Пределья
+  if (v.zone === 'frost') {
+    ctx.fillStyle = 'rgba(206,216,214,0.13)'
+    ctx.fillRect(0, 0, w, h)
+    // снежные хлопья на экране
+    const t = v.time
+    ctx.fillStyle = 'rgba(240,246,244,0.5)'
+    for (let i = 0; i < 42; i++) {
+      const sx = ((i * 137.5 + t * (26 + (i % 5) * 9)) % (w + 40)) - 20
+      const sy = ((i * 91.7 + t * (44 + (i % 7) * 11)) % (h + 40)) - 20
+      ctx.beginPath()
+      ctx.arc(sx, sy, 1.2 + (i % 3) * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
   // Фаза 5: Тишь — выцветание мира (composite 'saturation' + гаснущий серый)
   const s = Math.min(1, (v.silence ?? 0) / 100)

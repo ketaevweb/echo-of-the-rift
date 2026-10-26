@@ -9,7 +9,7 @@ import { ABILITY_MAP } from '../data/abilities'
 import { QUESTS } from '../data/quests'
 import { ITEMS } from '../data/items'
 import { ABILITY_BAR_IDS, ENEMY_NAME } from '../data/tables'
-import { AbilityHud, CareerHud, PartyHud, QuestHud, useGame } from '../store'
+import { AbilityHud, CareerHud, PartyHud, QuestHud, ShoutHud, useGame } from '../store'
 import { SignId } from '../types'
 import type { EngineCtx } from '../core/ctx'
 import { countItem } from './inventory'
@@ -94,10 +94,36 @@ export function syncUi(ctx: EngineCtx): void {
   const graniteQ = quests.find((q) => q.id === 'granite')!
   const oreQ = quests.find((q) => q.id === 'granite_ore')!
   const scorpQ = quests.find((q) => q.id === 'granite_scorpions')!
-  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ].find((q) => q.stage > 0 && !q.done) ?? null
+  // Фаза 6.2: предельные квесты тоже попадают в трекер побочек
+  const frostWQ = quests.find((q) => q.id === 'frost_words')!
+  const frostDQ = quests.find((q) => q.id === 'frost_dragon')!
+  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ, frostWQ, frostDQ].find((q) => q.stage > 0 && !q.done) ?? null
   const boss = ctx.entities.find(
-    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother' || e.enemyType === 'pit_master') && e.alive && e.aiState !== 'idle',
+    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother' || e.enemyType === 'pit_master' || e.enemyType === 'dragon') && e.alive && e.aiState !== 'idle',
   )
+  // Фаза 6.2: крики Ту'ум — зеркало HUD
+  const shouts: ShoutHud[] = [
+    {
+      id: 'shout_force',
+      name: 'Крик: Сила',
+      icon: 'Wind',
+      hotkey: 'R',
+      word: 'ФУС',
+      lv: ctx.shoutLv?.force ?? 0,
+      cd: ctx.player.cds['shout_force'] ?? 0,
+      cdMax: ABILITY_MAP['shout_force']?.cooldown ?? 13,
+    },
+    {
+      id: 'shout_frost',
+      name: 'Крик: Мороз',
+      icon: 'Snowflake',
+      hotkey: 'T',
+      word: 'ЛОК',
+      lv: ctx.shoutLv?.frost ?? 0,
+      cd: ctx.player.cds['shout_frost'] ?? 0,
+      cdMax: ABILITY_MAP['shout_frost']?.cooldown ?? 16,
+    },
+  ]
   // Фаза 6: карьера — зеркало HUD
   const career: CareerHud | null = ctx.career.faction
     ? {
@@ -141,8 +167,9 @@ export function syncUi(ctx: EngineCtx): void {
     // Фаза 3: масло, сутки, зона
     oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
     daytime: ctx.dayClock,
-    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : ctx.zone === 'granite' ? 'ГРАНИТНАЯ ДОЛИНА' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : ctx.zone === 'granite' ? 'ГРАНИТНАЯ ДОЛИНА' : ctx.zone === 'frost' ? 'СТЫЛОЕ ПРЕДЕЛЬЕ' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
     formation: ctx.formation,
     career,
+    shouts,
   })
 }

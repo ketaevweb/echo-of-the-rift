@@ -6,7 +6,7 @@
 // updateParticles/tickCds).
 // ============================================================
 
-import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN2_WEAK, STUN_WEAK } from '../data/abilities'
+import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, SHOUT_WEAK, STUN2_WEAK, STUN_WEAK } from '../data/abilities'
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO, OIL_TARGETS } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
@@ -22,6 +22,7 @@ import { gainXp, signPower } from './progression'
 import { advanceQuest, checkProof } from './quest'
 import { approvalOnDowned, approvalOnKill, trySynergyFrostAndFlame, trySynergyWallAndHammer } from './party'
 import { careerRank, endPitFight } from './career'
+import { dragonSoulAbsorb } from './frost'
 
 // ---------------- Атаки ----------------
 
@@ -173,6 +174,20 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     goldLoot = 140
     if (ctx.quests.granite.stage === 3) advanceQuest(ctx, 'granite', 4)
     useGame.getState().patch({ bossBar: null })
+  } else if (type === 'draugr') {
+    goldLoot = 14 + Math.floor(Math.random() * 18)
+    if (Math.random() < 0.3) addItem(ctx, 'rift_shard', 1)
+  } else if (type === 'frost_troll') {
+    goldLoot = 45
+    if (Math.random() < 0.6) addItem(ctx, 'wolf_pelt', 1)
+  } else if (type === 'dragon') {
+    // Фаза 6.2: дракон Иммолтакс пал — душа дракона поглощается
+    ctx.flags.dragonDead = true
+    goldLoot = 180
+    addItem(ctx, 'frost_fang', 1)
+    if (ctx.quests.frost_dragon.stage === 3) advanceQuest(ctx, 'frost_dragon', 4)
+    dragonSoulAbsorb(ctx)
+    useGame.getState().patch({ bossBar: null })
   } else if (type === 'boss') {
     goldLoot = 150
     addItem(ctx, 'rift_shard', 3)
@@ -272,6 +287,9 @@ export function castAbility(ctx: EngineCtx, id: string) {
     return
   }
   if (id === 'shout' && !ctx.signs.shout.unlocked) return
+  // Фаза 6.2: крики Ту'ум открываются только у Стен Слов
+  if (id === 'shout_force' && (ctx.shoutLv?.force ?? 0) < 1) return
+  if (id === 'shout_frost' && (ctx.shoutLv?.frost ?? 0) < 1) return
   if (ab.kind === 'sign' && !ctx.signs[id as SignId]?.unlocked) return
   if (ctx.player.cds[id] > 0) return
   if (ctx.stamina < ab.staminaCost) {
@@ -350,6 +368,39 @@ export function castAbility(ctx: EngineCtx, id: string) {
         const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
         ctx.kb.set(e.eid, { x: Math.cos(a) * 360, y: Math.sin(a) * 360 })
       }
+    }
+  } else if (id === 'shout_force') {
+    // Фаза 6.2: ТУ'УМ — СИЛА: волна голоса роняет всех перед героем
+    const lv = ctx.shoutLv.force
+    const mult = 1 + 0.45 * (lv - 1)
+    if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
+    sfx('shout')
+    ctx.shake = 9
+    coneParticles(ctx, ctx.player.pos, ctx.player.facing, 190, '#f5c96b')
+    spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 190, width: 0.8, life: 0.32, maxLife: 0.32, color: '#f5c96b' })
+    const cone = enemiesInCone(ctx, 190, 0.8)
+    for (const e of cone) {
+      damage(ctx, e, Math.round((d(6) + d(4)) * mult * power), { color: '#f5c96b' })
+      // Мёртвая воля драугров расшатывается голосом древних
+      const stunMult = SHOUT_WEAK.has(e.enemyType ?? 'wolf') ? 1.7 : 1
+      e.stunT = Math.max(e.stunT, 1.3 * stunMult)
+      const a = Math.atan2(e.pos.y - ctx.player.pos.y, e.pos.x - ctx.player.pos.x)
+      ctx.kb.set(e.eid, { x: Math.cos(a) * 440, y: Math.sin(a) * 440 })
+      floater(ctx, e.pos, 'ФУС!', '#f5c96b', 14)
+    }
+  } else if (id === 'shout_frost') {
+    // Фаза 6.2: ТУ'УМ — МОРОЗ: ледяное дыхание жжёт холодом и замедляет
+    const lv = ctx.shoutLv.frost
+    const mult = 1 + 0.45 * (lv - 1)
+    if (target?.alive) ctx.player.facing = Math.atan2(target.pos.y - ctx.player.pos.y, target.pos.x - ctx.player.pos.x)
+    sfx('frost')
+    coneParticles(ctx, ctx.player.pos, ctx.player.facing, 180, '#bfe3ea')
+    spawnTelegraph(ctx, { shape: 'cone', x: ctx.player.pos.x, y: ctx.player.pos.y, facing: ctx.player.facing, radius: 180, width: 0.7, life: 0.32, maxLife: 0.32, color: '#bfe3ea' })
+    const cone = enemiesInCone(ctx, 180, 0.7)
+    for (const e of cone) {
+      damage(ctx, e, Math.round((d(8) + d(6)) * mult * power), { color: '#bfe3ea' })
+      e.slowT = Math.max(e.slowT, 3.5 + lv)
+      floater(ctx, e.pos, 'ЛОК!', '#bfe3ea', 14)
     }
   }
   ctx.syncUi()

@@ -31,6 +31,8 @@ export class Props3d {
   /** Вращающиеся магические элементы (руна алтаря, ядра порталов). */
   private spinners: THREE.Object3D[] = []
   private herbPulse: THREE.Object3D[] = []
+  /** Фаза 6.2: кольца рунных камней (обновляются цветом из состояния движка). */
+  private runeRings = new Map<string, THREE.Mesh>()
   private disposables: Array<{ dispose(): void }> = []
 
   constructor() {
@@ -47,6 +49,7 @@ export class Props3d {
     const shrubs = PROPS.filter((p) => p.kind === 'shrub' || p.kind === 'flower')
     const deadTrees = PROPS.filter((p) => p.kind === 'deadtree')
     const reeds = PROPS.filter((p) => p.kind === 'reed')
+    const snowTrees = PROPS.filter((p) => p.kind === 'snowtree')
 
     if (trees.length) {
       // Ствол
@@ -184,6 +187,41 @@ export class Props3d {
       })
       this.group.add(mesh)
       this.disposables.push(reedGeo, reedMat)
+    }
+
+    // Снежные ели Пределья (Фаза 6.2): тёмная хвоя под шапкой снега
+    if (snowTrees.length) {
+      const trunkGeo = new THREE.CylinderGeometry(1.3, 2.2, 12, 6)
+      trunkGeo.translate(0, 6, 0)
+      const barkMat = groundMat(0x3c3226)
+      const trunks = new THREE.InstancedMesh(trunkGeo, barkMat, snowTrees.length)
+      const coneGeo = new THREE.ConeGeometry(6.5, 15, 7)
+      const needleMat = groundMat(0x2a3a28)
+      const snowMatI = groundMat(0xd8dee0, 0.92)
+      const cones = new THREE.InstancedMesh(coneGeo, needleMat, snowTrees.length * 2)
+      const caps = new THREE.InstancedMesh(new THREE.ConeGeometry(4.4, 5.5, 7), snowMatI, snowTrees.length)
+      const m = new THREE.Matrix4()
+      const q = new THREE.Quaternion()
+      const sc = new THREE.Vector3()
+      snowTrees.forEach((p, i) => {
+        const h = heightAt(p.pos.x, p.pos.y)
+        const rot = seedRot(p.seed ?? i)
+        const s = 0.85 + ((p.seed ?? 7) % 100) / 200
+        q.setFromAxisAngle(V(0, 1, 0), rot)
+        sc.set(s, s, s)
+        m.compose(V(p.pos.x, h, p.pos.y), q, sc)
+        trunks.setMatrixAt(i, m)
+        m.compose(V(p.pos.x, h + 11 * s, p.pos.y), q, sc)
+        cones.setMatrixAt(i * 2, m)
+        m.compose(V(p.pos.x, h + 19 * s, p.pos.y), q, sc)
+        cones.setMatrixAt(i * 2 + 1, m)
+        m.compose(V(p.pos.x, h + 26.5 * s, p.pos.y), q, sc)
+        caps.setMatrixAt(i, m)
+      })
+      trunks.castShadow = true
+      cones.castShadow = true
+      this.group.add(trunks, cones, caps)
+      this.disposables.push(trunkGeo, barkMat, coneGeo, needleMat, snowMatI)
     }
   }
 
@@ -564,6 +602,119 @@ export class Props3d {
         this.herbPulse.push(ring)
         break
       }
+
+      // --- Фаза 6.2: Стылое Пределье ---
+
+      case 'cave': {
+        // Вход Пещеры Рун: ледяная арка с тёмным проёмом
+        const g = new THREE.Group()
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(32, 9, 8, 20, Math.PI), groundMat(0x7a8482))
+        arch.position.y = 4
+        arch.castShadow = true
+        const ice = new THREE.Mesh(new THREE.TorusGeometry(30, 2.2, 6, 20, Math.PI), groundMat(0xbfd4d6, 0.4))
+        ice.position.y = 4
+        const hole = new THREE.Mesh(
+          new THREE.CircleGeometry(27, 20, 0, Math.PI),
+          new THREE.MeshBasicMaterial({ color: 0x0a0d0c }),
+        )
+        hole.position.y = 3
+        g.add(arch, ice, hole)
+        for (const px of [-36, 36]) {
+          const pillar = new THREE.Mesh(new THREE.BoxGeometry(10, 20, 13), groundMat(0x6a7470))
+          pillar.position.set(px, 10, 0)
+          pillar.castShadow = true
+          g.add(pillar)
+        }
+        place(this.group, g, x, y, 0, Math.PI) // проём смотрит на юг
+        break
+      }
+
+      case 'runestone': {
+        // Рунный камень: монолит с парящим кольцом-символом (цвет = текущая руна)
+        const g = new THREE.Group()
+        const stone = new THREE.Mesh(new THREE.BoxGeometry(8, 22, 5), groundMat(0x6e7672))
+        stone.position.y = 11
+        stone.rotation.z = seedRot(p.seed ?? 1) * 0.06
+        stone.castShadow = true
+        g.add(stone)
+        // руны на камне — светлая полоска
+        const strip = new THREE.Mesh(
+          new THREE.PlaneGeometry(4.4, 12),
+          new THREE.MeshBasicMaterial({ color: 0xd8dde2, transparent: true, opacity: 0.55 }),
+        )
+        strip.position.set(0, 12, 2.55)
+        g.add(strip)
+        // парящее кольцо символа
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(5.6, 0.8, 8, 24),
+          new THREE.MeshStandardMaterial({ color: 0x9fb8a4, emissive: 0x9fb8a4, emissiveIntensity: 0.8, roughness: 0.35 }),
+        )
+        ring.rotation.x = Math.PI / 2.3
+        ring.position.y = 27
+        g.add(ring)
+        const glow = new THREE.PointLight(0xbfe3ea, 90, 90, 2)
+        glow.position.y = 27
+        g.add(glow)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.4)
+        this.spinners.push(ring)
+        if (p.id) this.runeRings.set(p.id, ring)
+        break
+      }
+
+      case 'wordwall': {
+        // Стена Слова: каменная стена с тлеющими рунами (seed 501 — Сила, 502 — Мороз)
+        const g = new THREE.Group()
+        const isFrost = (p.seed ?? 0) === 502
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(p.w ?? 150, 34, 12), groundMat(0x5e6662))
+        wall.position.y = 17
+        wall.castShadow = true
+        g.add(wall)
+        // тёмная триглифная полоса с рунами
+        const runes = new THREE.Mesh(
+          new THREE.PlaneGeometry((p.w ?? 150) * 0.62, 9),
+          new THREE.MeshBasicMaterial({ color: isFrost ? 0xbfe3ea : 0xf5c96b, transparent: true, opacity: 0.85 }),
+        )
+        runes.position.set(0, 20, 6.1)
+        g.add(runes)
+        const glow = new THREE.PointLight(isFrost ? 0xbfe3ea : 0xf5c96b, 160, 180, 2)
+        glow.position.set(0, 22, 14)
+        g.add(glow)
+        // осыпь у подножия
+        for (let i = 0; i < 4; i++) {
+          const b = new THREE.Mesh(new THREE.DodecahedronGeometry(2.4 + (i % 3), 0), groundMat(0x545c58))
+          b.position.set(-40 + i * 26, 2, 10 + (i % 2) * 6)
+          b.castShadow = true
+          g.add(b)
+        }
+        place(this.group, g, x, y, 0, 0)
+        this.herbPulse.push(runes)
+        break
+      }
+
+      case 'rune_door': {
+        // Рунная пелена: ледяная завеса (убирается решением головоломки)
+        const g = new THREE.Group()
+        const veil = new THREE.Mesh(
+          new THREE.PlaneGeometry(64, 30),
+          new THREE.MeshStandardMaterial({
+            color: 0x9fd8d2,
+            emissive: 0x6fc2ba,
+            emissiveIntensity: 0.55,
+            transparent: true,
+            opacity: 0.62,
+            side: THREE.DoubleSide,
+            roughness: 0.2,
+          }),
+        )
+        veil.position.y = 15
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(66, 4, 6), groundMat(0x5e6662))
+        frame.position.y = 31
+        g.add(veil, frame)
+        place(this.group, g, x, y, 0, Math.PI / 2)
+        this.herbPulse.push(veil)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
     }
   }
 
@@ -613,7 +764,7 @@ export class Props3d {
 
   // ---------------- Кадр ----------------
 
-  update(time: number, removed: Set<string>, darkness = 0) {
+  update(time: number, removed: Set<string>, darkness = 0, runes?: { rs1: number; rs2: number; rs3: number }) {
     // Огни костров мерцают; ночью — ярче (Фаза 3)
     const nightBoost = 0.8 + darkness * 1.5
     for (const f of this.fires) {
@@ -632,6 +783,16 @@ export class Props3d {
     for (const s of this.spinners) {
       s.rotation.y = time * 0.9
       s.rotation.z = Math.sin(time * 0.6) * 0.15
+    }
+    // Фаза 6.2: кольца рунных камней перекрашиваются по состоянию головоломки
+    if (runes) {
+      const colors = [0x9fb8a4, 0xd9a441, 0xd8dde2]
+      for (const [id, mesh] of this.runeRings) {
+        const idx = runes[id as 'rs1'] ?? 0
+        const mat = mesh.material as THREE.MeshStandardMaterial
+        mat.color.setHex(colors[idx])
+        mat.emissive.setHex(colors[idx])
+      }
     }
     // Скрытые пропсы (барьеры по квесту, собранные травы)
     for (const [id, objs] of this.removable) {

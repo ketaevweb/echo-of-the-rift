@@ -40,6 +40,18 @@ export interface CareerHud {
   perks: string[]
 }
 
+/** Крик Ту'ум в HUD (Фаза 6.2): lv — уровень слова (0 — закрыт). */
+export interface ShoutHud {
+  id: string
+  name: string
+  icon: string
+  hotkey: string
+  word: string
+  lv: number
+  cd: number
+  cdMax: number
+}
+
 export interface PlayerHud {
   level: number
   xp: number
@@ -222,6 +234,8 @@ interface GameStore {
   formation: FormationId
   // Фаза 6
   career: CareerHud | null
+  // Фаза 6.2
+  shouts: ShoutHud[]
   // Фаза 5
   diceRoll: DiceRollHudState | null
   setScreen: (s: Screen) => void
@@ -262,6 +276,7 @@ export const useGame = create<GameStore>((set) => ({
   zoneFade: null,
   formation: 'wedge',
   career: null,
+  shouts: [],
   diceRoll: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
