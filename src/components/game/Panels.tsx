@@ -412,6 +412,7 @@ function reloadContinue() {
 
 function PausePanel() {
   const hasSave = useGame((s) => s.hasSave)
+  const renderMode = useGame((s) => s.renderMode)
   const [muted, setMutedState] = useState(isMuted())
   return (
     <Panel title="Пауза" subtitle="Долина подождёт. Ненадолго.">
@@ -422,6 +423,9 @@ function PausePanel() {
         <MenuBtn onClick={() => getEngine()?.saveGame(true)}>Сохранить игру</MenuBtn>
         <MenuBtn onClick={reloadContinue} disabled={!hasSave}>
           Загрузить последнее сохранение
+        </MenuBtn>
+        <MenuBtn onClick={() => getEngine()?.setRenderMode(renderMode === '3d' ? '2d' : '3d')}>
+          Графика: {renderMode === '3d' ? '3D (Three.js)' : 'Legacy 2D'}
         </MenuBtn>
         <MenuBtn
           onClick={() => {
@@ -436,6 +440,12 @@ function PausePanel() {
           <p className="mb-1 font-semibold text-[#c9b06b]">Управление</p>
           WASD / ЛКМ — движение · ЛКМ по врагу — цель · 1–4 знаки · 5 — Голос Древних · Q/E — зелья ·
           F — взаимодействие · Пробел — тактическая пауза · C/I/J/M — панели · Esc — меню
+          {renderMode === '3d' && (
+            <>
+              <br />
+              <span className="text-[#8fbf6a]">3D: ПКМ (зажать) — поворот камеры · колесо — зум</span>
+            </>
+          )}
         </div>
         <MenuBtn
           onClick={() => {

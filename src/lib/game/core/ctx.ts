@@ -12,6 +12,40 @@ import type { PanelId } from '../store'
 
 export type ToastKind = 'info' | 'quest' | 'level' | 'warn' | 'loot'
 
+// ---------------- Мост 3D-рендера (Фаза 1) ----------------
+
+/** Снимок состояния движка для 3D-рендера (структурно = SceneView3d). */
+export interface View3dSnapshot {
+  time: number
+  shake: number
+  player: Entity
+  playerAlive: boolean
+  entities: Entity[]
+  particles: Particle[]
+  floaters: Floater[]
+  targetEid: number | null
+  removedProps: Set<string>
+}
+
+/** Минимальный интерфейс 3D-вью, которым пользуется движок/ввод. */
+export interface View3dBridge {
+  render(view: View3dSnapshot): void
+  /** Точка мира под курсором (для приказов движения). */
+  screenToGround(sx: number, sy: number): Vec | null
+  /** Сущность под курсором (проекционный пикинг). */
+  pickAtScreen(sx: number, sy: number, padPx: number): {
+    eid: number
+    kind: Entity['kind']
+    alive: boolean
+    enemyType?: Entity['enemyType']
+    npcDialogue?: string
+  } | null
+  resize(): void
+  dispose(): void
+}
+
+export type RenderMode = '2d' | '3d'
+
 export interface EngineCtx {
   // --- Метрики сессии ---
   playtime: number
@@ -50,6 +84,11 @@ export interface EngineCtx {
 
   // --- Рендер/ввод/цикл ---
   canvas: HTMLCanvasElement
+  /** Активный канвас ввода (= canvas в 2D, webgl-канвас в 3D). */
+  inputCanvas: HTMLCanvasElement
+  renderMode: RenderMode
+  view3d: View3dBridge | null
+  setRenderMode(mode: RenderMode): void
   baked: HTMLCanvasElement
   colliders: Collider[]
   props: PropDef[]

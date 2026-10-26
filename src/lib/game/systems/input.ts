@@ -76,7 +76,7 @@ function onKeyUp(ctx: EngineCtx, ev: KeyboardEvent) {
 }
 
 function canvasPoint(ctx: EngineCtx, ev: PointerEvent): Vec {
-  const rect = ctx.canvas.getBoundingClientRect()
+  const rect = ctx.inputCanvas.getBoundingClientRect()
   return {
     x: ctx.camera.x + (ev.clientX - rect.left - rect.width / 2),
     y: ctx.camera.y + (ev.clientY - rect.top - rect.height / 2),
@@ -86,6 +86,33 @@ function canvasPoint(ctx: EngineCtx, ev: PointerEvent): Vec {
 function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
   if (useGame.getState().panel || ctx.dialogueTree) return
   if (ev.button !== 0) return
+
+  // --- 3D-режим: проекционный пикинг + луч в рельеф ---
+  if (ctx.renderMode === '3d' && ctx.view3d) {
+    const hit = ctx.view3d.pickAtScreen(ev.clientX, ev.clientY, 18)
+    if (hit && hit.kind === 'enemy' && hit.alive) {
+      ctx.targetEid = hit.eid
+      sfx('click')
+      return
+    }
+    if (hit && hit.kind === 'npc' && hit.alive && hit.npcDialogue) {
+      openDialogue(ctx, hit.npcDialogue)
+      return
+    }
+    const ground = ctx.view3d.screenToGround(ev.clientX, ev.clientY)
+    if (ground) {
+      const it = pickInteractable(ctx, ground, 30)
+      if (it) {
+        runInteractable(ctx, it)
+        return
+      }
+      ctx.targetEid = null
+      ctx.player.dest = ground
+    }
+    return
+  }
+
+  // --- 2D (легаси) ---
   const p = canvasPoint(ctx, ev)
   const enemy = pickEntity(ctx, p, (e) => e.kind === 'enemy' && e.alive, 10)
   if (enemy) {
@@ -116,7 +143,8 @@ export function bindInput(ctx: EngineCtx) {
   handlers.set(ctx, h)
   window.addEventListener('keydown', h.keyDown)
   window.addEventListener('keyup', h.keyUp)
-  ctx.canvas.addEventListener('pointerdown', h.pointerDown)
+  // Ввод мыши — на активном канвасе (при смене режима бинд переносится)
+  ctx.inputCanvas.addEventListener('pointerdown', h.pointerDown)
 }
 
 export function unbindInput(ctx: EngineCtx) {
@@ -124,6 +152,6 @@ export function unbindInput(ctx: EngineCtx) {
   if (!h) return
   window.removeEventListener('keydown', h.keyDown)
   window.removeEventListener('keyup', h.keyUp)
-  ctx.canvas.removeEventListener('pointerdown', h.pointerDown)
+  ctx.inputCanvas.removeEventListener('pointerdown', h.pointerDown)
   handlers.delete(ctx)
 }

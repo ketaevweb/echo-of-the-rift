@@ -2,22 +2,26 @@
 
 import { useEffect, useRef } from 'react'
 import { createEngine, getEngine } from '@/lib/game/engine'
-import { boot, readSave, useGame } from '@/lib/game/store'
+import { boot, readRenderMode, readSave, useGame } from '@/lib/game/store'
 import Hud from './Hud'
 import DialogueOverlay from './DialogueOverlay'
 import Panels from './Panels'
 
 export default function GameView() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const canvas3dRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const screen = useGame((s) => s.screen)
+  const renderMode = useGame((s) => s.renderMode)
 
   useEffect(() => {
     if (screen !== 'game') return
     const canvas = canvasRef.current
     if (!canvas) return
     const save = boot.mode === 'continue' ? readSave() : null
-    const engine = createEngine(canvas, save)
+    const mode = readRenderMode()
+    useGame.getState().patch({ renderMode: mode })
+    const engine = createEngine(canvas, save, { canvas3d: canvas3dRef.current, mode })
     const onResize = () => engine.resize()
     window.addEventListener('resize', onResize)
     // миникарта рендерится в HUD (дочерний эффект уже отработал)
@@ -33,13 +37,30 @@ export default function GameView() {
     }
   }, [screen])
 
+  // Переключение режима рендера на живую игру
+  useEffect(() => {
+    if (screen !== 'game') return
+    const e = getEngine()
+    if (!e) return
+    e.setRenderMode(renderMode)
+    const id = requestAnimationFrame(() => e.resize())
+    return () => cancelAnimationFrame(id)
+  }, [renderMode, screen])
+
   if (screen !== 'game') return null
+
+  const is3d = renderMode === '3d'
 
   return (
     <div ref={wrapRef} className="relative h-screen w-screen overflow-hidden bg-[#12100c]">
       <canvas
+        ref={canvas3dRef}
+        className={`absolute inset-0 h-full w-full touch-none ${is3d ? 'block cursor-crosshair' : 'hidden'}`}
+        aria-label="Трёхмерный мир Эха Разлома"
+      />
+      <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
+        className={`absolute inset-0 h-full w-full touch-none ${is3d ? 'hidden' : 'block cursor-crosshair'}`}
         aria-label="Игровое поле Эха Разлома"
       />
       <Hud />

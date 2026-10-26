@@ -24,10 +24,12 @@ import { LAKE, PLAYER_SPAWN, PROPS } from './data/world'
 import { sfx } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider } from './core/util'
-import { EngineCtx, ToastKind } from './core/ctx'
+import { EngineCtx, RenderMode, ToastKind } from './core/ctx'
 import { GameLoop, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
+import { Renderer3d } from './render3d/Renderer3d'
+import { writeRenderMode } from './store'
 import { applySave, saveGame as saveGameSys, toTitle as toTitleSys } from './systems/save'
 import {
   buyItem as buyItemSys,
@@ -66,8 +68,14 @@ let engineInstance: GameEngine | null = null
 export function getEngine() {
   return engineInstance
 }
-export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null) {
-  engineInstance = new GameEngine(canvas, save)
+export interface CreateEngineOpts {
+  /** WebGL-канвас для 3D-режима. */
+  canvas3d?: HTMLCanvasElement | null
+  /** Стартовый режим рендера (по умолчанию 3d). */
+  mode?: RenderMode
+}
+export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null, opts?: CreateEngineOpts) {
+  engineInstance = new GameEngine(canvas, save, opts)
   if (typeof window !== 'undefined') {
     ;(window as unknown as { __echoEngine?: GameEngine }).__echoEngine = engineInstance
   }
@@ -77,6 +85,10 @@ export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null) {
 export class GameEngine implements EngineCtx {
   // --- Состояние (EngineCtx) ---
   canvas: HTMLCanvasElement
+  canvas3d: HTMLCanvasElement | null
+  inputCanvas: HTMLCanvasElement
+  renderMode: RenderMode
+  view3d: Renderer3d | null = null
   baked: HTMLCanvasElement
   colliders: Collider[] = []
   props = [...PROPS].sort((a, b) => a.pos.y - b.pos.y)
@@ -138,8 +150,14 @@ export class GameEngine implements EngineCtx {
   private loop: GameLoop | null = null
   private dpr = 1
 
-  constructor(canvas: HTMLCanvasElement, save: SaveData | null) {
+  constructor(canvas: HTMLCanvasElement, save: SaveData | null, opts?: CreateEngineOpts) {
     this.canvas = canvas
+    this.canvas3d = opts?.canvas3d ?? null
+    this.renderMode = opts?.mode ?? '3d'
+    this.inputCanvas = this.renderMode === '3d' && this.canvas3d ? this.canvas3d : canvas
+    if (this.renderMode === '3d' && this.canvas3d) {
+      this.view3d = new Renderer3d(this.canvas3d)
+    }
     this.ctx2d = canvas.getContext('2d') as CanvasRenderingContext2D
     this.baked = renderer2d.bakeTerrain()
     this.buildColliders()
@@ -210,6 +228,7 @@ export class GameEngine implements EngineCtx {
     const h = this.canvas.clientHeight || window.innerHeight
     this.canvas.width = Math.floor(w * this.dpr)
     this.canvas.height = Math.floor(h * this.dpr)
+    this.view3d?.resize()
   }
 
   attachMinimap(c: HTMLCanvasElement | null) {
@@ -227,6 +246,8 @@ export class GameEngine implements EngineCtx {
     this.destroyed = true
     this.loop?.stop()
     this.unbindInput()
+    this.view3d?.dispose()
+    this.view3d = null
     if (engineInstance === this) engineInstance = null
   }
 
@@ -308,6 +329,28 @@ export class GameEngine implements EngineCtx {
 
   // ---------------- Панели / приказы / сейвы ----------------
 
+  /** Переключение режима рендера (2D ⇄ 3D) на живую игру. */
+  setRenderMode(mode: RenderMode) {
+    if (this.renderMode === mode) return
+    if (mode === '3d' && !this.canvas3d) return
+    this.renderMode = mode
+    this.unbindInput()
+    this.inputCanvas = mode === '3d' ? this.canvas3d! : this.canvas
+    if (mode === '3d') this.view3d = new Renderer3d(this.canvas3d!)
+    else {
+      this.view3d?.dispose()
+      this.view3d = null
+    }
+    this.bindInput()
+    writeRenderMode(mode)
+    useGame.getState().patch({ renderMode: mode })
+    sfx('click')
+    // канвас станет видимым после ре-рендера React — подгоняем размер следующим кадром
+    requestAnimationFrame(() => {
+      if (!this.destroyed) this.resize()
+    })
+  }
+
   openPanel(p: PanelId) {
     if (p === 'trainer') openTrainerSys(this)
     else useGame.getState().setPanel(p)
@@ -371,6 +414,20 @@ export class GameEngine implements EngineCtx {
   }
 
   render() {
+    if (this.renderMode === '3d' && this.view3d) {
+      this.view3d.render({
+        time: this.time,
+        shake: this.shake,
+        player: this.player,
+        playerAlive: this.player.alive,
+        entities: this.entities,
+        particles: this.particles,
+        floaters: this.floaters,
+        targetEid: this.targetEid,
+        removedProps: this.removedProps,
+      })
+      return
+    }
     drawScene({
       ctx: this.ctx2d,
       renderer: renderer2d,

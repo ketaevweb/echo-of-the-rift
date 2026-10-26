@@ -109,6 +109,27 @@ export interface AreaToastState {
 // Режим запуска игры (новая / продолжить)
 export const boot: { mode: 'new' | 'continue' } = { mode: 'new' }
 
+// Режим рендера: '3d' (Three.js, по умолчанию) или '2d' (легаси-канвас)
+export type RenderModePref = '3d' | '2d'
+export const RENDER_KEY = 'echo-rift-render-mode'
+
+export function readRenderMode(): RenderModePref {
+  if (typeof window === 'undefined') return '3d'
+  try {
+    return localStorage.getItem(RENDER_KEY) === '2d' ? '2d' : '3d'
+  } catch {
+    return '3d'
+  }
+}
+
+export function writeRenderMode(mode: RenderModePref) {
+  try {
+    localStorage.setItem(RENDER_KEY, mode)
+  } catch {
+    /* приватный режим — игнорируем */
+  }
+}
+
 interface GameStore {
   screen: Screen
   panel: PanelId
@@ -130,6 +151,7 @@ interface GameStore {
   hasSave: boolean
   paused: boolean
   interactHint: string | null
+  renderMode: RenderModePref
   setScreen: (s: Screen) => void
   setPanel: (p: PanelId) => void
   patch: (partial: Partial<GameStore>) => void
@@ -161,6 +183,7 @@ export const useGame = create<GameStore>((set) => ({
   hasSave: false,
   paused: false,
   interactHint: null,
+  renderMode: '3d',
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
   patch: (partial) => set(partial),

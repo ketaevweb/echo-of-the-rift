@@ -34,10 +34,11 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
   updateArea(ctx)
   updateEnding(ctx)
-  // камера следует за игроком, не выходя за границы мира
+  // камера следует за игроком (в 3D кламп не нужен — там своя орбита)
   const lerp = 1 - Math.pow(0.0001, dt)
   ctx.camera.x += (ctx.player.pos.x - ctx.camera.x) * lerp
   ctx.camera.y += (ctx.player.pos.y - ctx.camera.y) * lerp
+  if (ctx.renderMode === '3d') return
   const vw = ctx.canvas.clientWidth || 1
   const vh = ctx.canvas.clientHeight || 1
   ctx.camera.x = Math.max(Math.min(vw / 2, WORLD.w / 2), Math.min(ctx.camera.x, WORLD.w - vw / 2))
