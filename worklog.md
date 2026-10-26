@@ -48,3 +48,20 @@ Stage Summary:
 - Репозиторий: https://github.com/ketaevweb/echo-of-the-rift (main).
 - GDD-пакет из 6 документов утверждён как база разработки; Phase 0 (рефакторинг) готов к запуску.
 - Баг кнопок HUD исправлен в коде (коммит в репо).
+
+---
+Task ID: 6-a
+Agent: general-purpose (subagent, шаги 0.1–0.8) + Z.ai Code (main, шаг 0.9 и верификация)
+Task: Phase 0 — модульный рефакторинг engine.ts (2381 строк) / render.ts (899 строк) по плану GDD 03 §5, без изменения поведения игры.
+
+Work Log:
+- Шаги 0.1–0.7 (субагент, коммиты 766b62e..c240b4a): typecheck-скрипт; вынос констант/утилит (data/tables.ts, core/util.ts); systems/save.ts (версионирование схемы); systems/inventory.ts + progression.ts; systems/quest.ts; systems/combat.ts + systems/ai.ts + core/entity.ts; systems/movement.ts + systems/input.ts. Введён EngineCtx (core/ctx.ts) — системы мутируют состояние только через ctx.
+- Шаг 0.8 (субагент): render2d/ — types.ts (IRenderer-мост для будущего render3d), renderer.ts (полная канвас-2D реализация + renderer2d), scene.ts (сборка кадра drawScene/SceneView); легаси render.ts стал 15-строчным реэкспортом.
+- Шаг 0.9 (main, коммит e60d155): core/Game.ts (GameLoop: rAF, sync каждые 0.12с, автосейв 45с; stepWorld — фиксированный порядок систем), core/Clock.ts (кламп dt ≤ 50мс), core/Events.ts (типизированная шина событий для Фазы 1+), systems/uiSync.ts (syncUi вынесен из движка); engine.ts переписан в фасад.
+- Верификация: lint зелёный; tsc --noEmit — 0 ошибок по src/**; dev.log без ошибок компиляции.
+- Браузерная E2E (agent-browser): титул → новая игра → мир рендерится (NPC Дорн/Грим, миникарта, трекер «Шёпот Разлома», панель умений) → ВСЕ 6 кнопок слева внизу открывают панели: ПЕРСОНАЖ ✓, ИНВЕНТАРЬ ✓, ЖУРНАЛ ✓, КАРТА ДОЛИНЫ ✓, Меню (Продолжить/Сохранить/Загрузить) ✓, Звук ✓; ошибок консоли нет; скриншот .ref/game-after-refactor.png.
+
+Stage Summary:
+- engine.ts: 2381 → 393 строки (фасад). Структура: core/ (Game, Clock, Events, ctx, entity, util), systems/ (ai, combat, input, inventory, movement, progression, quest, save, uiSync), render2d/ (types, renderer, scene), data/ (таблицы+контент). Каждая система ≤ 500 строк.
+- Публичный API GameEngine сохранён полностью, React-слой не тронут, геймплей не изменён.
+- Phase 0 закрыта полностью (0.1–0.9). Следующий шаг по роадмапу — Фаза 1: 3D-ядро (three, render3d, третье лицо, чанковый террейн).
