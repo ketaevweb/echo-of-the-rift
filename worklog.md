@@ -29,3 +29,22 @@ Stage Summary:
 - Играбельный прототип «Эхо Разлома» готов и проверен в браузере: полный цикл «титул → квесты → отряд → фракции → тренировки → босс → эпилог → свободная игра», сейвы, d20-бой, знаки, спутники, бестиарий.
 - Ключевые артефакты: src/lib/game/* (движок/данные/рендер/звук/store), src/components/game/* (TitleScreen, Hud, DialogueOverlay, Panels, GameView, GameIcon), public/images/title-splash.png.
 - Lint чистый, консоль браузера без ошибок, dev-сервер :3000 без фатальных логов.
+
+---
+Task ID: 2, 3, 4, 5
+Agent: Z.ai Code (main)
+Task: GDD-пакет для 3D-перехода, README, GitHub, фикс неработающих кнопок HUD слева внизу.
+
+Work Log:
+- Проанализировал проект (Explore-агент): engine.ts 2381 строк, render.ts 899 (canvas 2D), Three.js отсутствует, панель кнопок HUD (C/I/J/M/Меню/Звук) не работала.
+- Найден корень бага кнопок: Hud.tsx вызывал useGame((s) => s.openPanel), но в store.ts есть только setPanel → TypeError при клике. Клавиши работали, т.к. движок имеет свой openPanel. Фикс: getEngine()?.openPanel(...) в 4 местах + иконка звука переведена на useState.
+- Написал пакет GDD (docs/GDD/): 00-vision.md (High Concept, столпы, честная рамка «уровень BG3»), 01-world-story.md (Гексмарк, 6 доменов-оммажей, 3 фракции, 6 компаньонов, 3 акта, 5 концовок, silence-счётчик), 02-gameplay.md (управление 3D, d20+позиционная тактика, знаки, Слово, XP+LP, диалоги, экономика), 03-architecture.md (стек, ECS-lite, карта миграции engine.ts→модули с диапазонами строк, бюджеты перфа, план Phase 0 шаги 0.1–0.9), 04-art-audio.md (Painterly PBR, палитры доменов, Three.js-пайплайн, MusicDirector), 05-roadmap.md (Фазы 0–8 с DoD).
+- Переписал README.md под новую концепцию.
+- Настроил git (user ketaevweb), создал репозиторий GitHub API: ketaevweb/echo-of-the-rift, .gitignore дополнен (examples, skills, tests, download, db, *.db, dev.log, server.log).
+- Коммит 7d44761 (GDD + фикс кнопок), пуш в main успешен.
+- lint зелёный; tsc чист по src/ (ошибки только в служебных examples/, skills/ — вне проекта).
+
+Stage Summary:
+- Репозиторий: https://github.com/ketaevweb/echo-of-the-rift (main).
+- GDD-пакет из 6 документов утверждён как база разработки; Phase 0 (рефакторинг) готов к запуску.
+- Баг кнопок HUD исправлен в коде (коммит в репо).

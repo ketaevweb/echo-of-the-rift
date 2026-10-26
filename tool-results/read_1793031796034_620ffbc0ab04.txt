@@ -1,0 +1,2002 @@
+     1→import {
+     2→  DialogueChoice,
+     3→  Entity,
+     4→  Faction,
+     5→  Floater,
+     6→  InteractableDef,
+     7→  Particle,
+     8→  QuestState,
+     9→  SaveData,
+    10→  SignId,
+    11→  Stance,
+    12→  Vec,
+    13→} from './types'
+    14→import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, STUN_WEAK } from './data/abilities'
+    15→import { ITEMS, MERCHANT_STOCK, SELL_RATE } from './data/items'
+    16→import { QUESTS, QUEST_MAP } from './data/quests'
+    17→import { DIALOGUES, PORTRAITS } from './data/dialogues'
+    18→import {
+    19→  AREAS,
+    20→  INTERACTABLES,
+    21→  LAKE,
+    22→  NPCS,
+    23→  PLAYER_SPAWN,
+    24→  PROPS,
+    25→  SPAWN_ZONES,
+    26→  UNIQUE_SPAWNS,
+    27→  WORLD,
+    28→} from './data/world'
+    29→import {
+    30→  bakeTerrain,
+    31→  drawEntity,
+    32→  drawFloaters,
+    33→  drawFullMap,
+    34→  drawMinimap,
+    35→  drawParticles,
+    36→  drawProp,
+    37→} from './render'
+    38→import { sfx } from './sfx'
+    39→import {
+    40→  AbilityHud,
+    41→  PanelId,
+    42→  PartyHud,
+    43→  QuestHud,
+    44→  TrainerHudState,
+    45→  useGame,
+    46→  writeSave,
+    47→} from './store'
+    48→
+    49→interface Collider {
+    50→  x: number
+    51→  y: number
+    52→  r: number
+    53→  propId?: string
+    54→}
+    55→
+    56→const ABILITY_BAR_IDS = ['igni', 'aard', 'quen', 'axii', 'shout', 'potion_heal', 'potion_stam']
+    57→
+    58→export const BESTIARY_INFO: Record<string, { name: string; text: string; weakness: string }> = {
+    59→  wolf: {
+    60→    name: 'Лесной волк',
+    61→    text: 'Озверевшая стая Сумрачного леса. Кусает быстро, но шкура тонкая.',
+    62→    weakness: 'Уязвим к огню (Игни).',
+    63→  },
+    64→  alpha: {
+    65→    name: 'Лютая волчица',
+    66→    text: 'Старая, умная и злая. Шрамы говорят: охотилась на людей не раз.',
+    67→    weakness: 'Уязвима к огню. Двойной урон от Игни.',
+    68→  },
+    69→  bandit: {
+    70→    name: 'Разбойник',
+    71→    text: 'Дезертиры с трактов. Дерутся грязно, зато предсказуемо.',
+    72→    weakness: 'Особых нет. Аард ломает строй.',
+    73→  },
+    74→  archer: {
+    75→    name: 'Разбойник-лучник',
+    76→    text: 'Стреляет издалека и норовит держать дистанцию.',
+    77→    weakness: 'Сближение. Аксий даёт фору.',
+    78→  },
+    79→  captain: {
+    80→    name: 'Главарь разбойников',
+    81→    text: 'Два шрама поперёк лица — и два подхода к фехтованию.',
+    82→    weakness: 'Квен против натиска. Боевой клич Торвальда помогает.',
+    83→  },
+    84→  horror: {
+    85→    name: 'Порождение Разлома',
+    86→    text: 'Сгусток чужой голодной мысли. Полупрозрачный, шипит на свет.',
+    87→    weakness: 'Аксий держит его вдвое дольше.',
+    88→  },
+    89→  boss: {
+    90→    name: 'Пожиратель Бурь',
+    91→    text: 'Пасть Разлома. Ел королей и богов с их молитвами. Славит отчаяние.',
+    92→    weakness: 'Сильные удержания. Убеждение (СЛ 15) ослабляет его ещё до боя.',
+    93→  },
+    94→}
+    95→
+    96→const ENEMY_NAME: Record<string, string> = {
+    97→  wolf: 'Лесной волк',
+    98→  alpha: 'Лютая волчица',
+    99→  bandit: 'Разбойник',
+   100→  archer: 'Лучник',
+   101→  captain: 'Главарь разбойников',
+   102→  horror: 'Порождение Разлома',
+   103→  boss: 'Пожиратель Бурь',
+   104→}
+   105→
+   106→const ATTR_NAMES: Record<string, string> = {
+   107→  might: 'Мощь',
+   108→  vigor: 'Стойкость',
+   109→  intellect: 'Разум',
+   110→  charisma: 'Обаяние',
+   111→}
+   112→
+   113→function rndRange(a: number, b: number) {
+   114→  return a + Math.random() * (b - a)
+   115→}
+   116→function d(sides: number) {
+   117→  return 1 + Math.floor(Math.random() * sides)
+   118→}
+   119→function angleDiff(a: number, b: number) {
+   120→  let x = Math.abs(a - b) % (Math.PI * 2)
+   121→  if (x > Math.PI) x = Math.PI * 2 - x
+   122→  return x
+   123→}
+   124→
+   125→let engineInstance: GameEngine | null = null
+   126→export function getEngine() {
+   127→  return engineInstance
+   128→}
+   129→export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null) {
+   130→  engineInstance = new GameEngine(canvas, save)
+   131→  if (typeof window !== 'undefined') {
+   132→    ;(window as unknown as { __echoEngine?: GameEngine }).__echoEngine = engineInstance
+   133→  }
+   134→  return engineInstance
+   135→}
+   136→
+   137→export class GameEngine {
+   138→  private canvas: HTMLCanvasElement
+   139→  private ctx: CanvasRenderingContext2D
+   140→  private mini: HTMLCanvasElement | null = null
+   141→  private baked: HTMLCanvasElement
+   142→  private colliders: Collider[] = []
+   143→  private props = [...PROPS].sort((a, b) => a.pos.y - b.pos.y)
+   144→
+   145→  private eidSeq = 1
+   146→  private entities: Entity[] = []
+   147→  private particles: Particle[] = []
+   148→  private floaters: Floater[] = []
+   149→  private kb = new Map<number, Vec>()
+   150→
+   151→  private player!: Entity
+   152→  private companionIds = { kaya: false, torvald: false }
+   153→
+   154→  private level = 1
+   155→  private xp = 0
+   156→  private lp = 0
+   157→  private gold = 60
+   158→  private hp = 100
+   159→  private maxHp = 100
+   160→  private stamina = 80
+   161→  private maxStamina = 80
+   162→  private attributes = { might: 3, vigor: 3, intellect: 3, charisma: 3 }
+   163→  private skills = { blade: 0, vitality: 0, signs: 0, speech: 0 }
+   164→  private signs: Record<SignId, { unlocked: boolean; level: number }> = {
+   165→    igni: { unlocked: true, level: 1 },
+   166→    aard: { unlocked: false, level: 0 },
+   167→    quen: { unlocked: false, level: 0 },
+   168→    axii: { unlocked: false, level: 0 },
+   169→    shout: { unlocked: false, level: 1 },
+   170→  }
+   171→  private weapon: string | null = 'sword_rusty'
+   172→  private armor: string | null = null
+   173→  private inventory: Array<{ item: string; qty: number }> = []
+   174→  private faction: Faction = 'none'
+   175→
+   176→  private quests: Record<string, QuestState> = {}
+   177→  private flags: Record<string, boolean> = {}
+   178→  private bestiary = new Set<string>()
+   179→  private removedProps = new Set<string>()
+   180→  private kills = 0
+   181→  private playtime = 0
+   182→
+   183→  private keys = new Set<string>()
+   184→  private camera: Vec = { ...PLAYER_SPAWN }
+   185→  private shake = 0
+   186→  private tacticalPaused = false
+   187→  private dialogueTree: string | null = null
+   188→  private dlgChoices: DialogueChoice[] = []
+   189→  private targetEid: number | null = null
+   190→  private time = 0
+   191→  private raf = 0
+   192→  private lastT = 0
+   193→  private syncT = 0
+   194→  private autosaveT = 0
+   195→  private endingAt: number | null = null
+   196→  private currentArea = ''
+   197→  private destroyed = false
+   198→  private buffT = 0
+   199→  private dpr = 1
+   200→
+   201→  constructor(canvas: HTMLCanvasElement, save: SaveData | null) {
+   202→    this.canvas = canvas
+   203→    this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+   204→    this.baked = bakeTerrain()
+   205→    this.buildColliders()
+   206→    this.initQuests()
+   207→    if (save) this.loadFrom(save)
+   208→    else this.newGame()
+   209→    this.bindInput()
+   210→    this.resize()
+   211→  }
+   212→
+   213→  // ---------------- Инициализация ----------------
+   214→
+   215→  private buildColliders() {
+   216→    this.colliders = [{ x: LAKE.x, y: LAKE.y, r: LAKE.r - 5, propId: 'lake' }]
+   217→    for (const p of this.props) {
+   218→      if (!p.solid) continue
+   219→      const r =
+   220→        p.kind === 'house'
+   221→          ? Math.max(p.w ?? 100, p.h ?? 60) * 0.36
+   222→          : p.kind === 'tent'
+   223→            ? (p.w ?? 60) * 0.4
+   224→            : (p.r ?? 10)
+   225→      this.colliders.push({ x: p.pos.x, y: p.pos.y, r, propId: p.id })
+   226→    }
+   227→  }
+   228→
+   229→  private initQuests() {
+   230→    for (const q of QUESTS) {
+   231→      this.quests[q.id] = { stage: 0, counter: 0, done: false }
+   232→    }
+   233→  }
+   234→
+   235→  private newGame() {
+   236→    this.inventory = [
+   237→      { item: 'potion_heal', qty: 3 },
+   238→      { item: 'potion_stam', qty: 2 },
+   239→    ]
+   240→    this.recalcStats(true)
+   241→    this.hp = this.maxHp
+   242→    this.stamina = this.maxStamina
+   243→    this.createPlayer({ ...PLAYER_SPAWN })
+   244→    this.spawnWorld()
+   245→  }
+   246→
+   247→  private recalcStats(full = false) {
+   248→    const newMaxHp = 80 + this.attributes.vigor * 8 + this.skills.vitality * 15 + (this.level - 1) * 8
+   249→    if (full) this.maxHp = newMaxHp
+   250→    else if (newMaxHp !== this.maxHp) {
+   251→      const ratio = this.hp / this.maxHp
+   252→      this.maxHp = newMaxHp
+   253→      this.hp = Math.min(this.maxHp, Math.max(1, Math.round(ratio * this.maxHp)))
+   254→    }
+   255→    this.maxStamina = 70 + this.attributes.vigor * 3 + (this.level - 1) * 4
+   256→    this.stamina = Math.min(this.stamina, this.maxStamina)
+   257→    this.refreshPlayerStats()
+   258→  }
+   259→
+   260→  private refreshPlayerStats() {
+   261→    if (!this.player) return
+   262→    this.player.maxHp = this.maxHp
+   263→    this.player.hp = Math.max(0, Math.min(this.player.hp, this.maxHp))
+   264→    this.player.atkBonus = this.playerAtk().atkBonus
+   265→    this.player.ac = this.playerAc()
+   266→    this.player.dmgMod = this.playerAtk().mod
+   267→  }
+   268→
+   269→  private playerAtk() {
+   270→    const w = this.weapon ? ITEMS[this.weapon] : null
+   271→    return {
+   272→      atkBonus: 2 + Math.floor(this.level / 2) + Math.floor(this.attributes.might / 2) + this.skills.blade,
+   273→      mod: (w?.damage ?? 2) + Math.floor(this.attributes.might / 2),
+   274→    }
+   275→  }
+   276→
+   277→  private playerAc() {
+   278→    const a = this.armor ? ITEMS[this.armor] : null
+   279→    return 10 + (a?.ac ?? 0) + Math.floor(this.attributes.vigor / 2)
+   280→  }
+   281→
+   282→  private signPower() {
+   283→    const robe = this.armor === 'armor_robe' ? 0.1 : 0
+   284→    return 1 + this.skills.signs * 0.15 + (this.attributes.intellect - 3) * 0.08 + robe
+   285→  }
+   286→
+   287→  private xpNext() {
+   288→    return 100 + (this.level - 1) * 60
+   289→  }
+   290→
+   291→  private makeEntity(base: Partial<Entity>): Entity {
+   292→    return {
+   293→      id: base.id ?? 'e',
+   294→      eid: this.eidSeq++,
+   295→      kind: base.kind ?? 'enemy',
+   296→      name: base.name ?? '',
+   297→      role: base.role,
+   298→      pos: base.pos ?? { x: 0, y: 0 },
+   299→      vel: { x: 0, y: 0 },
+   300→      radius: base.radius ?? 14,
+   301→      facing: base.facing ?? 0,
+   302→      color: base.color ?? '#8a7a54',
+   303→      hp: base.hp ?? 30,
+   304→      maxHp: base.maxHp ?? base.hp ?? 30,
+   305→      alive: base.alive ?? true,
+   306→      team: base.team ?? 'hostile',
+   307→      speed: base.speed ?? 110,
+   308→      atkBonus: base.atkBonus ?? 3,
+   309→      ac: base.ac ?? 11,
+   310→      dmgDice: base.dmgDice ?? 1,
+   311→      dmgSides: base.dmgSides ?? 6,
+   312→      dmgMod: base.dmgMod ?? 0,
+   313→      attackCd: base.attackCd ?? 1.3,
+   314→      attackRange: base.attackRange ?? 44,
+   315→      ranged: base.ranged,
+   316→      enemyType: base.enemyType,
+   317→      boss: base.boss,
+   318→      aiState: base.aiState ?? 'idle',
+   319→      home: base.home ? { ...base.home } : { ...(base.pos ?? { x: 0, y: 0 }) },
+   320→      aggroR: base.aggroR ?? 200,
+   321→      leashR: base.leashR ?? 600,
+   322→      wanderT: 0,
+   323→      stunT: 0,
+   324→      burnT: 0,
+   325→      burnTick: 0,
+   326→      slowT: 0,
+   327→      shield: 0,
+   328→      targetEid: null,
+   329→      attackT: 0,
+   330→      hitT: 0,
+   331→      castT: 0,
+   332→      cds: { atk: 0 },
+   333→      respawnAt: undefined,
+   334→      summonStage: 0,
+   335→      slamT: 0,
+   336→      walkPhase: 0,
+   337→      downT: 0,
+   338→      dest: null,
+   339→      stance: base.stance,
+   340→      zoneId: base.zoneId,
+   341→      npc: base.npc,
+   342→    }
+   343→  }
+   344→
+   345→  private createPlayer(pos: Vec) {
+   346→    this.player = this.makeEntity({
+   347→      id: 'player',
+   348→      kind: 'player',
+   349→      name: 'Смотритель',
+   350→      pos: { ...pos },
+   351→      color: '#c46a2b',
+   352→      radius: 13,
+   353→      hp: this.hp,
+   354→      maxHp: this.maxHp,
+   355→      team: 'party',
+   356→      speed: 160,
+   357→      atkBonus: this.playerAtk().atkBonus,
+   358→      ac: this.playerAc(),
+   359→      dmgDice: 1,
+   360→      dmgSides: 6,
+   361→      dmgMod: this.playerAtk().mod,
+   362→      attackCd: 0.9,
+   363→      attackRange: 52,
+   364→      aggroR: 0,
+   365→      leashR: 99999,
+   366→    })
+   367→    this.entities.push(this.player)
+   368→  }
+   369→
+   370→  private spawnWorld() {
+   371→    for (const n of NPCS) {
+   372→      if (n.id === 'kaya' && this.companionIds.kaya) continue
+   373→      if (n.id === 'torvald_npc' && this.companionIds.torvald) continue
+   374→      this.entities.push(
+   375→        this.makeEntity({
+   376→          id: n.id,
+   377→          kind: 'npc',
+   378→          name: n.name,
+   379→          role: n.role,
+   380→          pos: { ...n.pos },
+   381→          color: n.color,
+   382→          radius: 13,
+   383→          hp: 1,
+   384→          maxHp: 1,
+   385→          team: 'village',
+   386→          speed: 0,
+   387→          npc: n,
+   388→        }),
+   389→      )
+   390→    }
+   391→    for (const z of SPAWN_ZONES) {
+   392→      for (let i = 0; i < z.max; i++) this.spawnZoneEnemy(z)
+   393→    }
+   394→    for (const u of UNIQUE_SPAWNS) {
+   395→      if (u.enemy === 'alpha' && this.flags.alphaDead) continue
+   396→      if (u.enemy === 'captain' && this.flags.captainDead) continue
+   397→      if (u.enemy === 'boss' && this.flags.bossDead) continue
+   398→      this.spawnUnique(u.enemy, u.pos)
+   399→    }
+   400→    if (this.companionIds.kaya) this.spawnCompanion('kaya')
+   401→    if (this.companionIds.torvald) this.spawnCompanion('torvald')
+   402→    if (this.flags.gateOpen) {
+   403→      this.removedProps.add('barrier')
+   404→      this.removedProps.add('barrier2')
+   405→      this.removedProps.add('barrier3')
+   406→    }
+   407→    for (let i = 1; i <= 4; i++) {
+   408→      if (this.flags['herb_herb' + i]) this.removedProps.add('herb' + i)
+   409→    }
+   410→  }
+   411→
+   412→  private spawnZoneEnemy(z: (typeof SPAWN_ZONES)[number]) {
+   413→    const st = ENEMY_STATS[z.enemy]
+   414→    const a = Math.random() * Math.PI * 2
+   415→    const rr = Math.random() * z.radius
+   416→    const pos = { x: z.center.x + Math.cos(a) * rr, y: z.center.y + Math.sin(a) * rr }
+   417→    const e = this.makeEntity({
+   418→      id: z.enemy,
+   419→      name: ENEMY_NAME[z.enemy],
+   420→      pos,
+   421→      radius: st.radius,
+   422→      hp: st.hp,
+   423→      maxHp: st.hp,
+   424→      speed: st.speed,
+   425→      atkBonus: st.atk,
+   426→      ac: st.ac,
+   427→      dmgDice: st.dmgDice,
+   428→      dmgSides: st.dmgSides,
+   429→      dmgMod: st.dmgMod,
+   430→      attackCd: st.attackCd,
+   431→      attackRange: st.attackRange,
+   432→      ranged: st.ranged,
+   433→      enemyType: z.enemy,
+   434→      aggroR: st.aggroR,
+   435→      leashR: st.leashR,
+   436→    })
+   437→    e.zoneId = z.id
+   438→    e.home = { ...pos }
+   439→    this.entities.push(e)
+   440→  }
+   441→
+   442→  private spawnUnique(type: 'alpha' | 'captain' | 'boss', pos: Vec) {
+   443→    const st = ENEMY_STATS[type]
+   444→    const e = this.makeEntity({
+   445→      id: type,
+   446→      name: ENEMY_NAME[type],
+   447→      pos: { ...pos },
+   448→      radius: st.radius,
+   449→      hp: st.hp,
+   450→      maxHp: st.hp,
+   451→      speed: st.speed,
+   452→      atkBonus: st.atk,
+   453→      ac: st.ac,
+   454→      dmgDice: st.dmgDice,
+   455→      dmgSides: st.dmgSides,
+   456→      dmgMod: st.dmgMod,
+   457→      attackCd: st.attackCd,
+   458→      attackRange: st.attackRange,
+   459→      ranged: st.ranged,
+   460→      enemyType: type,
+   461→      boss: type === 'boss',
+   462→      aggroR: type === 'boss' ? 0 : st.aggroR,
+   463→      leashR: st.leashR,
+   464→    })
+   465→    this.entities.push(e)
+   466→  }
+   467→
+   468→  private spawnCompanion(id: 'kaya' | 'torvald') {
+   469→    if (this.companionIds[id]) return
+   470→    this.companionIds[id] = true
+   471→    const npcDef = NPCS.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
+   472→    const isKaya = id === 'kaya'
+   473→    const e = this.makeEntity({
+   474→      id,
+   475→      kind: 'companion',
+   476→      name: npcDef?.name ?? id,
+   477→      role: npcDef?.role ?? '',
+   478→      pos: { x: this.player.pos.x - 26, y: this.player.pos.y + 18 },
+   479→      color: isKaya ? '#9fb8a4' : '#7a8a4a',
+   480→      radius: 13,
+   481→      hp: (isKaya ? 70 : 110) + (this.level - 1) * 10,
+   482→      maxHp: (isKaya ? 70 : 110) + (this.level - 1) * 10,
+   483→      team: 'party',
+   484→      speed: 158,
+   485→      atkBonus: isKaya ? 4 : 5,
+   486→      ac: isKaya ? 12 : 13,
+   487→      dmgDice: 1,
+   488→      dmgSides: isKaya ? 6 : 8,
+   489→      dmgMod: isKaya ? 2 : 3,
+   490→      attackCd: isKaya ? 1.8 : 1.1,
+   491→      attackRange: isKaya ? 220 : 46,
+   492→      ranged: isKaya ? 240 : undefined,
+   493→      aggroR: 0,
+   494→      leashR: 99999,
+   495→      stance: 'follow',
+   496→    })
+   497→    this.entities.push(e)
+   498→    this.entities = this.entities.filter(
+   499→      (x) => !(x.kind === 'npc' && x.id === (id === 'torvald' ? 'torvald_npc' : id)),
+   500→    )
+   501→  }
+   502→
+   503→  // ---------------- Ввод ----------------
+   504→
+   505→  private onKeyDown = (ev: KeyboardEvent) => {
+   506→    const store = useGame.getState()
+   507→    if (this.dialogueTree) {
+   508→      const n = parseInt(ev.key, 10)
+   509→      if (!isNaN(n) && n >= 1 && n <= 9) {
+   510→        this.chooseOption(n - 1)
+   511→        ev.preventDefault()
+   512→      } else if (ev.key === 'Escape') {
+   513→        this.closeDialogue()
+   514→      }
+   515→      return
+   516→    }
+   517→    if (ev.key === 'Escape') {
+   518→      if (store.panel && store.panel !== 'ending') this.closePanel()
+   519→      else if (!store.panel) this.openPanel('pause')
+   520→      return
+   521→    }
+   522→    if (store.panel) {
+   523→      const map: Record<string, PanelId> = { c: 'char', i: 'inv', j: 'journal', m: 'map' }
+   524→      const k = ev.key.toLowerCase()
+   525→      if (map[k] && store.panel === map[k]) {
+   526→        this.closePanel()
+   527→        ev.preventDefault()
+   528→      }
+   529→      return
+   530→    }
+   531→    const k = ev.key.toLowerCase()
+   532→    this.keys.add(k)
+   533→    if (k === ' ') {
+   534→      this.tacticalPaused = !this.tacticalPaused
+   535→      useGame.getState().patch({ paused: this.tacticalPaused })
+   536→      sfx('click')
+   537→      ev.preventDefault()
+   538→      return
+   539→    }
+   540→    if (k === 'f' || k === 'а') this.doInteract()
+   541→    if (k === 'c' || k === 'с') this.openPanel('char')
+   542→    if (k === 'i' || k === 'ш') this.openPanel('inv')
+   543→    if (k === 'j' || k === 'о') this.openPanel('journal')
+   544→    if (k === 'm' || k === 'ь') this.openPanel('map')
+   545→    if (k >= '1' && k <= '7') {
+   546→      const id = ABILITY_BAR_IDS[parseInt(k, 10) - 1]
+   547→      if (id) this.castAbility(id)
+   548→    }
+   549→    if (k === 'q' || k === 'й') this.castAbility('potion_heal')
+   550→    if (k === 'e' || k === 'у') this.castAbility('potion_stam')
+   551→  }
+   552→
+   553→  private onKeyUp = (ev: KeyboardEvent) => {
+   554→    this.keys.delete(ev.key.toLowerCase())
+   555→  }
+   556→
+   557→  private canvasPoint(ev: PointerEvent): Vec {
+   558→    const rect = this.canvas.getBoundingClientRect()
+   559→    return {
+   560→      x: this.camera.x + (ev.clientX - rect.left - rect.width / 2),
+   561→      y: this.camera.y + (ev.clientY - rect.top - rect.height / 2),
+   562→    }
+   563→  }
+   564→
+   565→  private onPointerDown = (ev: PointerEvent) => {
+   566→    if (useGame.getState().panel || this.dialogueTree) return
+   567→    if (ev.button !== 0) return
+   568→    const p = this.canvasPoint(ev)
+   569→    const enemy = this.pickEntity(p, (e) => e.kind === 'enemy' && e.alive, 10)
+   570→    if (enemy) {
+   571→      this.targetEid = enemy.eid
+   572→      sfx('click')
+   573→      return
+   574→    }
+   575→    const npc = this.pickEntity(p, (e) => e.kind === 'npc' && e.alive, 22)
+   576→    if (npc && npc.npc) {
+   577→      this.openDialogue(npc.npc.dialogue)
+   578→      return
+   579→    }
+   580→    const it = this.pickInteractable(p, 28)
+   581→    if (it) {
+   582→      this.runInteractable(it)
+   583→      return
+   584→    }
+   585→    this.targetEid = null
+   586→    this.player.dest = p
+   587→  }
+   588→
+   589→  private pickEntity(p: Vec, filter: (e: Entity) => boolean, extra = 0): Entity | null {
+   590→    let best: Entity | null = null
+   591→    let bd = 1e9
+   592→    for (const e of this.entities) {
+   593→      if (!filter(e)) continue
+   594→      const dist = Math.hypot(e.pos.x - p.x, e.pos.y - p.y)
+   595→      if (dist < e.radius + extra && dist < bd) {
+   596→        bd = dist
+   597→        best = e
+   598→      }
+   599→    }
+   600→    return best
+   601→  }
+   602→
+   603→  private bindInput() {
+   604→    window.addEventListener('keydown', this.onKeyDown)
+   605→    window.addEventListener('keyup', this.onKeyUp)
+   606→    this.canvas.addEventListener('pointerdown', this.onPointerDown)
+   607→  }
+   608→
+   609→  private unbindInput() {
+   610→    window.removeEventListener('keydown', this.onKeyDown)
+   611→    window.removeEventListener('keyup', this.onKeyUp)
+   612→    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+   613→  }
+   614→
+   615→  resize() {
+   616→    this.dpr = Math.min(2, window.devicePixelRatio || 1)
+   617→    const w = this.canvas.clientWidth || window.innerWidth
+   618→    const h = this.canvas.clientHeight || window.innerHeight
+   619→    this.canvas.width = Math.floor(w * this.dpr)
+   620→    this.canvas.height = Math.floor(h * this.dpr)
+   621→  }
+   622→
+   623→  attachMinimap(c: HTMLCanvasElement | null) {
+   624→    this.mini = c
+   625→  }
+   626→
+   627→  start() {
+   628→    this.lastT = performance.now()
+   629→    const loop = (t: number) => {
+   630→      if (this.destroyed) return
+   631→      const dt = Math.min(0.05, (t - this.lastT) / 1000)
+   632→      this.lastT = t
+   633→      this.time += dt
+   634→      if (!this.isFrozen() && !this.tacticalPaused) {
+   635→        this.playtime += dt
+   636→        this.update(dt)
+   637→      }
+   638→      this.render()
+   639→      this.syncT -= dt
+   640→      if (this.syncT <= 0) {
+   641→        this.syncT = 0.12
+   642→        this.syncUi()
+   643→        this.renderMinimap()
+   644→      }
+   645→      if (this.playtime > 0) {
+   646→        this.autosaveT += dt
+   647→        if (this.autosaveT > 45) {
+   648→          this.autosaveT = 0
+   649→          this.saveGame(false)
+   650→        }
+   651→      }
+   652→      this.raf = requestAnimationFrame(loop)
+   653→    }
+   654→    this.raf = requestAnimationFrame(loop)
+   655→  }
+   656→
+   657→  destroy() {
+   658→    this.destroyed = true
+   659→    cancelAnimationFrame(this.raf)
+   660→    this.unbindInput()
+   661→    if (engineInstance === this) engineInstance = null
+   662→  }
+   663→
+   664→  private isFrozen() {
+   665→    return useGame.getState().panel !== null || this.dialogueTree !== null
+   666→  }
+   667→
+   668→  // ---------------- Обновление ----------------
+   669→
+   670→  private update(dt: number) {
+   671→    this.updatePlayer(dt)
+   672→    for (const e of this.entities) {
+   673→      if (e.kind === 'companion') this.updateCompanion(e, dt)
+   674→      else if (e.kind === 'enemy') this.updateEnemy(e, dt)
+   675→      else if (e.kind === 'npc') e.walkPhase += dt * 0.5
+   676→      this.updateStatuses(e, dt)
+   677→      this.tickCds(e, dt)
+   678→    }
+   679→    this.separate()
+   680→    this.updateParticles(dt)
+   681→    this.buffT = Math.max(0, this.buffT - dt)
+   682→    this.shake = Math.max(0, this.shake - dt * 26)
+   683→    this.updateArea()
+   684→    this.updateEnding()
+   685→    const lerp = 1 - Math.pow(0.0001, dt)
+   686→    this.camera.x += (this.player.pos.x - this.camera.x) * lerp
+   687→    this.camera.y += (this.player.pos.y - this.camera.y) * lerp
+   688→    // не показываем зоны за пределами мира
+   689→    const vw = this.canvas.clientWidth || 1
+   690→    const vh = this.canvas.clientHeight || 1
+   691→    this.camera.x = Math.max(Math.min(vw / 2, WORLD.w / 2), Math.min(this.camera.x, WORLD.w - vw / 2))
+   692→    this.camera.y = Math.max(Math.min(vh / 2, WORLD.h / 2), Math.min(this.camera.y, WORLD.h - vh / 2))
+   693→  }
+   694→
+   695→  private tickCds(e: Entity, dt: number) {
+   696→    for (const k of Object.keys(e.cds)) {
+   697→      if (e.cds[k] > 0) e.cds[k] = Math.max(0, e.cds[k] - dt)
+   698→    }
+   699→    e.attackT = Math.max(0, e.attackT - dt)
+   700→    e.hitT = Math.max(0, e.hitT - dt)
+   701→    e.castT = Math.max(0, e.castT - dt)
+   702→  }
+   703→
+   704→  private updateStatuses(e: Entity, dt: number) {
+   705→    if (!e.alive) return
+   706→    if (e.stunT > 0) e.stunT -= dt
+   707→    if (e.slowT > 0) e.slowT -= dt
+   708→    if (e.burnT > 0) {
+   709→      e.burnT -= dt
+   710→      e.burnTick -= dt
+   711→      if (e.burnTick <= 0) {
+   712→        e.burnTick = 0.5
+   713→        this.damage(e, Math.max(1, Math.round(2 * this.signPower())), {
+   714→          silent: true,
+   715→          color: '#e08a3a',
+   716→        })
+   717→      }
+   718→    }
+   719→  }
+   720→
+   721→  private moveWithCollisions(e: Entity, vx: number, vy: number, dt: number) {
+   722→    const kbi = this.kb.get(e.eid)
+   723→    let nx = e.pos.x + (vx + (kbi?.x ?? 0)) * dt
+   724→    let ny = e.pos.y + (vy + (kbi?.y ?? 0)) * dt
+   725→    if (kbi) {
+   726→      const decay = Math.pow(0.002, dt)
+   727→      kbi.x *= decay
+   728→      kbi.y *= decay
+   729→      if (Math.hypot(kbi.x, kbi.y) < 8) this.kb.delete(e.eid)
+   730→    }
+   731→    nx = Math.max(30, Math.min(WORLD.w - 30, nx))
+   732→    ny = Math.max(30, Math.min(WORLD.h - 30, ny))
+   733→    for (const c of this.colliders) {
+   734→      if (c.propId && this.removedProps.has(c.propId)) continue
+   735→      const dx = nx - c.x
+   736→      const dy = ny - c.y
+   737→      const dist = Math.hypot(dx, dy)
+   738→      const min = c.r + e.radius * 0.7
+   739→      if (dist < min && dist > 0.001) {
+   740→        nx = c.x + (dx / dist) * min
+   741→        ny = c.y + (dy / dist) * min
+   742→      }
+   743→    }
+   744→    e.pos.x = nx
+   745→    e.pos.y = ny
+   746→  }
+   747→
+   748→  private separate() {
+   749→    const alive = this.entities.filter((e) => e.alive && e.kind !== 'npc')
+   750→    for (let i = 0; i < alive.length; i++) {
+   751→      for (let j = i + 1; j < alive.length; j++) {
+   752→        const a = alive[i]
+   753→        const b = alive[j]
+   754→        const dx = b.pos.x - a.pos.x
+   755→        const dy = b.pos.y - a.pos.y
+   756→        const dist = Math.hypot(dx, dy)
+   757→        const min = a.radius + b.radius
+   758→        if (dist < min && dist > 0.01) {
+   759→          const push = ((min - dist) / 2) * 0.6
+   760→          const ux = dx / dist
+   761→          const uy = dy / dist
+   762→          if (a.kind !== 'player') {
+   763→            a.pos.x -= ux * push
+   764→            a.pos.y -= uy * push
+   765→          }
+   766→          if (b.kind !== 'player') {
+   767→            b.pos.x += ux * push
+   768→            b.pos.y += uy * push
+   769→          }
+   770→        }
+   771→      }
+   772→    }
+   773→  }
+   774→
+   775→  private nearestParty(from: Vec, maxDist = 1e9): Entity | null {
+   776→    let best: Entity | null = null
+   777→    let bd = maxDist
+   778→    for (const e of this.entities) {
+   779→      if ((e.kind !== 'player' && e.kind !== 'companion') || !e.alive) continue
+   780→      const dist = Math.hypot(e.pos.x - from.x, e.pos.y - from.y)
+   781→      if (dist < bd) {
+   782→        bd = dist
+   783→        best = e
+   784→      }
+   785→    }
+   786→    return best
+   787→  }
+   788→
+   789→  private nearestEnemyOf(from: Entity, maxDist: number): Entity | null {
+   790→    let best: Entity | null = null
+   791→    let bd = maxDist
+   792→    for (const e of this.entities) {
+   793→      if (e.kind !== 'enemy' || !e.alive) continue
+   794→      const dist = Math.hypot(e.pos.x - from.pos.x, e.pos.y - from.pos.y)
+   795→      if (dist < bd) {
+   796→        bd = dist
+   797→        best = e
+   798→      }
+   799→    }
+   800→    return best
+   801→  }
+   802→
+   803→  private updatePlayer(dt: number) {
+   804→    const p = this.player
+   805→    if (!p.alive) return
+   806→    let mx = 0
+   807→    let my = 0
+   808→    if (this.keys.has('w') || this.keys.has('arrowup') || this.keys.has('ц')) my -= 1
+   809→    if (this.keys.has('s') || this.keys.has('arrowdown') || this.keys.has('ы')) my += 1
+   810→    if (this.keys.has('a') || this.keys.has('arrowleft') || this.keys.has('ф')) mx -= 1
+   811→    if (this.keys.has('d') || this.keys.has('arrowright') || this.keys.has('в')) mx += 1
+   812→    const moving = mx !== 0 || my !== 0
+   813→    if (moving) {
+   814→      const l = Math.hypot(mx, my)
+   815→      p.vel = { x: (mx / l) * p.speed, y: (my / l) * p.speed }
+   816→      p.dest = null
+   817→    } else if (p.dest) {
+   818→      const dx = p.dest.x - p.pos.x
+   819→      const dy = p.dest.y - p.pos.y
+   820→      const dist = Math.hypot(dx, dy)
+   821→      if (dist < 8) p.dest = null
+   822→      else p.vel = { x: (dx / dist) * p.speed, y: (dy / dist) * p.speed }
+   823→    } else {
+   824→      p.vel = { x: 0, y: 0 }
+   825→    }
+   826→    const target = this.targetEid ? this.entities.find((e) => e.eid === this.targetEid) : null
+   827→    if (target && target.alive) {
+   828→      p.facing = Math.atan2(target.pos.y - p.pos.y, target.pos.x - p.pos.x)
+   829→      const dist = Math.hypot(target.pos.x - p.pos.x, target.pos.y - p.pos.y)
+   830→      if (dist > p.attackRange + target.radius * 0.6 && !moving) {
+   831→        p.dest = { ...target.pos }
+   832→      } else if (dist <= p.attackRange + target.radius * 0.6) {
+   833→        p.dest = null
+   834→        if (p.cds['atk'] <= 0) this.meleeAttack(p, target)
+   835→      }
+   836→    } else if (moving) {
+   837→      p.facing = Math.atan2(p.vel.y, p.vel.x)
+   838→    }
+   839→    this.moveWithCollisions(p, p.vel.x, p.vel.y, dt)
+   840→    p.walkPhase += dt * (Math.hypot(p.vel.x, p.vel.y) > 4 ? 1 : 0.2)
+   841→    const inCombat = this.nearestEnemyOf(p, 320) !== null
+   842→    this.stamina = Math.min(this.maxStamina, this.stamina + (inCombat ? 6 : 14) * dt)
+   843→  }
+   844→
+   845→  private updateCompanion(e: Entity, dt: number) {
+   846→    if (!e.alive) {
+   847→      e.downT -= dt
+   848→      if (e.downT <= 0) {
+   849→        e.alive = true
+   850→        e.hp = Math.round(e.maxHp * 0.45)
+   851→        this.floater(e.pos, 'На ноги!', '#8fbf7f', 14)
+   852→      }
+   853→      return
+   854→    }
+   855→    const stance: Stance = e.stance ?? 'follow'
+   856→    const player = this.player
+   857→    let desired: Vec | null = null
+   858→    let target: Entity | null = null
+   859→
+   860→    if (stance === 'hold') {
+   861→      if (Math.hypot(e.home.x - e.pos.x, e.home.y - e.pos.y) > 14) desired = { ...e.home }
+   862→      target = this.nearestEnemyOf(e, 260)
+   863→    } else if (stance === 'aggressive') {
+   864→      target = this.nearestEnemyOf(e, 460)
+   865→      if (!target) desired = { x: player.pos.x - 20, y: player.pos.y + 16 }
+   866→    } else {
+   867→      const t = this.targetEid ? this.entities.find((x) => x.eid === this.targetEid) : null
+   868→      if (t && t.alive && Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) < 400) target = t
+   869→      else target = this.nearestEnemyOf(e, 240)
+   870→      const off = e.id === 'torvald' ? { x: -30, y: 22 } : { x: -26, y: -26 }
+   871→      desired = { x: player.pos.x + off.x, y: player.pos.y + off.y }
+   872→    }
+   873→    if (target) {
+   874→      const dist = Math.hypot(target.pos.x - e.pos.x, target.pos.y - e.pos.y)
+   875→      const stopAt = e.ranged ? e.ranged * 0.75 : e.attackRange + target.radius * 0.6
+   876→      desired = dist > stopAt ? { ...target.pos } : null
+   877→      e.facing = Math.atan2(target.pos.y - e.pos.y, target.pos.x - e.pos.x)
+   878→      if (dist <= (e.ranged ?? e.attackRange) + target.radius * 0.6 && e.cds['atk'] <= 0) {
+   879→        if (e.ranged) this.rangedAttack(e, target)
+   880→        else this.meleeAttack(e, target)
+   881→      }
+   882→      if (e.id === 'torvald') {
+   883→        if (e.cds['shieldbash'] <= 0 && dist < 70) this.castCompanionAbility(e.eid, 'shieldbash', target.eid)
+   884→        if (e.cds['warcry'] <= 0 && dist < 300) this.castCompanionAbility(e.eid, 'warcry', target.eid)
+   885→      }
+   886→      if (e.id === 'kaya' && e.cds['frostbolt'] <= 0 && dist < 260) {
+   887→        this.castCompanionAbility(e.eid, 'frostbolt', target.eid)
+   888→      }
+   889→    }
+   890→    if (e.id === 'kaya' && e.cds['mend'] <= 0) this.castCompanionAbility(e.eid, 'mend', null)
+   891→
+   892→    if (desired) {
+   893→      const dx = desired.x - e.pos.x
+   894→      const dy = desired.y - e.pos.y
+   895→      const dist = Math.hypot(dx, dy)
+   896→      if (dist > 10) {
+   897→        const sp = e.speed * (e.slowT > 0 ? 0.5 : 1)
+   898→        e.vel = { x: (dx / dist) * sp, y: (dy / dist) * sp }
+   899→      } else e.vel = { x: 0, y: 0 }
+   900→    } else {
+   901→      e.vel = { x: 0, y: 0 }
+   902→    }
+   903→    if (!target && Math.hypot(e.vel.x, e.vel.y) > 4) {
+   904→      e.facing = Math.atan2(e.vel.y, e.vel.x)
+   905→    }
+   906→    this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
+   907→    e.walkPhase += dt * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1 : 0.2)
+   908→  }
+   909→
+   910→  castCompanionAbility(eid: number, abilityId: string, targetEid: number | null) {
+   911→    const e = this.entities.find((x) => x.eid === eid)
+   912→    if (!e || !e.alive) return
+   913→    if ((e.cds[abilityId] ?? 0) > 0) return
+   914→    const target = targetEid ? this.entities.find((x) => x.eid === targetEid) : null
+   915→    switch (abilityId) {
+   916→      case 'shieldbash': {
+   917→        const t = target ?? this.nearestEnemyOf(e, 70)
+   918→        if (!t) return
+   919→        e.cds['shieldbash'] = ABILITY_MAP['shieldbash'].cooldown
+   920→        t.stunT = Math.max(t.stunT, 1.3)
+   921→        this.damage(t, d(6) + 2, { color: '#c9c4bc' })
+   922→        this.floater(t.pos, 'Оглушён!', '#c9c4bc', 12)
+   923→        sfx('hit')
+   924→        break
+   925→      }
+   926→      case 'warcry': {
+   927→        e.cds['warcry'] = ABILITY_MAP['warcry'].cooldown
+   928→        this.buffT = 6
+   929→        this.ring(e.pos, '#d9a441', 60, 0.6)
+   930→        this.floater(e.pos, 'Клич!', '#d9a441', 14)
+   931→        sfx('shield')
+   932→        break
+   933→      }
+   934→      case 'frostbolt': {
+   935→        const t = target ?? this.nearestEnemyOf(e, 260)
+   936→        if (!t) return
+   937→        e.cds['frostbolt'] = ABILITY_MAP['frostbolt'].cooldown
+   938→        this.damage(t, d(4) + d(4) + 2, { color: '#bfe3ea' })
+   939→        t.slowT = 2.5
+   940→        this.beam(e.pos, t.pos, '#bfe3ea')
+   941→        sfx('frost')
+   942→        break
+   943→      }
+   944→      case 'mend': {
+   945→        let lowAlly: Entity | null = null
+   946→        let lowRatio = 0.6
+   947→        for (const a of this.entities) {
+   948→          if (a.team !== 'party' || !a.alive) continue
+   949→          const r = a.hp / a.maxHp
+   950→          if (r < lowRatio && Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < 280) {
+   951→            lowRatio = r
+   952→            lowAlly = a
+   953→          }
+   954→        }
+   955→        if (!lowAlly) return
+   956→        e.cds['mend'] = ABILITY_MAP['mend'].cooldown
+   957→        const amount = Math.round(lowAlly.maxHp * 0.3)
+   958→        lowAlly.hp = Math.min(lowAlly.maxHp, lowAlly.hp + amount)
+   959→        if (lowAlly.kind === 'player') this.hp = lowAlly.hp
+   960→        this.floater(lowAlly.pos, '+' + amount, '#8fbf7f', 14)
+   961→        this.ring(lowAlly.pos, '#8fbf7f', 30, 0.5)
+   962→        sfx('heal')
+   963→        break
+   964→      }
+   965→    }
+   966→    this.syncUi()
+   967→  }
+   968→
+   969→  private updateEnemy(e: Entity, dt: number) {
+   970→    if (!e.alive) {
+   971→      if (e.respawnAt !== undefined && this.time >= e.respawnAt) {
+   972→        if (Math.hypot(this.player.pos.x - e.home.x, this.player.pos.y - e.home.y) > 500) {
+   973→          e.alive = true
+   974→          e.hp = e.maxHp
+   975→          e.aiState = 'idle'
+   976→          e.burnT = 0
+   977→          e.stunT = 0
+   978→          const zone = SPAWN_ZONES.find((z) => z.id === e.zoneId)
+   979→          if (zone) {
+   980→            const a = Math.random() * Math.PI * 2
+   981→            const rr = Math.random() * zone.radius
+   982→            e.pos = { x: zone.center.x + Math.cos(a) * rr, y: zone.center.y + Math.sin(a) * rr }
+   983→            e.home = { ...e.pos }
+   984→          }
+   985→          e.respawnAt = undefined
+   986→        }
+   987→      }
+   988→      return
+   989→    }
+   990→    // Интро босса
+   991→    if (e.boss && !this.flags.bossIntroDone) {
+   992→      if (Math.hypot(this.player.pos.x - e.pos.x, this.player.pos.y - e.pos.y) < 340) {
+   993→        this.flags.bossIntroDone = true
+   994→        e.aggroR = 400
+   995→        this.openDialogue('boss_intro')
+   996→        return
+   997→      }
+   998→    }
+   999→    if (e.stunT > 0) {
+  1000→      e.vel = { x: 0, y: 0 }
+  1001→      this.moveWithCollisions(e, 0, 0, dt)
+  1002→      return
+  1003→    }
+  1004→    const prey = this.nearestParty(e.pos, e.aiState === 'idle' || e.aiState === 'wander' ? e.aggroR : 1e9)
+  1005→    const homeDist = Math.hypot(e.pos.x - e.home.x, e.pos.y - e.home.y)
+  1006→
+  1007→    // поводок: слишком далеко от дома — возвращаемся
+  1008→    if (e.aiState === 'chase' && homeDist > e.leashR) {
+  1009→      e.aiState = 'return'
+  1010→    }
+  1011→
+  1012→    if (e.aiState === 'return') {
+  1013→      if (homeDist < 20) {
+  1014→        e.aiState = 'idle'
+  1015→        e.hp = e.maxHp
+  1016→      } else {
+  1017→        const dx = e.home.x - e.pos.x
+  1018→        const dy = e.home.y - e.pos.y
+  1019→        const l = Math.hypot(dx, dy)
+  1020→        e.vel = { x: (dx / l) * e.speed, y: (dy / l) * e.speed }
+  1021→        e.facing = Math.atan2(dy, dx)
+  1022→        this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
+  1023→        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.12 * dt)
+  1024→        e.walkPhase += dt
+  1025→      }
+  1026→      return
+  1027→    }
+  1028→
+  1029→    if (!prey) {
+  1030→      if (e.aiState === 'chase' || e.aiState === 'attack') {
+  1031→        e.aiState = 'return'
+  1032→      } else {
+  1033→        e.wanderT -= dt
+  1034→        if (e.wanderT <= 0) {
+  1035→          e.wanderT = rndRange(1.5, 4)
+  1036→          const a = Math.random() * Math.PI * 2
+  1037→          const rr = rndRange(0, 60)
+  1038→          e.dest = { x: e.home.x + Math.cos(a) * rr, y: e.home.y + Math.sin(a) * rr }
+  1039→        }
+  1040→        if (e.dest) {
+  1041→          const dx = e.dest.x - e.pos.x
+  1042→          const dy = e.dest.y - e.pos.y
+  1043→          const l = Math.hypot(dx, dy)
+  1044→          if (l < 6) e.dest = null
+  1045→          else {
+  1046→            e.vel = { x: (dx / l) * e.speed * 0.35, y: (dy / l) * e.speed * 0.35 }
+  1047→            e.facing = Math.atan2(e.vel.y, e.vel.x)
+  1048→            this.moveWithCollisions(e, e.vel.x, e.vel.y, dt)
+  1049→            e.walkPhase += dt
+  1050→            return
+  1051→          }
+  1052→        }
+  1053→        e.vel = { x: 0, y: 0 }
+  1054→      }
+  1055→      return
+  1056→    }
+  1057→
+  1058→    e.aiState = 'chase'
+  1059→    const dist = Math.hypot(prey.pos.x - e.pos.x, prey.pos.y - e.pos.y)
+  1060→    e.facing = Math.atan2(prey.pos.y - e.pos.y, prey.pos.x - e.pos.x)
+  1061→
+  1062→    if (e.boss) this.bossLogic(e, dist)
+  1063→
+  1064→    const isRanged = !!e.ranged
+  1065→    const wantRange = isRanged ? e.ranged! * 0.85 : e.attackRange + prey.radius * 0.6
+  1066→    let vx = 0
+  1067→    let vy = 0
+  1068→    if (isRanged && dist < wantRange * 0.6) {
+  1069→      vx = -Math.cos(e.facing) * e.speed
+  1070→      vy = -Math.sin(e.facing) * e.speed
+  1071→    } else if (dist > wantRange) {
+  1072→      vx = Math.cos(e.facing) * e.speed
+  1073→      vy = Math.sin(e.facing) * e.speed
+  1074→    }
+  1075→    const spd = e.slowT > 0 ? 0.5 : 1
+  1076→    this.moveWithCollisions(e, vx * spd, vy * spd, dt)
+  1077→    e.walkPhase += dt * (Math.hypot(vx, vy) > 4 ? 1 : 0.2)
+  1078→
+  1079→    if (e.cds['atk'] <= 0) {
+  1080→      if (isRanged && dist < e.ranged!) this.rangedAttack(e, prey)
+  1081→      else if (!isRanged && dist <= e.attackRange + prey.radius * 0.6) this.meleeAttack(e, prey)
+  1082→    }
+  1083→  }
+  1084→
+  1085→  private bossLogic(e: Entity, dist: number) {
+  1086→    if (e.slamT > 0) {
+  1087→      e.slamT -= 0.016
+  1088→      if (e.slamT <= 0) {
+  1089→        this.ring(e.pos, '#c94f3d', 170, 0.7, 'slam')
+  1090→        this.shake = 10
+  1091→        sfx('boss')
+  1092→        for (const a of this.entities) {
+  1093→          if (a.team !== 'party' || !a.alive) continue
+  1094→          if (Math.hypot(a.pos.x - e.pos.x, a.pos.y - e.pos.y) < 175) {
+  1095→            this.damage(a, d(8) + d(8) + e.dmgMod, { color: '#e0653a' })
+  1096→            this.kb.set(a.eid, { x: (a.pos.x - e.pos.x) * 4, y: (a.pos.y - e.pos.y) * 4 })
+  1097→          }
+  1098→        }
+  1099→      }
+  1100→      return
+  1101→    }
+  1102→    if (e.cds['slam'] === undefined) e.cds['slam'] = 4
+  1103→    if (e.cds['slam'] <= 0 && dist < 200) {
+  1104→      e.cds['slam'] = 7
+  1105→      e.slamT = 0.9
+  1106→      this.floater(e.pos, 'Буря близко!', '#a06bd9', 16)
+  1107→      return
+  1108→    }
+  1109→    const ratio = e.hp / e.maxHp
+  1110→    if (ratio < 0.66 && e.summonStage < 1) {
+  1111→      e.summonStage = 1
+  1112→      this.summonHorrors(e)
+  1113→    }
+  1114→    if (ratio < 0.33 && e.summonStage < 2) {
+  1115→      e.summonStage = 2
+  1116→      this.summonHorrors(e)
+  1117→    }
+  1118→  }
+  1119→
+  1120→  private summonHorrors(e: Entity) {
+  1121→    for (let i = 0; i < 2; i++) {
+  1122→      const st = ENEMY_STATS.horror
+  1123→      const a = Math.random() * Math.PI * 2
+  1124→      const h = this.makeEntity({
+  1125→        id: 'horror',
+  1126→        name: ENEMY_NAME.horror,
+  1127→        pos: { x: e.pos.x + Math.cos(a) * 60, y: e.pos.y + Math.sin(a) * 60 },
+  1128→        radius: st.radius,
+  1129→        hp: st.hp,
+  1130→        maxHp: st.hp,
+  1131→        speed: st.speed,
+  1132→        atkBonus: st.atk,
+  1133→        ac: st.ac,
+  1134→        dmgDice: st.dmgDice,
+  1135→        dmgSides: st.dmgSides,
+  1136→        dmgMod: st.dmgMod,
+  1137→        attackCd: st.attackCd,
+  1138→        attackRange: st.attackRange,
+  1139→        enemyType: 'horror',
+  1140→        aggroR: st.aggroR,
+  1141→        leashR: 9999,
+  1142→        aiState: 'chase',
+  1143→      })
+  1144→      this.entities.push(h)
+  1145→      this.ring(h.pos, '#a06bd9', 40, 0.6)
+  1146→    }
+  1147→    this.floater(e.pos, 'Разлом извергает слуг!', '#a06bd9', 15)
+  1148→    sfx('boss')
+  1149→  }
+  1150→
+  1151→  // ---------------- Бой ----------------
+  1152→
+  1153→  private meleeAttack(a: Entity, t: Entity) {
+  1154→    a.cds['atk'] = a.attackCd
+  1155→    a.attackT = 0.28
+  1156→    sfx('swing')
+  1157→    const buff = a.team === 'party' && this.buffT > 0 ? 2 : 0
+  1158→    const roll = d(20)
+  1159→    const total = roll + a.atkBonus + buff
+  1160→    if (roll === 20 || (roll !== 1 && total >= t.ac)) {
+  1161→      const crit = roll === 20
+  1162→      const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+  1163→      this.damage(t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
+  1164→      if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
+  1165→    } else {
+  1166→      this.floater(t.pos, 'Промах', '#9a9a90', 12)
+  1167→    }
+  1168→  }
+  1169→
+  1170→  private rangedAttack(a: Entity, t: Entity) {
+  1171→    a.cds['atk'] = a.attackCd
+  1172→    a.attackT = 0.25
+  1173→    const buff = a.team === 'party' && this.buffT > 0 ? 2 : 0
+  1174→    const roll = d(20)
+  1175→    const total = roll + a.atkBonus + buff
+  1176→    if (roll === 20 || (roll !== 1 && total >= t.ac)) {
+  1177→      const crit = roll === 20
+  1178→      const dmg = Math.max(1, d(a.dmgSides) * a.dmgDice * (crit ? 2 : 1) + a.dmgMod)
+  1179→      this.damage(t, dmg, { crit, color: a.team === 'party' ? '#f5c96b' : '#e0653a' })
+  1180→      this.beam(a.pos, t.pos, a.team === 'party' ? '#bfe3ea' : '#d9c04f')
+  1181→      if (t.kind !== 'player' && t.team !== 'party') sfx('hit')
+  1182→    } else {
+  1183→      this.floater(t.pos, 'Промах', '#9a9a90', 12)
+  1184→      this.beam(a.pos, t.pos, 'rgba(200,200,190,0.4)')
+  1185→    }
+  1186→  }
+  1187→
+  1188→  private damage(t: Entity, amount: number, opts: { crit?: boolean; silent?: boolean; color?: string } = {}) {
+  1189→    if (!t.alive) return
+  1190→    let amt = amount
+  1191→    if (t.shield > 0) {
+  1192→      const absorbed = Math.min(t.shield, amt)
+  1193→      t.shield -= absorbed
+  1194→      amt -= absorbed
+  1195→      if (absorbed > 0) this.floater(t.pos, 'Квен −' + absorbed, '#d9a441', 12)
+  1196→    }
+  1197→    if (amt > 0) {
+  1198→      t.hp -= amt
+  1199→      t.hitT = 0.15
+  1200→      if (!opts.silent) {
+  1201→        this.floater(
+  1202→          t.pos,
+  1203→          opts.crit ? 'КРИТ ' + amt : String(amt),
+  1204→          opts.color ?? (t.team === 'party' ? '#e0653a' : '#f5c96b'),
+  1205→          opts.crit ? 20 : 15,
+  1206→        )
+  1207→      }
+  1208→      if (t.kind === 'player') this.hp = t.hp
+  1209→      if (t.kind === 'player' || t.kind === 'companion') sfx('hit')
+  1210→    }
+  1211→    if (t.team === 'hostile' && t.aiState === 'idle') t.aiState = 'chase'
+  1212→    if (t.hp <= 0) {
+  1213→      t.hp = 0
+  1214→      t.alive = false
+  1215→      if (t.kind === 'enemy') this.onEnemyKilled(t)
+  1216→      else if (t.kind === 'companion') {
+  1217→        t.downT = 12
+  1218→        this.floater(t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
+  1219→      } else if (t.kind === 'player') this.onPlayerDeath()
+  1220→    }
+  1221→  }
+  1222→
+  1223→  private onEnemyKilled(e: Entity) {
+  1224→    const type = e.enemyType!
+  1225→    this.kills++
+  1226→    sfx('death')
+  1227→    if (e.zoneId) {
+  1228→      const z = SPAWN_ZONES.find((zz) => zz.id === e.zoneId)
+  1229→      if (z) e.respawnAt = this.time + z.respawnSec
+  1230→    }
+  1231→    const st = ENEMY_STATS[type]
+  1232→    this.gainXp(st.xp)
+  1233→    let goldLoot = 0
+  1234→    if (type === 'wolf') {
+  1235→      if (Math.random() < 0.6) this.addItem('wolf_pelt', 1)
+  1236→      if (Math.random() < 0.4) this.addItem('wolf_fang', 1)
+  1237→    } else if (type === 'bandit' || type === 'archer') {
+  1238→      goldLoot = 8 + Math.floor(Math.random() * 14)
+  1239→    } else if (type === 'alpha') {
+  1240→      this.addItem('alpha_pelt', 1)
+  1241→      goldLoot = 40
+  1242→    } else if (type === 'horror') {
+  1243→      if (Math.random() < 0.5) this.addItem('rift_shard', 1)
+  1244→    } else if (type === 'captain') {
+  1245→      goldLoot = 60
+  1246→    } else if (type === 'boss') {
+  1247→      goldLoot = 150
+  1248→      this.addItem('rift_shard', 3)
+  1249→    }
+  1250→    if (goldLoot > 0) {
+  1251→      this.gold += goldLoot
+  1252→      this.floater(e.pos, '+' + goldLoot + ' золота', '#e8d5a8', 13)
+  1253→    }
+  1254→    if (!this.bestiary.has(type)) {
+  1255→      this.bestiary.add(type)
+  1256→      this.toast('Бестиарий: ' + BESTIARY_INFO[type].name, 'quest')
+  1257→    }
+  1258→    if (type === 'wolf' && this.quests.main.stage === 2 && !this.quests.main.done) {
+  1259→      this.quests.main.counter++
+  1260→      if (this.quests.main.counter >= 4) this.advanceQuest('main', 3)
+  1261→      else this.toast(`Волки: ${this.quests.main.counter}/4`, 'info')
+  1262→    }
+  1263→    if (type === 'alpha') {
+  1264→      this.flags.alphaDead = true
+  1265→      if (this.quests.contract.stage === 1) this.advanceQuest('contract', 2)
+  1266→      this.checkProof()
+  1267→    }
+  1268→    if (type === 'captain') {
+  1269→      this.flags.captainDead = true
+  1270→      if (this.quests.flame.stage === 1) this.advanceQuest('flame', 2)
+  1271→      this.checkProof()
+  1272→    }
+  1273→    if (type === 'boss') {
+  1274→      this.flags.bossDead = true
+  1275→      this.advanceQuest('main', 6)
+  1276→      useGame.getState().patch({ bossBar: null })
+  1277→      this.endingAt = this.time + 1.8
+  1278→    }
+  1279→    if (this.targetEid === e.eid) this.targetEid = null
+  1280→  }
+  1281→
+  1282→  private onPlayerDeath() {
+  1283→    this.player.alive = false
+  1284→    this.toast('Ты пал... Но Смотрители не умирают так просто.', 'warn')
+  1285→    sfx('death')
+  1286→    setTimeout(() => {
+  1287→      if (this.destroyed) return
+  1288→      this.player.alive = true
+  1289→      this.player.pos = { ...PLAYER_SPAWN }
+  1290→      this.player.dest = null
+  1291→      this.hp = Math.round(this.maxHp * 0.6)
+  1292→      this.player.hp = this.hp
+  1293→      this.stamina = this.maxStamina
+  1294→      this.gold = Math.max(0, this.gold - 30)
+  1295→      for (const e of this.entities) {
+  1296→        if (e.kind === 'companion' && !e.alive) {
+  1297→          e.alive = true
+  1298→          e.downT = 0
+  1299→          e.hp = Math.round(e.maxHp * 0.5)
+  1300→          e.pos = { x: this.player.pos.x - 26, y: this.player.pos.y + 18 }
+  1301→        }
+  1302→        if (e.kind === 'enemy' && e.alive) e.aiState = 'return'
+  1303→      }
+  1304→      this.targetEid = null
+  1305→      this.camera.x = this.player.pos.x
+  1306→      this.camera.y = this.player.pos.y
+  1307→      this.toast('Ты очнулся в Хеймхолле. −30 золота на лечение.', 'info')
+  1308→      this.syncUi()
+  1309→    }, 1800)
+  1310→  }
+  1311→
+  1312→  private gainXp(n: number) {
+  1313→    this.xp += n
+  1314→    this.floater(this.player.pos, '+' + n + ' опыта', '#c9b06b', 12)
+  1315→    let next = this.xpNext()
+  1316→    while (this.xp >= next) {
+  1317→      this.xp -= next
+  1318→      this.level++
+  1319→      this.lp += 5
+  1320→      this.recalcStats()
+  1321→      this.hp = this.maxHp
+  1322→      this.player.hp = this.maxHp
+  1323→      this.stamina = this.maxStamina
+  1324→      this.toast(`Уровень ${this.level}! +5 очков обучения`, 'level')
+  1325→      sfx('level')
+  1326→      this.ring(this.player.pos, '#f5c96b', 60, 0.9)
+  1327→      next = this.xpNext()
+  1328→    }
+  1329→  }
+  1330→
+  1331→  // ---------------- Способности игрока ----------------
+  1332→
+  1333→  castAbility(id: string) {
+  1334→    if (this.isFrozen() || this.tacticalPaused || !this.player.alive) return
+  1335→    const ab = ABILITY_MAP[id]
+  1336→    if (!ab) return
+  1337→    if (ab.kind === 'potion') {
+  1338→      if (this.player.cds['potion'] > 0) return
+  1339→      const inv = this.inventory.find((i) => i.item === id)
+  1340→      if (!inv || inv.qty <= 0) {
+  1341→        this.toast('Ничего выпить нет.', 'warn')
+  1342→        return
+  1343→      }
+  1344→      const def = ITEMS[id]
+  1345→      if (def.heal) {
+  1346→        this.hp = Math.min(this.maxHp, this.hp + def.heal)
+  1347→        this.player.hp = this.hp
+  1348→        this.floater(this.player.pos, '+' + def.heal, '#8fbf7f', 15)
+  1349→      }
+  1350→      if (def.stamina) {
+  1351→        this.stamina = Math.min(this.maxStamina, this.stamina + def.stamina)
+  1352→        this.floater(this.player.pos, '+' + def.stamina + ' ОВ', '#bfe3ea', 13)
+  1353→      }
+  1354→      this.removeItem(id, 1)
+  1355→      this.player.cds['potion'] = ab.cooldown
+  1356→      sfx('potion')
+  1357→      this.syncUi()
+  1358→      return
+  1359→    }
+  1360→    if (id === 'shout' && !this.signs.shout.unlocked) return
+  1361→    if (ab.kind === 'sign' && !this.signs[id as SignId]?.unlocked) return
+  1362→    if (this.player.cds[id] > 0) return
+  1363→    if (this.stamina < ab.staminaCost) {
+  1364→      this.floater(this.player.pos, 'Нет сил!', '#9a9a90', 12)
+  1365→      return
+  1366→    }
+  1367→    this.stamina -= ab.staminaCost
+  1368→    this.player.cds[id] = ab.cooldown
+  1369→    this.player.castT = 0.25
+  1370→    const signLevel = this.signs[id as SignId]?.level ?? 1
+  1371→    const power = this.signPower()
+  1372→    const target = this.targetEid ? this.entities.find((e) => e.eid === this.targetEid) : null
+  1373→
+  1374→    if (id === 'igni') {
+  1375→      if (target?.alive) this.player.facing = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x)
+  1376→      sfx('fire')
+  1377→      this.coneParticles(this.player.pos, this.player.facing, 150, '#e08a3a')
+  1378→      for (const e of this.enemiesInCone(150, 0.62)) {
+  1379→        const weak = FIRE_WEAK.has(e.enemyType ?? 'wolf') ? 2 : 1
+  1380→        this.damage(e, Math.round(d(6) * 2 * power * weak), { color: '#e08a3a' })
+  1381→        e.burnT = 4
+  1382→        e.burnTick = 0.5
+  1383→      }
+  1384→    } else if (id === 'aard') {
+  1385→      if (target?.alive) this.player.facing = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x)
+  1386→      sfx('shield')
+  1387→      this.coneParticles(this.player.pos, this.player.facing, 160, '#d9e3ea')
+  1388→      for (const e of this.enemiesInCone(160, 0.95)) {
+  1389→        this.damage(e, Math.round(d(4) * power), { color: '#d9e3ea' })
+  1390→        e.stunT = Math.max(e.stunT, 1.1 + signLevel * 0.15)
+  1391→        const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
+  1392→        this.kb.set(e.eid, { x: Math.cos(a) * 300, y: Math.sin(a) * 300 })
+  1393→      }
+  1394→    } else if (id === 'quen') {
+  1395→      const sh = Math.round((25 + 12 * this.level) * power)
+  1396→      this.player.shield = sh
+  1397→      this.floater(this.player.pos, 'Квен: ' + sh, '#d9a441', 14)
+  1398→      this.ring(this.player.pos, '#d9a441', 40, 0.6)
+  1399→      sfx('shield')
+  1400→    } else if (id === 'axii') {
+  1401→      const t =
+  1402→        target && target.alive && Math.hypot(target.pos.x - this.player.pos.x, target.pos.y - this.player.pos.y) < 240
+  1403→          ? target
+  1404→          : this.nearestEnemyOf(this.player, 240)
+  1405→      sfx('mind')
+  1406→      if (t) {
+  1407→        const dur = (2.4 + signLevel * 0.5) * (STUN_WEAK.has(t.enemyType ?? 'wolf') ? 1.6 : 1)
+  1408→        t.stunT = Math.max(t.stunT, dur)
+  1409→        this.floater(t.pos, 'Аксий!', '#c9a3e8', 14)
+  1410→        this.ring(t.pos, '#c9a3e8', 24, 0.5)
+  1411→      } else {
+  1412→        this.floater(this.player.pos, 'Никого рядом', '#9a9a90', 12)
+  1413→      }
+  1414→    } else if (id === 'shout') {
+  1415→      sfx('shout')
+  1416→      this.shake = 12
+  1417→      this.ring(this.player.pos, '#f5c96b', 210, 0.8)
+  1418→      for (const e of this.entities) {
+  1419→        if (e.kind !== 'enemy' || !e.alive) continue
+  1420→        if (Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y) < 210) {
+  1421→          this.damage(e, d(6) * 3 * power, { color: '#f5c96b' })
+  1422→          e.stunT = Math.max(e.stunT, 1.2)
+  1423→          const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
+  1424→          this.kb.set(e.eid, { x: Math.cos(a) * 360, y: Math.sin(a) * 360 })
+  1425→        }
+  1426→      }
+  1427→    }
+  1428→    this.syncUi()
+  1429→  }
+  1430→
+  1431→  private enemiesInCone(range: number, halfAngle: number): Entity[] {
+  1432→    return this.entities.filter((e) => {
+  1433→      if (e.kind !== 'enemy' || !e.alive) return false
+  1434→      const dist = Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y)
+  1435→      if (dist > range + e.radius) return false
+  1436→      const a = Math.atan2(e.pos.y - this.player.pos.y, e.pos.x - this.player.pos.x)
+  1437→      return angleDiff(a, this.player.facing) < halfAngle
+  1438→    })
+  1439→  }
+  1440→
+  1441→  // ---------------- Эффекты ----------------
+  1442→
+  1443→  private floater(pos: Vec, text: string, color: string, size: number) {
+  1444→    this.floaters.push({
+  1445→      x: pos.x + rndRange(-6, 6),
+  1446→      y: pos.y - 18,
+  1447→      text,
+  1448→      color,
+  1449→      life: 1.1,
+  1450→      maxLife: 1.1,
+  1451→      size,
+  1452→      vy: -34,
+  1453→    })
+  1454→    if (this.floaters.length > 40) this.floaters.shift()
+  1455→  }
+  1456→
+  1457→  private ring(pos: Vec, color: string, size: number, life: number, kind: Particle['kind'] = 'ring') {
+  1458→    this.particles.push({ x: pos.x, y: pos.y, vx: 0, vy: 0, life, maxLife: life, size, color, kind })
+  1459→  }
+  1460→
+  1461→  private beam(a: Vec, b: Vec, color: string) {
+  1462→    for (let i = 0; i <= 8; i++) {
+  1463→      const t = i / 8
+  1464→      this.particles.push({
+  1465→        x: a.x + (b.x - a.x) * t,
+  1466→        y: a.y + (b.y - a.y) * t,
+  1467→        vx: rndRange(-10, 10),
+  1468→        vy: rndRange(-10, 10),
+  1469→        life: 0.25,
+  1470→        maxLife: 0.25,
+  1471→        size: 2.4,
+  1472→        color,
+  1473→        kind: 'spark',
+  1474→      })
+  1475→    }
+  1476→  }
+  1477→
+  1478→  private coneParticles(pos: Vec, facing: number, range: number, color: string) {
+  1479→    for (let i = 0; i < 26; i++) {
+  1480→      const a = facing + rndRange(-0.55, 0.55)
+  1481→      const dist = rndRange(20, range)
+  1482→      this.particles.push({
+  1483→        x: pos.x + Math.cos(a) * dist * 0.3,
+  1484→        y: pos.y + Math.sin(a) * dist * 0.3 - 6,
+  1485→        vx: Math.cos(a) * dist * 2.4,
+  1486→        vy: Math.sin(a) * dist * 2.4,
+  1487→        life: rndRange(0.2, 0.42),
+  1488→        maxLife: 0.42,
+  1489→        size: rndRange(2.5, 5),
+  1490→        color,
+  1491→        kind: 'fire',
+  1492→      })
+  1493→    }
+  1494→  }
+  1495→
+  1496→  private updateParticles(dt: number) {
+  1497→    for (const p of this.particles) {
+  1498→      p.life -= dt
+  1499→      p.x += p.vx * dt
+  1500→      p.y += p.vy * dt
+  1501→      if (p.kind === 'fire' || p.kind === 'spark') {
+  1502→        p.vx *= 0.92
+  1503→        p.vy *= 0.92
+  1504→      }
+  1505→    }
+  1506→    this.particles = this.particles.filter((p) => p.life > 0)
+  1507→    for (const f of this.floaters) {
+  1508→      f.life -= dt
+  1509→      f.y += f.vy * dt
+  1510→      f.vy *= 0.95
+  1511→    }
+  1512→    this.floaters = this.floaters.filter((f) => f.life > 0)
+  1513→  }
+  1514→
+  1515→  // ---------------- Диалоги ----------------
+  1516→
+  1517→  private dialogueCtx() {
+  1518→    return {
+  1519→      quest: (id: string) => this.quests[id],
+  1520→      flag: (name: string) => !!this.flags[name],
+  1521→      faction: this.faction,
+  1522→      companion: (id: string) => this.companionIds[id as 'kaya' | 'torvald'],
+  1523→      has: (item: string, qty = 1) => this.countItem(item) >= qty,
+  1524→      lp: this.lp,
+  1525→      gold: this.gold,
+  1526→    }
+  1527→  }
+  1528→
+  1529→  private evalCond(cond: string): boolean {
+  1530→    if (!cond) return true
+  1531→    for (const tok of cond.split(',')) {
+  1532→      const s = tok.trim()
+  1533→      if (s && !this.evalToken(s)) return false
+  1534→    }
+  1535→    return true
+  1536→  }
+  1537→
+  1538→  private evalToken(s: string): boolean {
+  1539→    let m = s.match(/^quest\.(\w+)==(\d+)$/)
+  1540→    if (m) return this.quests[m[1]].stage === parseInt(m[2], 10)
+  1541→    m = s.match(/^quest\.(\w+)>=(\d+)$/)
+  1542→    if (m) return this.quests[m[1]].stage >= parseInt(m[2], 10)
+  1543→    m = s.match(/^quest\.(\w+)<(\d+)$/)
+  1544→    if (m) return this.quests[m[1]].stage < parseInt(m[2], 10)
+  1545→    m = s.match(/^flag\.(\w+)$/)
+  1546→    if (m) return !!this.flags[m[1]]
+  1547→    m = s.match(/^!flag\.(\w+)$/)
+  1548→    if (m) return !this.flags[m[1]]
+  1549→    m = s.match(/^faction==(\w+)$/)
+  1550→    if (m) return this.faction === (m[1] as Faction)
+  1551→    m = s.match(/^comp\.(\w+)$/)
+  1552→    if (m) return !!this.companionIds[m[1] as 'kaya' | 'torvald']
+  1553→    m = s.match(/^!comp\.(\w+)$/)
+  1554→    if (m) return !this.companionIds[m[1] as 'kaya' | 'torvald']
+  1555→    m = s.match(/^has\.(\w+)(?::(\d+))?$/)
+  1556→    if (m) return this.countItem(m[1]) >= (m[2] ? parseInt(m[2], 10) : 1)
+  1557→    m = s.match(/^lp>=(\d+)$/)
+  1558→    if (m) return this.lp >= parseInt(m[1], 10)
+  1559→    m = s.match(/^gold>=(\d+)$/)
+  1560→    if (m) return this.gold >= parseInt(m[1], 10)
+  1561→    return true
+  1562→  }
+  1563→
+  1564→  openDialogue(treeId: string) {
+  1565→    const tree = DIALOGUES[treeId]
+  1566→    if (!tree) return
+  1567→    this.dialogueTree = treeId
+  1568→    const start = typeof tree.start === 'function' ? tree.start(this.dialogueCtx()) : tree.start
+  1569→    this.setNode(start)
+  1570→  }
+  1571→
+  1572→  private setNode(nodeId: string) {
+  1573→    const tree = DIALOGUES[this.dialogueTree!]
+  1574→    const node = tree.nodes[nodeId]
+  1575→    if (!node) {
+  1576→      this.closeDialogue()
+  1577→      return
+  1578→    }
+  1579→    const choices = node.choices.filter((c) => this.evalCond(c.cond ?? ''))
+  1580→    this.dlgChoices = choices
+  1581→    const p = PORTRAITS[node.speaker] ?? { icon: 'User', color: '#b08356', title: node.role ?? '' }
+  1582→    useGame.getState().patch({
+  1583→      dialogue: {
+  1584→        speaker: node.speaker,
+  1585→        role: p.title,
+  1586→        portraitIcon: p.icon,
+  1587→        portraitColor: p.color,
+  1588→        text: node.text,
+  1589→        choices: choices.map((c) => ({
+  1590→          text: c.text,
+  1591→          tag: c.tag,
+  1592→          checkLabel: c.check ? c.check.label : undefined,
+  1593→        })),
+  1594→      },
+  1595→    })
+  1596→  }
+  1597→
+  1598→  chooseOption(i: number) {
+  1599→    const c = this.dlgChoices[i]
+  1600→    if (!c) return
+  1601→    sfx('click')
+  1602→    if (c.check) {
+  1603→      const bonus = 1 + Math.floor(this.attributes.charisma / 2) + this.skills.speech
+  1604→      const roll = d(20)
+  1605→      const total = roll + bonus
+  1606→      const success = roll !== 1 && (roll === 20 || total >= c.check.dc)
+  1607→      this.toast(
+  1608→        `${c.check.label}: d20 ${roll} + ${bonus} = ${total} — ${success ? 'успех!' : 'провал'}`,
+  1609→        success ? 'quest' : 'warn',
+  1610→      )
+  1611→      if (success && c.action) this.runAction(c.action)
+  1612→      const next = success ? c.goto : (c.gotoFail ?? null)
+  1613→      if (next === null || next === undefined) {
+  1614→        this.closeDialogue()
+  1615→        return
+  1616→      }
+  1617→      this.setNode(next)
+  1618→      return
+  1619→    }
+  1620→    if (c.action) this.runAction(c.action)
+  1621→    if (c.goto === null || c.goto === undefined) {
+  1622→      this.closeDialogue()
+  1623→      return
+  1624→    }
+  1625→    this.setNode(c.goto)
+  1626→  }
+  1627→
+  1628→  closeDialogue() {
+  1629→    this.dialogueTree = null
+  1630→    this.dlgChoices = []
+  1631→    useGame.getState().patch({ dialogue: null })
+  1632→  }
+  1633→
+  1634→  private runAction(action: string) {
+  1635→    for (const cmdRaw of action.split(';')) {
+  1636→      const cmd = cmdRaw.trim()
+  1637→      if (!cmd || cmd === 'end') continue
+  1638→      const [op, arg1, arg2] = cmd.split(':')
+  1639→      switch (op) {
+  1640→        case 'quest':
+  1641→          this.advanceQuest(arg1, parseInt(arg2, 10))
+  1642→          break
+  1643→        case 'flag':
+  1644→          this.flags[arg1] = true
+  1645→          break
+  1646→        case 'give':
+  1647→          this.addItem(arg1, parseInt(arg2 ?? '1', 10))
+  1648→          break
+  1649→        case 'take':
+  1650→          this.removeItem(arg1, parseInt(arg2 ?? '1', 10))
+  1651→          break
+  1652→        case 'gold': {
+  1653→          this.gold = Math.max(0, this.gold + parseInt(arg1, 10))
+  1654→          sfx('coin')
+  1655→          break
+  1656→        }
+  1657→        case 'xp':
+  1658→          this.gainXp(parseInt(arg1, 10))
+  1659→          break
+  1660→        case 'lp':
+  1661→          this.lp = Math.max(0, this.lp + parseInt(arg1, 10))
+  1662→          break
+  1663→        case 'open':
+  1664→          this.closeDialogue()
+  1665→          if (arg1 === 'shop') this.openShop()
+  1666→          if (arg1 === 'trainer') this.openTrainer()
+  1667→          break
+  1668→        case 'join':
+  1669→          if (arg1 === 'kaya' || arg1 === 'torvald') {
+  1670→            const wasNew = !this.companionIds[arg1]
+  1671→            this.spawnCompanion(arg1)
+  1672→            if (wasNew) {
+  1673→              this.toast(`${arg1 === 'kaya' ? 'Кайя' : 'Торвальд'} присоединяется к отряду!`, 'quest')
+  1674→              sfx('quest')
+  1675→            }
+  1676→          }
+  1677→          break
+  1678→        case 'faction':
+  1679→          this.faction = arg1 as Faction
+  1680→          this.toast(arg1 === 'flame' ? 'Ты вступил в Орден Пламени!' : 'Ты вступил в Ковен Тумана!', 'quest')
+  1681→          if (arg1 === 'mist') this.checkProof()
+  1682→          sfx('quest')
+  1683→          break
+  1684→        case 'sign':
+  1685→          if (arg1 === 'shout' && !this.signs.shout.unlocked) {
+  1686→            this.signs.shout.unlocked = true
+  1687→            this.toast('Голос Древних изучен! Клавиша 5.', 'level')
+  1688→            sfx('level')
+  1689→          }
+  1690→          break
+  1691→        case 'boss':
+  1692→          if (arg1 === 'fight') {
+  1693→            const boss = this.entities.find((e) => e.enemyType === 'boss' && e.alive)
+  1694→            if (boss) boss.aiState = 'chase'
+  1695→          } else if (arg1 === 'weaken') {
+  1696→            const boss = this.entities.find((e) => e.enemyType === 'boss' && e.alive)
+  1697→            if (boss) {
+  1698→              boss.hp = Math.round(boss.hp * 0.8)
+  1699→              boss.dmgMod = 2
+  1700→              boss.summonStage = 1
+  1701→              this.floater(boss.pos, 'Слова жгут его!', '#c9a3e8', 15)
+  1702→            }
+  1703→          }
+  1704→          break
+  1705→        case 'heal':
+  1706→          if (arg1 === 'full') {
+  1707→            this.hp = this.maxHp
+  1708→            this.player.hp = this.hp
+  1709→          }
+  1710→          break
+  1711→      }
+  1712→    }
+  1713→    this.syncUi()
+  1714→  }
+  1715→
+  1716→  private runInteractable(it: InteractableDef) {
+  1717→    if (it.action.startsWith('dialogue:')) {
+  1718→      this.openDialogue(it.action.slice(9))
+  1719→    } else if (it.action.startsWith('gather:')) {
+  1720→      const item = it.action.slice(7)
+  1721→      this.addItem(item, 1)
+  1722→      this.removedProps.add(it.id)
+  1723→      this.flags['herb_' + it.id] = true
+  1724→      sfx('coin')
+  1725→      this.toast('Собрано: ' + ITEMS[item].name, 'loot')
+  1726→      const q = this.quests.mist
+  1727→      if (q.stage === 1 && !q.done) {
+  1728→        q.counter++
+  1729→        if (q.counter >= 3) this.toast('Лунные травы собраны — к Селене!', 'quest')
+  1730→        else this.toast(`Лунная трава: ${q.counter}/3`, 'info')
+  1731→      }
+  1732→      this.syncUi()
+  1733→    }
+  1734→  }
+  1735→
+  1736→  private pickInteractable(p: Vec, extra = 0): InteractableDef | null {
+  1737→    let best: InteractableDef | null = null
+  1738→    let bd = 1e9
+  1739→    for (const it of INTERACTABLES) {
+  1740→      if (this.removedProps.has(it.id)) continue
+  1741→      if (!this.evalCond(it.cond ?? '')) continue
+  1742→      const dist = Math.hypot(it.pos.x - p.x, it.pos.y - p.y)
+  1743→      if (dist < it.r + extra && dist < bd) {
+  1744→        bd = dist
+  1745→        best = it
+  1746→      }
+  1747→    }
+  1748→    return best
+  1749→  }
+  1750→
+  1751→  private nearestInteraction(): { label: string; npc?: Entity; it?: InteractableDef } | null {
+  1752→    let best: { label: string; npc?: Entity; it?: InteractableDef } | null = null
+  1753→    let bd = 1e9
+  1754→    for (const e of this.entities) {
+  1755→      if (e.kind !== 'npc' || !e.alive) continue
+  1756→      const dist = Math.hypot(e.pos.x - this.player.pos.x, e.pos.y - this.player.pos.y)
+  1757→      if (dist < 58 && dist < bd) {
+  1758→        bd = dist
+  1759→        best = { label: `Поговорить: ${e.name}`, npc: e }
+  1760→      }
+  1761→    }
+  1762→    for (const it of INTERACTABLES) {
+  1763→      if (this.removedProps.has(it.id)) continue
+  1764→      if (!this.evalCond(it.cond ?? '')) continue
+  1765→      const dist = Math.hypot(it.pos.x - this.player.pos.x, it.pos.y - this.player.pos.y)
+  1766→      if (dist < it.r + 14 && dist < bd) {
+  1767→        bd = dist
+  1768→        best = { label: `${it.prompt}: ${it.name}`, it }
+  1769→      }
+  1770→    }
+  1771→    return best
+  1772→  }
+  1773→
+  1774→  private doInteract() {
+  1775→    if (this.isFrozen() || this.tacticalPaused) return
+  1776→    const n = this.nearestInteraction()
+  1777→    if (!n) return
+  1778→    if (n.npc) this.openDialogue(n.npc.npc!.dialogue)
+  1779→    else if (n.it) this.runInteractable(n.it)
+  1780→  }
+  1781→
+  1782→  // ---------------- Квесты ----------------
+  1783→
+  1784→  private advanceQuest(id: string, stage: number) {
+  1785→    const q = this.quests[id]
+  1786→    if (!q || q.done) return
+  1787→    q.stage = stage
+  1788→    const def = QUEST_MAP[id]
+  1789→    if (stage >= def.stages.length) q.done = true
+  1790→    if (id === 'main' && stage === 5 && !this.flags.gateOpen) {
+  1791→      this.flags.gateOpen = true
+  1792→      this.removedProps.add('barrier')
+  1793→      this.removedProps.add('barrier2')
+  1794→      this.removedProps.add('barrier3')
+  1795→      this.toast('Пелена перед Разломом опала!', 'quest')
+  1796→    }
+  1797→    this.toast(`${def.name}: ${this.stageText(id)}`, 'quest')
+  1798→    sfx('quest')
+  1799→    this.saveGame(false)
+  1800→    this.syncUi()
+  1801→  }
+  1802→
+  1803→  private stageText(id: string) {
+  1804→    const def = QUEST_MAP[id]
+  1805→    const q = this.quests[id]
+  1806→    if (q.done) return def.stages[def.stages.length - 1].text
+  1807→    const st = def.stages[Math.max(0, Math.min(def.stages.length - 1, q.stage - 1))]
+  1808→    return st ? st.text : ''
+  1809→  }
+  1810→
+  1811→  private checkProof() {
+  1812→    const q = this.quests.main
+  1813→    if (q.stage === 4 && !q.done) {
+  1814→      if (this.flags.alphaDead || this.flags.captainDead || this.flags.mistJoined) {
+  1815→        this.advanceQuest('main', 5)
+  1816→      }
+  1817→    }
+  1818→  }
+  1819→
+  1820→  private questMarker(): Vec | null {
+  1821→    const q = this.quests.main
+  1822→    if (!q.done) {
+  1823→      if (q.stage <= 1) return NPCS.find((n) => n.id === 'bjorn')!.pos
+  1824→      if (q.stage === 2) return { x: 900, y: 720 }
+  1825→      if (q.stage === 3) return { x: 2200, y: 660 }
+  1826→      if (q.stage === 4) {
+  1827→        if (!this.flags.alphaDead) return { x: 720, y: 450 }
+  1828→        if (!this.flags.captainDead) return { x: 2590, y: 1690 }
+  1829→        return { x: 1600, y: 2160 }
+  1830→      }
+  1831→      if (q.stage === 5) return { x: 2935, y: 470 }
+  1832→    }
+  1833→    const c = this.quests.contract
+  1834→    if (c.stage > 0 && !c.done) {
+  1835→      if (c.stage === 1) return { x: 720, y: 450 }
+  1836→      return NPCS.find((n) => n.id === 'grim')!.pos
+  1837→    }
+  1838→    return null
+  1839→  }
+  1840→
+  1841→  private updateArea() {
+  1842→    let name = 'Долина'
+  1843→    for (const a of AREAS) {
+  1844→      if (a.id === 'wilds') continue
+  1845→      const [x, y, w, h] = a.rect
+  1846→      if (this.player.pos.x > x && this.player.pos.x < x + w && this.player.pos.y > y && this.player.pos.y < y + h) {
+  1847→        name = a.name
+  1848→        break
+  1849→      }
+  1850→    }
+  1851→    if (name !== this.currentArea) {
+  1852→      this.currentArea = name
+  1853→      useGame.getState().patch({ areaToast: { id: Date.now(), name } })
+  1854→    }
+  1855→  }
+  1856→
+  1857→  private updateEnding() {
+  1858→    if (this.endingAt !== null && this.time >= this.endingAt) {
+  1859→      this.endingAt = null
+  1860→      this.openEnding()
+  1861→    }
+  1862→  }
+  1863→
+  1864→  private openEnding() {
+  1865→    const factionLine: Record<Faction, string[]> = {
+  1866→      none: [
+  1867→        'Ты ушёл из долины до рассвета, никому ничего не сказав. Долг Смотрителя исполнен — а судьба Хеймхолла теперь в руках его людей.',
+  1868→      ],
+  1869→      flame: [
+  1870→        'Орден Пламени воздвиг у Разлома сторожевую башню. Капитан Ирма лично подняла твоё имя на её ворота.',
+  1871→        'Сталь и строй — теперь этого достаточно. Пока достаточно.',
+  1872→      ],
+  1873→      mist: [
+  1874→        'Ковен Тумана переписал печать, и Разлом затянулся туманом. Архимаг Селена назвала тебя «голосом между мирами».',
+  1875→        'Туман помнит. Туман ждёт.',
+  1876→      ],
+  1877→    }
+  1878→    const epilogue: string[] = [
+  1879→      'Пожиратель Бурь рассыпался пеплом, и небо над Хеймхоллом срослось швом из первых лучей солнца.',
+  1880→      ...factionLine[this.faction],
+  1881→    ]
+  1882→    if (this.companionIds.kaya && this.companionIds.torvald) {
+  1883→      epilogue.push(
+  1884→        'Кайя ушла дальше на север — искать истоки Разлома. Торвальд остался: сказал, что в деревне наконец появилось приличное пиво.',
+  1885→      )
+  1886→    }
+  1887→    epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
+  1888→    const mins = Math.floor(this.playtime / 60)
+  1889→    const stats: Array<[string, string]> = [
+  1890→      ['Уровень', String(this.level)],
+  1891→      ['Убито врагов', String(this.kills)],
+  1892→      ['Золото', String(this.gold)],
+  1893→      ['Время в игре', `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`],
+  1894→      ['Фракция', this.faction === 'flame' ? 'Орден Пламени' : this.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель'],
+  1895→      ['Спутники', `${(this.companionIds.kaya ? 1 : 0) + (this.companionIds.torvald ? 1 : 0)} из 2`],
+  1896→    ]
+  1897→    useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
+  1898→  }
+  1899→
+  1900→  // ---------------- Предметы ----------------
+  1901→
+  1902→  private addItem(id: string, qty: number) {
+  1903→    const def = ITEMS[id]
+  1904→    if (!def) return
+  1905→    const ex = this.inventory.find((i) => i.item === id)
+  1906→    if (ex) ex.qty += qty
+  1907→    else this.inventory.push({ item: id, qty })
+  1908→    this.toast('Получено: ' + def.name + (qty > 1 ? ` ×${qty}` : ''), 'loot')
+  1909→    this.syncUi()
+  1910→  }
+  1911→
+  1912→  private removeItem(id: string, qty: number) {
+  1913→    const ex = this.inventory.find((i) => i.item === id)
+  1914→    if (!ex) return
+  1915→    ex.qty -= qty
+  1916→    if (ex.qty <= 0) this.inventory = this.inventory.filter((i) => i !== ex)
+  1917→    this.syncUi()
+  1918→  }
+  1919→
+  1920→  private countItem(id: string) {
+  1921→    return this.inventory.find((i) => i.item === id)?.qty ?? 0
+  1922→  }
+  1923→
+  1924→  buyItem(id: string) {
+  1925→    const def = ITEMS[id]
+  1926→    if (!def) return
+  1927→    if (this.gold < def.price) {
+  1928→      this.toast('Не хватает золота.', 'warn')
+  1929→      return
+  1930→    }
+  1931→    this.gold -= def.price
+  1932→    this.addItem(id, 1)
+  1933→    sfx('coin')
+  1934→  }
+  1935→
+  1936→  sellItem(id: string) {
+  1937→    const def = ITEMS[id]
+  1938→    if (!def || def.type === 'quest') return
+  1939→    if (this.countItem(id) <= 0) return
+  1940→    const val = Math.floor(def.price * SELL_RATE)
+  1941→    this.removeItem(id, 1)
+  1942→    this.gold += val
+  1943→    this.toast(`Продано: ${def.name} (+${val} зол.)`, 'info')
+  1944→    sfx('coin')
+  1945→  }
+  1946→
+  1947→  equipItem(id: string) {
+  1948→    const def = ITEMS[id]
+  1949→    if (!def) return
+  1950→    if (def.type === 'weapon') {
+  1951→      if (this.weapon) this.addItem(this.weapon, 1)
+  1952→      this.weapon = id
+  1953→      this.removeItem(id, 1)
+  1954→    } else if (def.type === 'armor') {
+  1955→      if (this.armor) this.addItem(this.armor, 1)
+  1956→      this.armor = id
+  1957→      this.removeItem(id, 1)
+  1958→    } else return
+  1959→    this.recalcStats()
+  1960→    sfx('click')
+  1961→    this.syncUi()
+  1962→  }
+  1963→
+  1964→  unequipItem(slot: 'weapon' | 'armor') {
+  1965→    const cur = slot === 'weapon' ? this.weapon : this.armor
+  1966→    if (!cur) return
+  1967→    if (slot === 'weapon') this.weapon = null
+  1968→    else this.armor = null
+  1969→    this.addItem(cur, 1)
+  1970→    this.recalcStats()
+  1971→    sfx('click')
+  1972→  }
+  1973→
+  1974→  useItem(id: string) {
+  1975→    const def = ITEMS[id]
+  1976→    if (def?.type === 'potion') this.castAbility(id)
+  1977→  }
+  1978→
+  1979→  spendLp(attr: 'might' | 'vigor' | 'intellect' | 'charisma') {
+  1980→    if (this.lp < 3) {
+  1981→      this.toast('Нужно 3 очка обучения.', 'warn')
+  1982→      return
+  1983→    }
+  1984→    this.lp -= 3
+  1985→    this.attributes[attr]++
+  1986→    this.recalcStats()
+  1987→    this.toast(`${ATTR_NAMES[attr]} повышена!`, 'level')
+  1988→    sfx('level')
+  1989→    this.syncUi()
+  1990→  }
+  1991→
+  1992→  // ---------------- Магазин и тренер ----------------
+  1993→
+  1994→  private openShop() {
+  1995→    useGame.getState().patch({ shop: { merchantName: 'Грим', stock: [...MERCHANT_STOCK] }, panel: 'shop' })
+  1996→  }
+  1997→
+  1998→  private buildTrainerOptions(): TrainerHudState {
+  1999→    const opts: TrainerHudState['options'] = []
+  2000→    const skillDefs: Array<{ key: 'blade' | 'vitality' | 'signs' | 'speech'; name: string; desc: string }> = [
+
+[showing lines 1-2000 of 2381; use offset=2001 with limit to continue reading]
