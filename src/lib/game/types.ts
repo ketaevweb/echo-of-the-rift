@@ -11,6 +11,9 @@ export interface Vec {
 
 export type Faction = 'none' | 'flame' | 'mist'
 export type Stance = 'follow' | 'hold' | 'aggressive'
+/** Строй отряда (Фаза 4): клин — Торвальд впереди-сбоку, Кайя позади;
+ *  линия — оба флангах сзади. */
+export type FormationId = 'wedge' | 'line'
 
 export type SignId = 'igni' | 'aard' | 'quen' | 'axii' | 'shout'
 
@@ -376,4 +379,7 @@ export interface SaveData {
   dayClock: number
   oilKind: string | null
   oilT: number
+  // --- Фаза 4: одобрение компаньонов и строй (в старых сейвах нет — дефолты) ---
+  approval: { kaya: number; torvald: number }
+  formation: FormationId
 }

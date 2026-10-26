@@ -6,7 +6,7 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, DialogueChoice, Entity, Faction, Floater, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
+import { Attributes, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
 import { Collider } from './util'
 import type { PanelId } from '../store'
 
@@ -32,6 +32,8 @@ export interface View3dSnapshot {
   /** Зона игрока и фаза суток — для атмосферы (Фаза 3). */
   zone: ZoneId
   dayT: number
+  /** Фаза 4: тактическая пауза — id выбранного приказом компаньона. */
+  selEid: number | null
 }
 
 /** Минимальный интерфейс 3D-вью, которым пользуется движок/ввод. */
@@ -49,6 +51,8 @@ export interface View3dBridge {
   } | null
   /** Азимут орбиты камеры (рад) — для WASD относительно камеры. */
   getCameraYaw(): number
+  /** Фаза 4: изометрический отъём камеры в тактической паузе. */
+  setTactical(on: boolean): void
   resize(): void
   dispose(): void
 }
@@ -126,6 +130,18 @@ export interface EngineCtx {
   oilKind: string | null
   /** Переход через Врата Тумана: затемнение + телепорт партии. */
   travelTo(zone: ZoneId): void
+
+  // --- Фаза 4: партия (формации/одобрение/тактика) ---
+  /** Одобрение компаньонов 0..100: ≥60 открывает парные приёмы (синергии). */
+  approval: { kaya: number; torvald: number }
+  /** Текущий строй отряда: клин или линия. */
+  formation: FormationId
+  /** Выбранный в тактической паузе компаньон (для приказов движения). */
+  selEid: number | null
+  /** Сменить строй (клин ⇄ линия) — клавиша V. */
+  cycleFormation(): void
+  /** Вкл/выкл тактическую камеру (изометрический отъём). */
+  setTactical(on: boolean): void
 
   // --- Хуки, реализуемые движком (делегируют в системы/инициализацию) ---
   toast(text: string, kind?: ToastKind): void
