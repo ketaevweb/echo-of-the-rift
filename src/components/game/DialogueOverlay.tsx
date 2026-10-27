@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useGame, type DiceRollHudState } from '@/lib/game/store'
 import { getEngine } from '@/lib/game/engine'
+import { PORTRAIT_IMG } from '@/lib/game/data/portraits'
 
 // ============================================================
 // Фаза 5 — диалоговый оверлей:
@@ -12,10 +13,30 @@ import { getEngine } from '@/lib/game/engine'
 //  • бейджи происхождения и тегов.
 // ============================================================
 
-// ---------------- Портретный арт (процедурный SVG) ----------------
+// ---------------- Портретный арт ----------------
+// v1.2: painterly-арт (AI, scripts/gen-portraits.ts) для персонажей;
+// процедурный SVG Фазы 5 остаётся фолбэком (ошибка загрузки / объектные спикеры).
 
 /** Стилизованный бюст 64×64. Стиль: тёмный силуэт + один акцентный цвет фракции. */
 function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
+  const imgSrc = PORTRAIT_IMG[speaker] ?? null
+  // спикеры, у которых PNG не загрузился → постоянный SVG-фолбэк
+  const [failedSpeakers, setFailedSpeakers] = useState<Record<string, boolean>>({})
+  const imgFailed = imgSrc !== null && !!failedSpeakers[speaker]
+
+  if (imgSrc && !imgFailed) {
+    return (
+      <img
+        key={speaker}
+        src={imgSrc}
+        alt={`Портрет: ${speaker}`}
+        onError={() => setFailedSpeakers((m) => ({ ...m, [speaker]: true }))}
+        className="h-full w-full select-none object-cover object-top"
+        draggable={false}
+      />
+    )
+  }
+
   const uid = `pg-${speaker.replace(/[^a-zа-я]/gi, '') || 'x'}`
   const skin = '#c9a077'
   const dark = '#1a1512'
