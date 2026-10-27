@@ -235,7 +235,7 @@ export function sfx(name: SfxName) {
 
 /** Шаг по поверхности зоны (Фаза 8, GDD 04 §4.1 — звук поверхностей). */
 export function stepSfx(zone: ZoneId) {
-  sfx(zone === 'frost' ? 'step_snow' : zone === 'mara' ? 'step_ash' : zone === 'granite' ? 'step_stone' : zone === 'disputed' ? 'step_stone' : 'step_grass')
+  sfx(zone === 'frost' ? 'step_snow' : zone === 'mara' ? 'step_ash' : zone === 'granite' ? 'step_stone' : zone === 'disputed' ? 'step_stone' : zone === 'rubezh' ? 'step_stone' : 'step_grass')
 }
 
 // ---------------- Эмбиент (Фаза 3): петля ветра/топей ----------------

@@ -18,6 +18,7 @@ import { updatePit } from '../systems/career'
 import { updateFrost } from '../systems/frost'
 import { updateMara } from '../systems/mara'
 import { updateDisputed } from '../systems/disputed'
+import { updateRubezh } from '../systems/rubezh'
 import { updateFinale } from '../systems/finale'
 import type { EngineCtx } from './ctx'
 import { Clock } from './Clock'
@@ -43,6 +44,7 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   updateFrost(ctx, dt) // Фаза 6.2: дракон Стылого Пределья
   updateMara(ctx, dt) // Фаза 6.3: оборона Бастиона (волны штурма)
   updateDisputed(ctx, dt) // Фаза 6.4: набег Орды на Рощу (волны + триггер близости)
+  updateRubezh(ctx, dt) // Фаза 6.5: будим Капитана «Двенадцатого» у стазис-зала
   updateFinale(ctx, dt) // Фаза 7: рейд в Сердце Разлома (4 волны + суд)
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)

@@ -166,6 +166,13 @@ const SPECS: Spec[] = [
       'brutal raider warlord of an ash horde, horned helm with fang trophy, coal-dark skin smudged with ash, ' +
       'glowing ember eyes, blood-crimson banner cloth over shoulder, crimson accents',
   },
+  // ---------- Внешний Рубеж (Фаза 6.5) ----------
+  {
+    slug: 'asher',
+    prompt:
+      'worn mechanic engineer of a crashed starship, grease-stained hands, patchwork tech armor over a coat, ' +
+      'scruffy beard, tired amber eyes that still hope, wrench on belt, faint teal neon glow from tools, sand-brass accents',
+  },
   // ---------- Финал ----------
   {
     slug: 'devourer',

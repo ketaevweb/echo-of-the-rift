@@ -62,13 +62,28 @@ import {
   KRAJ,
   SHRINE,
 } from './disputed'
+import {
+  RB_EDGE,
+  RB_GATES,
+  RINGS,
+  RUBEZH_AREAS,
+  RUBEZH_INTERACTABLES,
+  RUBEZH_MARKERS,
+  RUBEZH_NPCS,
+  RUBEZH_PROPS,
+  RUBEZH_ROADS,
+  RUBEZH_SPAWN_ZONES,
+  SHIP,
+  RIDGE_RB,
+} from './rubezh'
 
 /** Мир: долина Хеймхолл на северо-западе, Вельд на юге за Хребтом (Фаза 3),
  *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6),
  *  Стылое Пределье за Стылым Хребтом (Фаза 6.2),
  *  Багровая Мара на юге Гранита за Багровым хребтом (Фаза 6.3),
- *  Спорные Земли за Рубежным Кряжем (Фаза 6.4). */
-export const WORLD = { w: 7760, h: 4200 }
+ *  Спорные Земли за Рубежным Кряжем (Фаза 6.4),
+ *  Внешний Рубеж — плато-космодром за восточным Обрывом (Фаза 6.5). */
+export const WORLD = { w: 8800, h: 4200 }
 
 /** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
 const VALLEY_BOTTOM = 2380
@@ -90,6 +105,7 @@ export const AREAS: AreaDef[] = [
   ...FROST_AREAS,
   ...MARA_AREAS,
   ...DISPUTED_AREAS,
+  ...RUBEZH_AREAS,
   { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
@@ -128,6 +144,8 @@ export const ROADS: Vec[][] = [
   ...MARA_ROADS,
   // Тропы Спорных Земель (Фаза 6.4)
   ...DISPUTED_ROADS,
+  // Тропы Внешнего Рубежа (Фаза 6.5)
+  ...RUBEZH_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -280,6 +298,7 @@ export const PROPS: PropDef[] = [
   ...FROST_PROPS,
   ...MARA_PROPS,
   ...DISPUTED_PROPS,
+  ...RUBEZH_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -302,6 +321,8 @@ export const NPCS: NpcDef[] = [
   ...MARA_NPCS,
   // Спорные Земли (Фаза 6.4)
   ...DISPUTED_NPCS,
+  // Внешний Рубеж (Фаза 6.5)
+  ...RUBEZH_NPCS,
 ]
 
 export const SPAWN_ZONES: SpawnZoneDef[] = [
@@ -315,6 +336,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   ...FROST_SPAWN_ZONES,
   ...MARA_SPAWN_ZONES,
   ...DISPUTED_SPAWN_ZONES,
+  ...RUBEZH_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -335,6 +357,7 @@ export const INTERACTABLES: InteractableDef[] = [
   ...FROST_INTERACTABLES,
   ...MARA_INTERACTABLES,
   ...DISPUTED_INTERACTABLES,
+  ...RUBEZH_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -349,6 +372,7 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   ...FROST_MARKERS,
   ...MARA_MARKERS,
   ...DISPUTED_MARKERS,
+  ...RUBEZH_MARKERS,
 ]
 
 // Реэкспорты Вельда/Гранита/Пределья/Марый для движка/рендеров (единая точка импорта мира)
@@ -394,11 +418,26 @@ export {
   SHIFT_PROPS,
   SHRINE,
 } from './disputed'
+export {
+  CREW_NAMES,
+  RB_EDGE,
+  RB_GATES,
+  RELAY_ORDER,
+  RELAYS,
+  RINGS,
+  RIDGE_RB,
+  RUBEZH_ROADS,
+  SHIP,
+  STASIS_HALL,
+  ASHER_CAMP,
+} from './rubezh'
 
-/** Зона по мировой точке: Спорные Земли (восток за Рубежным Кряжем) приоритетнее,
- *  затем Пределье (восток за Стылым Хребтом), затем Гранит (восток за Каменным Хребтом),
- *  в юге которого — Мара (Фаза 6.3), затем Вельд (юг за Хребтом), остальное — долина. */
-export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' | 'mara' | 'disputed' {
+/** Зона по мировой точке: Внешний Рубеж (восток за Обрывом) приоритетнее,
+ *  затем Спорные Земли (восток за Рубежным Кряжем), затем Пределье (восток за Стылым Хребтом),
+ *  затем Гранит (восток за Каменным Хребтом), в юге которого — Мара (Фаза 6.3),
+ *  затем Вельд (юг за Хребтом), остальное — долина. */
+export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' | 'mara' | 'disputed' | 'rubezh' {
+  if (x > RB_EDGE.x) return 'rubezh'
   if (x > KRAJ.x) return 'disputed'
   if (x > FRIDGE.x) return 'frost'
   if (x > GRIDGE.x) return y > MARA_RIDGE.y ? 'mara' : 'granite'

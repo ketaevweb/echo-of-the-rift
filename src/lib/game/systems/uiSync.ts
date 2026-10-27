@@ -127,6 +127,11 @@ export function syncUi(ctx: EngineCtx): void {
   const dispQ = quests.find((q) => q.id === 'disputed')!
   const dispHQ = quests.find((q) => q.id === 'disputed_hoard')!
   const dispSQ = quests.find((q) => q.id === 'disputed_scout')!
+  // Фаза 6.5: квесты Внешнего Рубежа — в трекере побочек
+  const rbShipQ = quests.find((q) => q.id === 'rubezh_ship')!
+  const rbSigQ = quests.find((q) => q.id === 'rubezh_signal')!
+  const rbRingQ = quests.find((q) => q.id === 'rubezh_rings')!
+  const rbCrewQ = quests.find((q) => q.id === 'rubezh_crew')!
   // Фаза 7: рейд и суд — в трекере как побочные до момента старта
   const raidQ = quests.find((q) => q.id === 'raid')!
   const judgQ = quests.find((q) => q.id === 'judgment')!
@@ -144,6 +149,10 @@ export function syncUi(ctx: EngineCtx): void {
     dispQ,
     dispHQ,
     dispSQ,
+    rbShipQ,
+    rbSigQ,
+    rbRingQ,
+    rbCrewQ,
     raidQ,
     judgQ,
   ].find((q) => q.stage > 0 && !q.done) ?? null
@@ -225,7 +234,9 @@ export function syncUi(ctx: EngineCtx): void {
               ? 'БАГРОВАЯ МАРА'
               : ctx.zone === 'disputed'
                 ? 'СПОРНЫЕ ЗЕМЛИ'
-                : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+                : ctx.zone === 'rubezh'
+                  ? 'ВНЕШНИЙ РУБЕЖ'
+                  : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
     formation: ctx.formation,
     career,
     shouts,

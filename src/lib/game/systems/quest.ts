@@ -29,6 +29,7 @@ import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, star
 import { cycleRune, learnWord } from './frost'
 import { startSiege } from './mara'
 import { applyLandscapeShift, spawnHordeChief } from './disputed'
+import { activateRelay, readCrewPod, surveyRing } from './rubezh'
 import { speakLine, stopVoice } from '../voice'
 
 export function initQuests(ctx: EngineCtx) {
@@ -368,11 +369,20 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
   if (it.action.startsWith('dialogue:')) {
     openDialogue(ctx, it.action.slice(9))
   } else if (it.action.startsWith('portal:')) {
-    // Врата Тумана / Врата Гранита / Врата Пределья / Врата Мары / Врата Спорных Земель
+    // Врата Тумана / Врата Гранита / Врата Пределья / Врата Мары / Врата Спорных Земель / Врата Рубежа
     const zone = it.action.slice(7)
-    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost' || zone === 'mara' || zone === 'disputed') {
-      ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost' | 'mara' | 'disputed')
+    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost' || zone === 'mara' || zone === 'disputed' || zone === 'rubezh') {
+      ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost' | 'mara' | 'disputed' | 'rubezh')
     }
+  } else if (it.action.startsWith('relay:')) {
+    // Внешний Рубеж (Фаза 6.5): синхронизация ретрансляторов Хребта — головоломка порядка
+    activateRelay(ctx, it.action.slice(6), it.id)
+  } else if (it.action.startsWith('crew:')) {
+    // Внешний Рубеж: чтение таблички стазис-капсулы — имена экипажа (VR-04)
+    readCrewPod(ctx, it.id)
+  } else if (it.action.startsWith('ringmap:')) {
+    // Внешний Рубеж: осмотр посадочных колец — карта Рубежа оф-тропой (VR-03)
+    surveyRing(ctx, it.id)
   } else if (it.action.startsWith('purge:')) {
     // Мор-сгустки Мары (Фаза 6.3): выжечь скверну в жилах — квест Хольта
     const questId = it.action.slice(6)
@@ -590,10 +600,11 @@ export function grantKey(ctx: EngineCtx, keyId: string, domain: string) {
   if (ctx.flags[keyId]) return
   ctx.flags[keyId] = true
   addItem(ctx, keyId, 1)
-  const keys = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed'].filter(
+  // Фаза 6.5: 7 осколков (6 канонных K1–K6 + ключ Оплота); порог концовок — 6 (GDD 01 §6)
+  const keys = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed', 'key_rubezh'].filter(
     (k) => ctx.flags[k],
   ).length
-  ctx.toast(`Ключ-осколок: ${domain} — собрано ${keys} из 6`, 'quest')
+  ctx.toast(`Ключ-осколок: ${domain} — собрано ${keys} из 7`, 'quest')
   sfx('level')
 }
 

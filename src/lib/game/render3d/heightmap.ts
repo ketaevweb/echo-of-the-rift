@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, MA_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW, BASTION, BLIGHT_WELLS, MARA_RIDGE, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, MA_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW, BASTION, BLIGHT_WELLS, MARA_RIDGE, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE, RB_EDGE, RB_GATES, SHIP, STASIS_HALL, ASHER_CAMP, RIDGE_RB, RINGS, RELAYS } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -97,6 +97,11 @@ const BASTION_FLAT = { x: BASTION.pos.x, y: BASTION.pos.y, rx: 210, ry: 150 }
 const GROVE_FLAT = { x: GROVE.pos.x, y: GROVE.pos.y, rx: 200, ry: 150 }
 const HORDE_FLAT = { x: HORDE_CAMP.pos.x, y: HORDE_CAMP.pos.y, rx: 190, ry: 140 }
 const SHRINE_FLAT = { x: SHRINE.pos.x, y: SHRINE.pos.y, r: 100 }
+// Фаза 6.5: пятачки Внешнего Рубежа (высота плато ~30)
+const SHIP_FLAT = { x: SHIP.pos.x, y: SHIP.pos.y, rx: 240, ry: 175 }
+const STASIS_FLAT = { x: STASIS_HALL.x, y: STASIS_HALL.y, r: 110 }
+const ASHER_FLAT = { x: ASHER_CAMP.x, y: ASHER_CAMP.y, r: 90 }
+const RIDGE_FLAT = { x: RIDGE_RB.pos.x, y: RIDGE_RB.pos.y, rx: 150, ry: 130 }
 
 export const WATER_LEVEL = -1.6
 
@@ -250,6 +255,25 @@ export function heightAt(x: number, y: number): number {
     const heath = (fbm(x / 330 + 113, y / 330 + 27, 3) - 0.5) * 6 + 1.6
     h = h * (1 - kz) + heath * kz
   }
+  // Внешний Рубеж (Фаза 6.5): тёмное базальтовое плато — высоко над Обрывом
+  if (x > RB_EDGE.x + 40) {
+    const rz = 1 - falloff(x - (RB_EDGE.x + 40), 0, 360)
+    const plateau = 30 + (fbm(x / 300 + 211, y / 300 + 47, 3) - 0.5) * 5
+    h = h * (1 - rz) + plateau * rz
+  }
+  // --- Фаза 6.5: Обрыв к плато (вертикальная стена по x; врата вырезают проход) ---
+  // ВАЖНО: после слоя плато — иначе плато (rz=1 при x≥8000) стирает стену
+  {
+    const drb = Math.abs(x - RB_EDGE.x)
+    if (drb < 330) {
+      const cut = 1 - falloff(Math.abs(y - RB_GATES.disputedSide.y), 90, 260)
+      if (cut > 0.01) {
+        const jag = (fbm(x / 110 + 203, y / 110 + 91, 2) - 0.5) * 9
+        const t = falloff(drb, 70, 260)
+        h += t * t * (58 + jag) * cut
+      }
+    }
+  }
   // --- Фаза 6.4: Рубежный Кряж к Спорным Землям (вертикальная стена по x) ---
   // ВАЖНО: после слоёв тундры/верещатника — иначе тундра Пределья (fz=1 при x≥5750) стирает стену
   const dk = Math.abs(x - KRAJ.x)
@@ -320,6 +344,31 @@ export function heightAt(x: number, y: number): number {
     const fg = falloff(tg, 90, 80)
     h = h * (1 - fg) + 1.8 * fg
   }
+  // Плоские пятачки Внешнего Рубежа (Фаза 6.5): кратер корабля, стазис-зал, кольца, ретрансляторы, лагерь, врата
+  const tsh = inEllipse(x, y, SHIP_FLAT.x, SHIP_FLAT.y, SHIP_FLAT.rx, SHIP_FLAT.ry)
+  const fsh = falloff(tsh, 0.75, 0.55)
+  h = h * (1 - fsh) + 25.6 * fsh
+  const fst = falloff(Math.hypot(x - STASIS_FLAT.x, y - STASIS_FLAT.y), STASIS_FLAT.r * 0.7, STASIS_FLAT.r * 0.6)
+  h = h * (1 - fst) + 25.4 * fst
+  const fash = falloff(Math.hypot(x - ASHER_FLAT.x, y - ASHER_FLAT.y), ASHER_FLAT.r * 0.7, ASHER_FLAT.r * 0.6)
+  h = h * (1 - fash) + 25.8 * fash
+  const trid = inEllipse(x, y, RIDGE_FLAT.x, RIDGE_FLAT.y, RIDGE_FLAT.rx, RIDGE_FLAT.ry)
+  const frid = falloff(trid, 0.75, 0.55)
+  h = h * (1 - frid) + 32.2 * frid
+  for (const r of RINGS) {
+    const frg = falloff(Math.hypot(x - r.pos.x, y - r.pos.y), 100, 80)
+    h = h * (1 - frg) + 29.8 * frg
+  }
+  for (const r of RELAYS) {
+    const frl = falloff(Math.hypot(x - r.pos.x, y - r.pos.y), 60, 50)
+    h = h * (1 - frl) + 32.0 * frl
+  }
+  for (const g of [RB_GATES.disputedSide, RB_GATES.rubezh]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    const pad = g === RB_GATES.disputedSide ? 1.8 : 29.8
+    h = h * (1 - fg) + pad * fg
+  }
 
   return h
 }
@@ -364,6 +413,11 @@ const C_HEATH2: [number, number, number] = [0.38, 0.33, 0.17]
 const C_SCORCHRED: [number, number, number] = [0.36, 0.17, 0.11]
 const C_GROVE: [number, number, number] = [0.26, 0.34, 0.16]
 const C_GROVE2: [number, number, number] = [0.20, 0.28, 0.13]
+// Фаза 6.5: плато Внешнего Рубежа — тёмный базальт, неоновые жилы, металл колец
+const C_PLATEAU: [number, number, number] = [0.155, 0.15, 0.155]
+const C_PLATEAU2: [number, number, number] = [0.115, 0.11, 0.115]
+const C_NEON: [number, number, number] = [0.10, 0.42, 0.33]
+const C_METAL: [number, number, number] = [0.21, 0.20, 0.19]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -542,6 +596,42 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
     const dkg = Math.abs(x - KRAJ.x)
     if (dkg < 320) {
       lerp3(tmpA, C_ROCK, falloff(dkg, 70, 250) * 0.9, tmpA)
+    }
+  }
+
+  // --- Фаза 6.5: Внешний Рубеж — тёмное базальтовое плато с неоновыми жилами (после Спорных: перекрывает их за Обрывом) ---
+  if (x > RB_EDGE.x - 120) {
+    const rz = 1 - falloff(x - (RB_EDGE.x - 120), 0, 420)
+    if (rz > 0.01) {
+      // пятна базальта — тёмная холодная база плато
+      const bas = fbm(x / 240 + 221, y / 240 + 97, 3)
+      lerp3(tmpA, bas > 0.5 ? C_PLATEAU : C_PLATEAU2, rz, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      // неоновые прожилки аварийной полосы — светятся у колец и корабля
+      const vein = fbm(x / 130 + 271, y / 130 + 143, 2)
+      if (vein > 0.56) {
+        lerp3(tmpA, C_NEON, (vein - 0.56) * 2.4 * rz, tmpA)
+      }
+      // кратер «Двенадцатого» — выжженный чёрный металл
+      const dcr = Math.hypot(x - SHIP.pos.x, y - SHIP.pos.y)
+      if (dcr < 340) {
+        const burnt = 0.5 + fbm(x / 100 + 301, y / 100 + 167, 2) * 0.5
+        lerp3(tmpA, C_SCORCH, falloff(dcr, 150, 190) * burnt * rz, tmpA)
+      }
+      // посадочные кольца — вытоптанный металл разметки
+      for (const r of RINGS) {
+        const drg = Math.hypot(x - r.pos.x, y - r.pos.y)
+        if (drg < 120) {
+          lerp3(tmpA, C_METAL, falloff(drg, 60, 60) * 0.85 * rz, tmpA)
+        }
+      }
+    }
+    // Обрыв — голый камень
+    const dob = Math.abs(x - RB_EDGE.x)
+    if (dob < 320) {
+      lerp3(tmpA, C_ROCK, falloff(dob, 70, 250) * 0.9, tmpA)
     }
   }
 

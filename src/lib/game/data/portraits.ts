@@ -35,6 +35,8 @@ export const PORTRAIT_IMG: Record<string, string> = {
   Пруша: '/images/portraits/prusha.png',
   Тарбен: '/images/portraits/tarben.png',
   'Гхарз Кровавый Пёс': '/images/portraits/gharz.png',
+  // Внешний Рубеж (Фаза 6.5)
+  Ашер: '/images/portraits/asher.png',
   // Финал
   'Пожиратель Эха': '/images/portraits/devourer.png',
 }

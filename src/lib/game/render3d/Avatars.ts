@@ -797,6 +797,77 @@ function buildHordeChief(): { group: THREE.Group; refs: HumanoidRefs } {
   return built
 }
 
+// ---------------- Фаза 6.5: Внешний Рубеж ----------------
+
+/** Боевой дрон «Двенадцатого»: летающий сфероид с роторами и неон-глазом. */
+function buildDrone(): { group: THREE.Group; refs: object } {
+  const g = new THREE.Group()
+  const bodyMat = mat(0x232022, { metalness: 0.5, roughness: 0.45 })
+  const neonMat = new THREE.MeshStandardMaterial({ color: 0x0e3a2e, emissive: 0x2ee8b4, emissiveIntensity: 1.5, roughness: 0.3 })
+  // корпус на высоте (hover): меши подняты внутри группы
+  const body = new THREE.Mesh(new THREE.SphereGeometry(7.5, 10, 8), bodyMat)
+  body.position.y = 26
+  body.scale.set(1.25, 0.8, 1.25)
+  body.castShadow = true
+  g.add(body)
+  // неон-глаз наведения
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(1.7, 8, 6), neonMat)
+  eye.position.set(0, 26, 8.2)
+  g.add(eye)
+  // 4 ротора-пилона
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 8.5, 4), bodyMat)
+    arm.position.set(Math.cos(a) * 6.5, 27.4, Math.sin(a) * 6.5)
+    arm.rotation.z = Math.PI / 2
+    arm.rotation.y = -a
+    g.add(arm)
+    const rotor = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.28, 10), mat(0x191617, { roughness: 0.6 }))
+    rotor.position.set(Math.cos(a) * 10.5, 28.4, Math.sin(a) * 10.5)
+    g.add(rotor)
+  }
+  // пушка снизу
+  const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 4.6, 6), bodyMat)
+  gun.position.set(0, 20.5, 4.4)
+  gun.rotation.x = Math.PI / 2.3
+  g.add(gun)
+  const glow = new THREE.PointLight(0x2ee8b4, 55, 60, 2)
+  glow.position.y = 26
+  g.add(glow)
+  return { group: g, refs: {} }
+}
+
+/** Капитан «Двенадцатого»: истлевшее эхо в мундире с неон-линиями и сломанной антенной. */
+function buildRbCaptain(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#2a2626', 0x8a9088, { helmet: true, sword: true, scale: 1.7 })
+  const neonMat = new THREE.MeshStandardMaterial({ color: 0x0e3a2e, emissive: 0x2ee8b4, emissiveIntensity: 1.2, roughness: 0.35 })
+  // неон-линии на броне — следы корабельных систем
+  for (const sx of [-1, 1]) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(1.1, 12.5, 0.5), neonMat)
+    line.position.set(sx * 5.6, 21, 2.6)
+    built.group.add(line)
+  }
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(8.5, 2, 4.2), neonMat)
+  chest.position.set(0, 24.5, 3)
+  built.group.add(chest)
+  // сломанная антенна на шлеме
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 9, 4), mat(0x35312e, { roughness: 0.5 }))
+  antenna.position.set(3.6, 34.5, -1)
+  antenna.rotation.z = 0.5
+  built.group.add(antenna)
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.8, 6, 5), neonMat)
+  tip.position.set(5.6, 38.2, -1)
+  built.group.add(tip)
+  // глаза — неоновый свет эха
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x2ee8b4 })
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.72, 6, 4), eyeMat)
+    eye.position.set(sx * 1.8, 28.6, 4.1)
+    built.group.add(eye)
+  }
+  return built
+}
+
 // ---------------- Аватар сущности ----------------
 
 export class Avatar {
@@ -884,6 +955,12 @@ export class Avatar {
       case 'horde_chief':
         built = buildHordeChief()
         break
+      case 'drone':
+        built = buildDrone()
+        break
+      case 'rb_captain':
+        built = buildRbCaptain()
+        break
       case 'dragon':
         built = buildDragon()
         break
@@ -934,6 +1011,8 @@ export class Avatar {
     | 'raider'
     | 'hexer'
     | 'horde_chief'
+    | 'drone'
+    | 'rb_captain'
     | 'dragon'
     | 'boss'
     | 'humanoid' {
@@ -960,6 +1039,8 @@ export class Avatar {
       case 'raider': return 'raider'
       case 'hexer': return 'hexer'
       case 'horde_chief': return 'horde_chief'
+      case 'drone': return 'drone'
+      case 'rb_captain': return 'rb_captain'
       case 'dragon': return 'dragon'
       case 'boss': return 'boss'
       default: return 'humanoid'

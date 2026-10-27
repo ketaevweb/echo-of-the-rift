@@ -213,6 +213,11 @@ export interface PropDef {
     | 'lantern'
     | 'bloom'
     | 'rubble'
+    // Фаза 6.5 (Внешний Рубеж, ME2):
+    | 'ship'
+    | 'relay'
+    | 'pring'
+    | 'stasis'
   pos: Vec
   w?: number
   h?: number
@@ -267,6 +272,9 @@ export type EnemyType =
   | 'raider'
   | 'hexer'
   | 'horde_chief'
+  // Фаза 6.5 (Внешний Рубеж, ME2):
+  | 'drone'
+  | 'rb_captain'
 
 export interface InteractableDef {
   id: string

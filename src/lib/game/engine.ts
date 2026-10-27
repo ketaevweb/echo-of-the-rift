@@ -23,7 +23,7 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, zoneOf } from './data/world'
+import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, RB_GATES, zoneOf } from './data/world'
 import { sfx, setAmbient, setMuted, setVolumes } from './sfx'
 import { setVoiceVolume } from './voice'
 import { musicBoss, musicBossPhase, musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
@@ -465,8 +465,9 @@ export class GameEngine implements EngineCtx {
     if (zoneOf(this.player.pos.x, this.player.pos.y) === zone) return
     if (!this.player.alive) return
     this.zoneBusy = true
-    // Фаза 6/6.2/6.3/6.4: из Гранита назад — через врата его стороны, из Пределья — через свои,
-    // из Мары — через врата её стороны, из Спорных Земель — через свои; иначе — обычные врата
+    // Фаза 6/6.2/6.3/6.4/6.5: из Гранита назад — через врата его стороны, из Пределья — через свои,
+    // из Мары — через врата её стороны, из Спорных Земель — через свои, из Рубежа — через свои;
+    // иначе — обычные врата
     let gate =
       zone === 'veld'
         ? GATES.veld
@@ -478,7 +479,9 @@ export class GameEngine implements EngineCtx {
               ? MA_GATES.mara
               : zone === 'disputed'
                 ? DF_GATES.disputed
-                : GATES.valley
+                : zone === 'rubezh'
+                  ? RB_GATES.rubezh
+                  : GATES.valley
     const from = zoneOf(this.player.pos.x, this.player.pos.y)
     if (zone === 'valley' && from === 'granite') {
       gate = GR_GATES.valleySide
@@ -491,6 +494,9 @@ export class GameEngine implements EngineCtx {
     }
     if (zone === 'frost' && from === 'disputed') {
       gate = DF_GATES.frostSide
+    }
+    if (zone === 'disputed' && from === 'rubezh') {
+      gate = RB_GATES.disputedSide
     }
     sfx('portal')
     useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })

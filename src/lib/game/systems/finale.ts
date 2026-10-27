@@ -108,6 +108,8 @@ function killCompanion(ctx: EngineCtx, id: CompanionId) {
  *  Лоялен + одобрение ≥ 25 — жив. Лоялен + < 25 — с волны 2 бросок d20 + одобрение/10 против СЛ 15.
  *  Не лоялен — гибнет на волне своей роли (Торвальд-авангард — 1, Кайя-артиллерия — 2). */
 function survivalCheck(ctx: EngineCtx, waveNo: number) {
+  // Фаза 6.5 (ME2-подготовка): дроны Ашера прикрывают отряд — +2 к броскам выживания
+  const droneCover = !!ctx.flags.asherLoyal && !!ctx.flags.ridgeOnline
   for (const id of ['kaya', 'torvald'] as CompanionId[]) {
     const loyal = !!ctx.flags[LOYALTY_FLAG[id]]
     const approval = ctx.approval[id]
@@ -117,10 +119,11 @@ function survivalCheck(ctx: EngineCtx, waveNo: number) {
     }
     if (approval >= 25) continue
     if (waveNo < 2) continue // GDD: броски выживания — в каждой волне ≥ 2
-    const roll = d(20) + Math.floor(approval / 10)
+    const bonus = Math.floor(approval / 10) + (droneCover ? 2 : 0)
+    const roll = d(20) + bonus
     const ok = roll >= 15
     ctx.toast(
-      `${id === 'kaya' ? 'Кайя' : 'Торвальд'}: выживание волны ${waveNo} — d20+${Math.floor(approval / 10)} = ${roll} против СЛ 15 — ${ok ? 'держится' : 'едва уходит'}`,
+      `${id === 'kaya' ? 'Кайя' : 'Торвальд'}: выживание волны ${waveNo} — d20+${bonus}${droneCover ? ' (дроны Ашера)' : ''} = ${roll} против СЛ 15 — ${ok ? 'держится' : 'едва уходит'}`,
       ok ? 'quest' : 'warn',
     )
   }

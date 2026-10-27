@@ -47,10 +47,10 @@ export const LOYALTY_FLAG: Record<CompanionId, string> = {
 
 // ---------------- Пороги концовок (числа GDD 01 §6) ----------------
 
-/** Ключей-осколков в билде: 6 доменов, Внешний Рубеж (K6) ещё не построен. */
-export const KEYS_ALL = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed']
-/** Достижимый максимум ключей в текущем билде (все, кроме Внешнего Рубежа). */
-export const KEYS_GOAL = 5
+/** Ключей-осколков в билде: 6 канонных K1–K6 (после Фазы 6.5) + ключ Оплота. */
+export const KEYS_ALL = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed', 'key_rubezh']
+/** Порог концовок (GDD 01 §6: «Ключей 6/6»). */
+export const KEYS_GOAL = 6
 /** Порог средней одобрения для «Зари». */
 export const APPROVAL_GOAL = 40
 /** Порог Тиши для катастрофы. */
@@ -90,6 +90,20 @@ export function companionFates(ctx: { flags: Record<string, boolean> }): FateLin
       )
     }
   }
+  // Фаза 6.5: судьба Ашера (LOY-05) — третья строка судеб (ME2: подготовка решает эпилог)
+  if (ctx.flags.asherLoyal) {
+    out.push({
+      id: 'asher',
+      name: 'Ашер',
+      text: 'Ашер вернулся на «Двенадцатый» — уже не один. Экипаж, брошенный 12 лет назад, похоронен по именам, а его дроны теперь сторожат не полосу, а людей.',
+    })
+  } else {
+    out.push({
+      id: 'asher',
+      name: 'Ашер',
+      text: 'Ашер остался на плато: чинить корабль, который уже не взлетит, и ждать ещё одну дюжину лет. Имена экипажа он выучил сам — вслух, по ночам.',
+    })
+  }
   return out
 }
 
@@ -119,7 +133,8 @@ export function endingState(ctx: {
   approval: { kaya: number; torvald: number }
   silence: number
 }): EndingState {
-  const loyalCount = (['kaya', 'torvald'] as CompanionId[]).filter((id) => !!ctx.flags[LOYALTY_FLAG[id]]).length
+  // Фаза 6.5: Ашер (LOY-05) — третья лояльность; пороги (>=2) остались каноном билда
+  const loyalCount = (['kaya', 'torvald'] as CompanionId[]).filter((id) => !!ctx.flags[LOYALTY_FLAG[id]]).length + (ctx.flags.asherLoyal ? 1 : 0)
   return {
     keys: KEYS_ALL.filter((k) => !!ctx.flags[k]).length,
     avgApproval: Math.round((ctx.approval.kaya + ctx.approval.torvald) / 2),

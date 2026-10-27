@@ -39,6 +39,9 @@ export const PORTRAITS: Record<string, PortraitDef> = {
   Тарбен: { icon: 'Crosshair', color: '#b08356', title: 'Следопыт пустоши' },
   'Гхарз Кровавый Пёс': { icon: 'Flame', color: '#b0563a', title: 'Вожак Пепельной Орды' },
   'Семя Разлома': { icon: 'Gem', color: '#c9a3e8', title: 'Сердце Рощи' },
+  // Фаза 6.5: Внешний Рубеж
+  Ашер: { icon: 'Wrench', color: '#c9a34a', title: 'Техник Внешнего Рубежа' },
+  'Бортжурнал «Двенадцатого»': { icon: 'ScrollText', color: '#7de8c4', title: 'Корабль-призрак' },
 }
 
 export const DIALOGUES: Record<string, DialogueTree> = {
@@ -604,7 +607,7 @@ export const DIALOGUES: Record<string, DialogueTree> = {
     id: 'judgment_devourer',
     start: (c) => {
       const canRift =
-        c.keys >= 5 && c.flag('bastionHeld') && c.flag('groveSaved') && c.flag('seedBlessed') && c.flag('emberTalk') && c.silence <= 30
+        c.keys >= 6 && c.flag('bastionHeld') && c.flag('groveSaved') && c.flag('seedBlessed') && c.flag('emberTalk') && c.silence <= 30
       if (canRift) return 'intro_rift'
       if (c.silence >= 75) return 'intro_doom'
       return 'intro'
@@ -1615,6 +1618,174 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       touch: {
         speaker: 'Семя Разлома',
         text: 'Тепло пробегает под кожей — не боль, а как первый глоток воды в жару. Семя замечает тебя. Ульва права: оно может стать чем угодно. Всё решит садовник.',
+        choices: [{ text: 'Отойти.', goto: null }],
+      },
+    },
+  },
+
+  // ---------------- Фаза 6.5: Внешний Рубеж (ME2) ----------------
+
+  // Ашер — техник у корабля-призрака (вербовка истории, 4 квеста, лояльность LOY-05)
+  rubezh_asher: {
+    id: 'rubezh_asher',
+    start: (ctx) => {
+      const ship = ctx.quest('rubezh_ship')
+      const crew = ctx.quest('rubezh_crew')
+      const signal = ctx.quest('rubezh_signal')
+      const rings = ctx.quest('rubezh_rings')
+      if (!ship || ship.stage === 0) return 'greet'
+      if (!ship.done && ship.stage === 3) return 'turnin_ship'
+      if (crew && !crew.done && crew.stage === 2) return 'turnin_crew'
+      if (signal && !signal.done && signal.stage === 2) return 'turnin_signal'
+      if (rings && !rings.done && rings.stage === 2) return 'turnin_rings'
+      if (ship.stage === 1) return 'hint_log'
+      if (ship.stage === 2) return 'hint_hall'
+      if (signal && !signal.done && signal.stage === 1) return 'hint_relay'
+      return 'after'
+    },
+    nodes: {
+      greet: {
+        speaker: 'Ашер',
+        text: 'Стой ещё на шаг — дроны нервные. Ашер, техник «Двенадцатого», если такое слово вообще ещё кто-то помнит. Двенадцать лет назад корабль лёг на это плато, а я — единственный, кто вылез. Хочешь послушать? Тогда у меня для тебя работа.',
+        choices: [
+          { text: '(Взять квест «Двенадцатый»)', action: 'quest:rubezh_ship:1', goto: 'taken' },
+          { text: 'Что это за место?', goto: 'lore' },
+          { text: 'Просто мимо шёл.', goto: null },
+        ],
+      },
+      lore: {
+        speaker: 'Ашер',
+        text: 'Внешний Рубеж — край карты, за Обрывом. Эхо Дальнего Космоса: тут даже звёзды чужие. «Двенадцатый» нёс колонию-семену, но сел аварийно. Стазис-зал цел — двенадцать капсул. А капитан... капитан до сих пор исполняет приказ «держать полосу». Ходячее эхо в истлевшем мундире.',
+        choices: [
+          { text: '(Взять квест «Двенадцатый»)', action: 'quest:rubezh_ship:1', goto: 'taken' },
+          { text: 'До встречи.', goto: null },
+        ],
+      },
+      taken: {
+        speaker: 'Ашер',
+        text: 'Корабль — в кратере севернее, всему плато видно. Начни с бортжурнала у трапа: он подскажет, что с экипажем. И держись подальше от дронов-стражей — они с посадки патрулируют полосу и никого не спрашивают.',
+        choices: [{ text: 'Иду к кораблю.', goto: null }],
+      },
+      hint_log: {
+        speaker: 'Ашер',
+        text: 'Журнал — у трапа «Двенадцатого», в кратере. Без него в стазис-зал не суйся: там тише, чем должно быть.',
+        choices: [{ text: 'Понял.', goto: null }],
+      },
+      hint_hall: {
+        speaker: 'Ашер',
+        text: 'Ты прочитал журнал... Значит, знаешь. Капитан Ханна Силв всё ещё «на посту». Вход в стазис-зал — с юга корпуса. Когда встретишь её эхо — не давай ему закончить приказ. Слабое место у эхо — разум, а не броня.',
+        choices: [{ text: 'Разберусь.', goto: null }],
+      },
+      turnin_ship: {
+        speaker: 'Ашер',
+        text: 'Тишина... Впервые за двенадцать лет над плато не гудит орудие. Ты сделал то, чего я не смог: разбудил корабль и уложил эхо. Держи Ключ-осколок — я выковал его из обшивки «Двенадцатого». И золото — последняя касса экипажа.',
+        choices: [
+          { text: '(Принять награду — Ключ-осколок, 350 золота, опыт)', action: 'quest:rubezh_ship:5;key:key_rubezh;gold:350;xp:700', goto: 'ship_done' },
+        ],
+      },
+      ship_done: {
+        speaker: 'Ашер',
+        text: 'Теперь, когда капитан спит, занимайся делом: ретрансляторы на Хребте, посадочные кольца, стазис-капсулы. Всё, что мы потеряли при посадке, — вернём.',
+        choices: [
+          { text: '(Взять квест «Хребет сигналов»)', cond: 'quest.rubezh_signal==0', action: 'quest:rubezh_signal:1', goto: 'taken_signal' },
+          { text: 'Позже.', goto: null },
+        ],
+      },
+      taken_signal: {
+        speaker: 'Ашер',
+        text: 'Хребет — на юго-восток от корабля. Три ретранслятора. Синхронизируй цепь в порядке: первый, третий, второй — они так шептали с посадки. Перепутаешь — вся цепь гаснет, начинай заново.',
+        choices: [{ text: 'Слушаю.', goto: null }],
+      },
+      hint_relay: {
+        speaker: 'Ашер',
+        text: 'Порядок: первый, третий, второй. Сбился — цепь гаснет и придётся начинать с первого.',
+        choices: [{ text: 'Запомнил.', goto: null }],
+      },
+      turnin_signal: {
+        speaker: 'Ашер',
+        text: 'Слышишь этот тонкий звон? Хребет сигналов поёт! Мои дроны-разведчики вышли на плато: теперь мы видим всё, что движется. Когда пойдёшь в Сердце Разлома — эта сеть пригодится всему отряду.',
+        choices: [
+          { text: '(Принять награду — 200 золота, опыт)', action: 'quest:rubezh_signal:3;gold:200;xp:420;flag:ridgeOnline', goto: 'signal_done' },
+        ],
+      },
+      signal_done: {
+        speaker: 'Ашер',
+        text: 'Дроны уже в небе. Заодно: посадочные кольца на плато — если осмотришь разметку всех трёх, соберу карту аварийной полосы.',
+        choices: [
+          { text: '(Взять квест «Посадочные кольца»)', cond: 'quest.rubezh_rings==0', action: 'quest:rubezh_rings:1', goto: 'taken_rings' },
+          { text: 'Позже.', goto: null },
+        ],
+      },
+      taken_rings: {
+        speaker: 'Ашер',
+        text: 'Кольца — на севере и в центре плато. Разметка стёрлась, но читается: присмотрись к каждому кольцу.',
+        choices: [{ text: 'Иду.', goto: null }],
+      },
+      turnin_rings: {
+        speaker: 'Ашер',
+        text: 'Полоса... вот она, целиком. Двенадцать лет я рисовал её по памяти, а ты собрал по земле. Держи заработанное — и последнее: стазис-зал. Двенадцать капсул. Двенадцать табличек.',
+        choices: [
+          { text: '(Принять награду — 150 золота, опыт)', action: 'quest:rubezh_rings:3;gold:150;xp:260', goto: 'rings_done' },
+        ],
+      },
+      rings_done: {
+        speaker: 'Ашер',
+        text: 'Прочти каждую табличку в зале. Экипаж, брошенный двенадцать лет назад, заслуживает того, чтобы их помнили по именам. Я... я тоже там был. Но об этом — когда вернёшься с именами.',
+        choices: [
+          { text: '(Взять квест «Список экипажа»)', cond: 'quest.rubezh_crew==0', action: 'quest:rubezh_crew:1', goto: 'taken_crew' },
+          { text: 'Позже.', goto: null },
+        ],
+      },
+      taken_crew: {
+        speaker: 'Ашер',
+        text: 'Стазис-зал — с южного борта корпуса. Двенадцать капсул, двенадцать имён. Не торопись.',
+        choices: [{ text: 'Иду.', goto: null }],
+      },
+      turnin_crew: {
+        speaker: 'Ашер',
+        text: 'Орт, Кем — кадет... Ты прочитал последнюю капсулу. Кема в ней не было — я и есть Кем Орт. Кадет, который вылез из шлюпки и 12 лет чинил корабль, потому что больше некому. Теперь имена вернутся домой — все тринадцать, считая меня. Спасибо, Смотритель. Когда пойдёшь в Разлом — мои дроны пойдут с тобой.',
+        choices: [
+          {
+            text: '(Принять награду — 250 золота, опыт. Ашер — с вами в рейде)',
+            action: 'quest:rubezh_crew:3;gold:250;xp:500;flag:asherLoyal',
+            goto: 'crew_done',
+          },
+        ],
+      },
+      crew_done: {
+        speaker: 'Ашер',
+        text: 'Дроны получат твою метку — увидят в Сердце Разлома своего. Экипаж «Двенадцатого» приносит присягу, Смотритель.',
+        choices: [{ text: 'До рейда.', goto: null }],
+      },
+      after: {
+        speaker: 'Ашер',
+        text: 'Плато живое: дроны в небе, ретрансляторы поют, полоса читается. Бывает же — двенадцать лет ждать одного гостя, а потом таких как ты не сосчитать.',
+        choices: [{ text: 'До встречи, техник.', goto: null }],
+      },
+    },
+  },
+
+  // Бортжурнал «Двенадцатого» — интеракт у трапа корабля
+  rubezh_log: {
+    id: 'rubezh_log',
+    start: (ctx) => (ctx.flag('shipLogRead') ? 'reread' : 'entry'),
+    nodes: {
+      entry: {
+        speaker: 'Бортжурнал «Двенадцатого»',
+        text: '«Бортовой журнал, последний час: посадка жёсткая, ядро трещит. Приказ капитана Силв: „Всем в стазис — я держу полосу“. Дальше почерк рваный: „ДРОНЫ НЕ ОТВЕЧАЮТ. ОНИ НАС НЕ УЗНАЮТ“». Последняя запись обведена углём чужой рукой: «Кем-то выжжен костёр у трапа. Кто-то выжил».',
+        choices: [
+          { text: '(Записать данные — идти в стазис-зал)', action: 'flag:shipLogRead;quest:rubezh_ship:2;bestiary:rb_captain', goto: 'logged' },
+          { text: 'Отойти.', goto: null },
+        ],
+      },
+      logged: {
+        speaker: 'Бортжурнал «Двенадцатого»',
+        text: 'Страницы шуршат под ветром. Стазис-зал — за южным бортом корпуса. Что-то внутри капсул мерцает — и это мерцание шагает тебе навстречу.',
+        choices: [{ text: 'Иду.', goto: null }],
+      },
+      reread: {
+        speaker: 'Бортжурнал «Двенадцатого»',
+        text: '«...я держу полосу». Угольная приписка всё ещё на месте: кто-то выжил. Теперь ты знаешь кто.',
         choices: [{ text: 'Отойти.', goto: null }],
       },
     },

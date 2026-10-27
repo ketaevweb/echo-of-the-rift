@@ -20,6 +20,7 @@ import { companionIndex, formationSlot } from './party'
 import { pitMasterLogic, spawnPitMaster } from './career'
 import { blightMotherLogic } from './mara'
 import { hordeChiefLogic } from './disputed'
+import { rbCaptainLogic } from './rubezh'
 import { syncShiftProps } from './disputed'
 import { spawnDragon } from './frost'
 
@@ -555,6 +556,8 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
   if (e.enemyType === 'blight_mother') blightMotherLogic(ctx, e, dist, dt)
   // Фаза 6.4: Гхарз управляет собой полностью (рывок/рёв/призыв)
   if (e.enemyType === 'horde_chief') hordeChiefLogic(ctx, e, dist, dt)
+  // Фаза 6.5: Капитан «Двенадцатого» управляет собой полностью (лазер/EMP/дроны)
+  if (e.enemyType === 'rb_captain') rbCaptainLogic(ctx, e, dist, dt)
   // Фаза 6.2: дракон управляет собой полностью (полёт/стрейф/посадка)
   if (e.enemyType === 'dragon') return
 

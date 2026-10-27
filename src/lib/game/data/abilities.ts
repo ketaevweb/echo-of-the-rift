@@ -281,10 +281,21 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 620, ac: 14, atk: 8, dmgDice: 2, dmgSides: 8, dmgMod: 4,
     speed: 104, aggroR: 0, leashR: 9999, attackRange: 58, attackCd: 1.4, xp: 1100, radius: 24,
   },
+  // ---------------- Фаза 6.5: Внешний Рубеж ----------------
+  drone: {
+    hp: 40, ac: 12, atk: 4, dmgDice: 1, dmgSides: 6, dmgMod: 2,
+    speed: 152, aggroR: 280, leashR: 760, attackRange: 200, attackCd: 1.6, xp: 65, radius: 12, ranged: 210,
+  },
+  rb_captain: {
+    hp: 560, ac: 14, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
+    speed: 96, aggroR: 0, leashR: 9999, attackRange: 56, attackCd: 1.5, xp: 480, radius: 22,
+  },
 }
 
 export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll', 'ghoul', 'abomination', 'raider', 'hexer'])
-export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother', 'blight_mother', 'horde_chief'])
+export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother', 'blight_mother', 'horde_chief', 'drone'])
+/** Фаза 6.5: капитан «Двенадцатого» — эхо, слаб к Аксию (GDD 07 §3). */
+export const AXII_WEAK = new Set<EnemyType>(['rb_captain'])
 /** Фаза 6: панцирь скорпиона трескается от телекинеза — Аард оглушает надолго. */
 export const STUN2_WEAK = new Set<EnemyType>(['scorpion', 'pit_master'])
 /** Фаза 6.2: крики Ту'ум расшатывают мёртвую волю драугров. */

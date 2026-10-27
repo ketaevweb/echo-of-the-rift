@@ -83,6 +83,8 @@ export class Renderer3d {
   /** Фаза 6.2: снегопад Пределья (Points-облако над камерой). */
   private snow: THREE.Points
   private snowMat: THREE.PointsMaterial
+  private stars: THREE.Points
+  private starMat: THREE.PointsMaterial
 
   // Орбита камеры (Фаза 4): user-значения правит ввод, pitch/dist —
   // анимируемые текущие (лерп к целям, тактика отъезжает в изометрию)
@@ -176,6 +178,44 @@ export class Renderer3d {
     this.snow.visible = false
     this.snow.frustumCulled = false
     this.scene.add(this.snow)
+
+    // Фаза 6.5: чужие созвездия Внешнего Рубежа — статичные точки на куполе (fog off)
+    const starGeo = new THREE.BufferGeometry()
+    const SN = 520
+    const sArr = new Float32Array(SN * 3)
+    let sSeed = 991
+    const srnd = () => {
+      sSeed = (sSeed * 1664525 + 1013904223) % 4294967296
+      return sSeed / 4294967296
+    }
+    for (let i = 0; i < SN; i++) {
+      // группировка в «созвездия»: каждый 5-й — случайная точка, остальные — кластер вокруг неё
+      const cx = (srnd() - 0.5) * 2
+      const cy = srnd() * 0.85 + 0.12
+      const cz = (srnd() - 0.5) * 2
+      for (let j = 0; j < 3; j++) {
+        const isCore = i % 5 === 0 || j === 0
+        const jx = isCore ? 0 : (srnd() - 0.5) * 0.14
+        const jy = isCore ? 0 : (srnd() - 0.5) * 0.1
+        const jz = isCore ? 0 : (srnd() - 0.5) * 0.14
+        const v = new THREE.Vector3(cx + jx, cy + jy, cz + jz).normalize().multiplyScalar(1100)
+        sArr[i * 3 + j] = v.getComponent(j)
+      }
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(sArr, 3))
+    this.starMat = new THREE.PointsMaterial({
+      color: 0xd9f5e8,
+      size: 4.2,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      sizeAttenuation: false,
+      fog: false,
+    })
+    this.stars = new THREE.Points(starGeo, this.starMat)
+    this.stars.visible = false
+    this.stars.frustumCulled = false
+    this.scene.add(this.stars)
 
     this.bindOrbit()
     this.resize()
@@ -355,6 +395,7 @@ export class Renderer3d {
     const frost = zone === 'frost'
     const mara = zone === 'mara'
     const disputed = zone === 'disputed'
+    const rubezh = zone === 'rubezh'
     const dl = this.daylight
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
     this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
@@ -376,6 +417,10 @@ export class Renderer3d {
       // Спорные Земли (Фаза 6.4): тёплый вересково-пыльный туман — сухой воздух пустошей
       this.tmpColor.setRGB(0.24 + dl * 0.40, 0.20 + dl * 0.30, 0.12 + dl * 0.16)
       this.fog.density += (0.0019 - dl * 0.0007 - this.fog.density) * k
+    } else if (rubezh) {
+      // Внешний Рубеж (Фаза 6.5): чёрный космический воздух — туман почти отсутствует, звёзды видны
+      this.tmpColor.setRGB(0.045 + dl * 0.16, 0.05 + dl * 0.17, 0.05 + dl * 0.15)
+      this.fog.density += (0.00115 - dl * 0.00035 - this.fog.density) * k
     } else if (veld) {
       this.tmpColor.setRGB(0.16 + dl * 0.32, 0.19 + dl * 0.33, 0.12 + dl * 0.28) // ночь → день
       this.fog.density += (0.0023 - dl * 0.0008 - this.fog.density) * k
@@ -404,6 +449,11 @@ export class Renderer3d {
       // Небо Спорных Земель (Фаза 6.4): тёплый сухой купол, вересковый горизонт
       this.tmpColor.setRGB(0.20 + dl * 0.26, 0.17 + dl * 0.21, 0.12 + dl * 0.13)
       this.tmpColor2.setRGB(0.38 + dl * 0.46, 0.31 + dl * 0.36, 0.19 + dl * 0.22)
+    } else if (rubezh) {
+      // Небо Внешнего Рубежа (Фаза 6.5): чёрный космос с чужими созвездиями —
+      // купол почти чёрный, горизонт — тёмный глянец плато (звёзды — отдельный слой)
+      this.tmpColor.setRGB(0.012 + dl * 0.05, 0.016 + dl * 0.06, 0.014 + dl * 0.05)
+      this.tmpColor2.setRGB(0.05 + dl * 0.13, 0.07 + dl * 0.15, 0.06 + dl * 0.13)
     } else if (veld) {
       this.tmpColor.setRGB(0.10 + dl * 0.24, 0.12 + dl * 0.25, 0.10 + dl * 0.19)
       this.tmpColor2.setRGB(0.14 + dl * 0.46, 0.16 + dl * 0.44, 0.12 + dl * 0.38)
@@ -415,7 +465,7 @@ export class Renderer3d {
     hor.lerp(this.tmpColor2, k)
 
     // Свет
-    const zoneDim = frost ? 0.94 : granite ? 0.82 : disputed ? 0.88 : veld ? 0.78 : mara ? 0.72 : 1
+    const zoneDim = frost ? 0.94 : granite ? 0.82 : disputed ? 0.88 : veld ? 0.78 : mara ? 0.72 : rubezh ? 0.62 : 1
     this.sun.intensity += ((0.04 + dl * 1.55 * zoneDim) - this.sun.intensity) * k
     // цвет солнца: на низком солнце — тёплый закатный
     const dusk = Math.max(0, 1 - Math.abs(Math.sin((dayT - 0.25) * Math.PI * 2)) * 2.6)
@@ -508,7 +558,7 @@ export class Renderer3d {
     for (const e of this.avatarsSyncedEntities) {
       if (!e.alive && e.kind !== 'npc') continue
       const h = heightAt(e.pos.x, e.pos.y)
-      const headH = e.boss && e.enemyType !== 'dragon' ? 58 : e.enemyType === 'dragon' ? 76 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : e.enemyType === 'scorpion' ? 15 : e.enemyType === 'pit_master' ? 46 : e.enemyType === 'frost_troll' ? 42 : e.enemyType === 'raider' ? 18 : e.enemyType === 'hexer' ? 26 : 28
+      const headH = e.boss && e.enemyType !== 'dragon' ? 58 : e.enemyType === 'dragon' ? 76 : e.enemyType === 'wolf' || e.enemyType === 'alpha' ? 18 : e.enemyType === 'horror' ? 26 : e.enemyType === 'ash_mother' ? 82 : e.enemyType === 'ash_shade' ? 24 : e.enemyType === 'bogling' ? 12 : e.enemyType === 'scorpion' ? 15 : e.enemyType === 'pit_master' ? 46 : e.enemyType === 'frost_troll' ? 42 : e.enemyType === 'raider' ? 18 : e.enemyType === 'hexer' ? 26 : e.enemyType === 'drone' ? 30 : 28
       // Экранные координаты ног и головы
       this.tmpV.set(e.pos.x, h + 1, e.pos.y)
       this.tmpV.project(this.camera)
@@ -608,6 +658,15 @@ export class Renderer3d {
         Math.round(this.camTarget.z / 100) * 100,
       )
       this.snow.position.x += Math.sin(view.time * 0.6) * (view.zone === 'mara' ? 14 : 6)
+    }
+
+    // Фаза 6.5: чужие созвездия — видны только на плато Рубежа (fog: false)
+    const starGoal = view.zone === 'rubezh' ? 0.9 : 0
+    this.starMat.opacity += (starGoal - this.starMat.opacity) * 0.05
+    this.stars.visible = this.starMat.opacity > 0.02
+    if (this.stars.visible) {
+      this.stars.position.copy(this.camera.position)
+      this.stars.rotation.y = view.time * 0.004
     }
 
     this.renderer.render(this.scene, this.camera)

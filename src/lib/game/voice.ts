@@ -25,6 +25,7 @@ const VOICE_OF: Record<string, VoiceKind> = {
   'Мастер Ямы': 'male',
   'Пожиратель Бурь': 'male',
   'Пожиратель Эха': 'male',
+  Ашер: 'male',
   // Женские голоса
   Кайя: 'female',
   Селена: 'female',

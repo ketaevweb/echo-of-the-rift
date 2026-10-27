@@ -987,6 +987,146 @@ export class Props3d {
         if (p.id) this.removable.set(p.id, [g])
         break
       }
+
+      // --- Фаза 6.5: Внешний Рубеж (корабль-призрак, ретрансляторы, кольца, стазис) ---
+
+      case 'ship': {
+        // Обломок «Двенадцатого»: рваный корпус с неон-полосами (виден издалека)
+        const g = new THREE.Group()
+        const hullMat = groundMat(0x232022, 0.96)
+        const neonMat = new THREE.MeshStandardMaterial({ color: 0x0e3a2e, emissive: 0x2ee8b4, emissiveIntensity: 1.15, roughness: 0.4 })
+        // крупный масштаб только для основного корпуса (r 120), крыло/рубка — меньше
+        const big = (p.r ?? 44) > 100
+        const L = big ? 130 : 46
+        const hull = new THREE.Mesh(new THREE.CylinderGeometry(big ? 20 : 9, big ? 26 : 12, L, 7), hullMat)
+        hull.rotation.set(Math.PI / 2.25, 0, seedRot(p.seed ?? 1) * 0.6)
+        hull.position.y = big ? 17 : 8
+        hull.castShadow = true
+        g.add(hull)
+        // рваный срез кормы
+        const cut = new THREE.Mesh(new THREE.DodecahedronGeometry(big ? 16 : 7.5, 0), groundMat(0x191617, 0.97))
+        cut.position.set(big ? -L * 0.42 : -18, big ? 13 : 6, 2)
+        cut.castShadow = true
+        g.add(cut)
+        // неон-полосы обшивки
+        for (let i = 0; i < 3; i++) {
+          const stripe = new THREE.Mesh(new THREE.BoxGeometry(big ? 3.2 : 1.6, big ? 30 : 11, 0.7), neonMat)
+          stripe.position.set(big ? 12 + i * 14 : 5 + i * 5.5, big ? 20 - i * 5 : 9 - i * 2, (big ? 21 : 10) - i * 1.2)
+          stripe.rotation.set(0.2, 0, seedRot((p.seed ?? 1) + i) * 0.35)
+          g.add(stripe)
+        }
+        // обломки вокруг крупного корпуса
+        if (big) {
+          for (let i = 0; i < 4; i++) {
+            const a = seedRot((p.seed ?? 1) + i * 53)
+            const scrap = new THREE.Mesh(new THREE.BoxGeometry(9, 2.4, 5), groundMat(0x1e1b1c, 0.96))
+            scrap.position.set(Math.cos(a) * 55, 1.2, Math.sin(a) * 42)
+            scrap.rotation.y = a
+            scrap.castShadow = true
+            g.add(scrap)
+          }
+        }
+        place(this.group, g, x, y, 0, 0)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'relay': {
+        // Ретранслятор Хребта: мачта с неон-сферой и кольцом-антенной
+        const g = new THREE.Group()
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.5, 26, 5), groundMat(0x2a2726, 0.96))
+        mast.position.y = 13
+        mast.castShadow = true
+        g.add(mast)
+        // перекладины
+        for (let i = 0; i < 3; i++) {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(9 - i * 2.2, 0.5, 0.5), groundMat(0x35312e))
+          bar.position.y = 18 + i * 3.4
+          bar.rotation.y = seedRot((p.seed ?? 1) + i * 29) * 1.2
+          g.add(bar)
+        }
+        const orb = new THREE.Mesh(
+          new THREE.SphereGeometry(2.6, 10, 8),
+          new THREE.MeshStandardMaterial({ color: 0x0e3a2e, emissive: 0x2ee8b4, emissiveIntensity: 1.4, roughness: 0.3 }),
+        )
+        orb.position.y = 28
+        g.add(orb)
+        const halo = new THREE.Mesh(
+          new THREE.TorusGeometry(4.6, 0.42, 6, 22),
+          new THREE.MeshStandardMaterial({ color: 0x123a30, emissive: 0x2ee8b4, emissiveIntensity: 0.8, roughness: 0.4 }),
+        )
+        halo.position.y = 28
+        halo.rotation.x = Math.PI / 2.4
+        g.add(halo)
+        const glow = new THREE.PointLight(0x2ee8b4, 90, 90, 2)
+        glow.position.y = 28
+        g.add(glow)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.6)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'pring': {
+        // Посадочное кольцо: тор на земле + неон-разметка + 4 огня по кромке
+        const g = new THREE.Group()
+        const R = p.r ?? 70
+        const torus = new THREE.Mesh(
+          new THREE.TorusGeometry(R * 0.72, 1.6, 6, 40),
+          new THREE.MeshStandardMaterial({ color: 0x191817, emissive: 0x2ee8b4, emissiveIntensity: 0.5, roughness: 0.55, metalness: 0.4 }),
+        )
+        torus.rotation.x = Math.PI / 2
+        torus.position.y = 1.4
+        g.add(torus)
+        // разметка-лучи внутри кольца
+        const lineMat = new THREE.MeshStandardMaterial({ color: 0x0e3a2e, emissive: 0x2ee8b4, emissiveIntensity: 0.35, roughness: 0.7 })
+        for (let i = 0; i < 5; i++) {
+          const a = seedRot((p.seed ?? 1) + i * 67) * Math.PI * 2
+          const ray = new THREE.Mesh(new THREE.BoxGeometry(R * 0.55, 0.18, 1.4), lineMat)
+          ray.position.set(Math.cos(a) * R * 0.4, 0.12, Math.sin(a) * R * 0.4)
+          ray.rotation.y = -a
+          g.add(ray)
+        }
+        // старые огни кромки (погашенные маяки)
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + seedRot(p.seed ?? 1) * 0.5
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 5.5, 5), groundMat(0x2a2726, 0.95))
+          post.position.set(Math.cos(a) * R * 0.72, 2.7, Math.sin(a) * R * 0.72)
+          post.castShadow = true
+          g.add(post)
+        }
+        place(this.group, g, x, y, 0, 0)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'stasis': {
+        // Стазис-капсула: стеклянный цилиндр с тусклой подсветкой изнутри
+        const g = new THREE.Group()
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 5.2, 1.6, 8), groundMat(0x232022, 0.95))
+        base.position.y = 0.8
+        base.castShadow = true
+        g.add(base)
+        const pod = new THREE.Mesh(
+          new THREE.CylinderGeometry(3.4, 3.4, 9.5, 10),
+          new THREE.MeshStandardMaterial({ color: 0x1a2e28, emissive: 0x2ee8b4, emissiveIntensity: 0.22, roughness: 0.25, metalness: 0.3, transparent: true, opacity: 0.85 }),
+        )
+        pod.position.y = 6.2
+        pod.castShadow = true
+        g.add(pod)
+        const inner = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.2, 2.2, 7.2, 8),
+          new THREE.MeshStandardMaterial({ color: 0x143026, emissive: 0x2ee8b4, emissiveIntensity: 0.55, roughness: 0.4 }),
+        )
+        inner.position.y = 5.8
+        g.add(inner)
+        // табличка с именем
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.5, 0.3), new THREE.MeshStandardMaterial({ color: 0x35312e, emissive: 0x8af0d4, emissiveIntensity: 0.25, roughness: 0.5 }))
+        plate.position.set(0, 3.4, 4.6)
+        g.add(plate)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.8)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
     }
   }
 

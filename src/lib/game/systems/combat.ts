@@ -6,7 +6,7 @@
 // updateParticles/tickCds).
 // ============================================================
 
-import { ABILITY_MAP, ENEMY_STATS, FIRE_WEAK, SHOUT_WEAK, STUN2_WEAK, STUN_WEAK } from '../data/abilities'
+import { ABILITY_MAP, AXII_WEAK, ENEMY_STATS, FIRE_WEAK, SHOUT_WEAK, STUN2_WEAK, STUN_WEAK } from '../data/abilities'
 import { ITEMS } from '../data/items'
 import { BESTIARY_INFO, OIL_TARGETS } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
@@ -210,6 +210,15 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     bumpScouts(ctx, type)
   } else if (type === 'hexer') {
     goldLoot = 20 + Math.floor(Math.random() * 16)
+  } else if (type === 'rb_captain') {
+    // Фаза 6.5: Капитан «Двенадцатого» пал — приказ 12-летней давности исполнен
+    ctx.flags.captainEchoDead = true
+    goldLoot = 180
+    useGame.getState().patch({ bossBar: null })
+    ctx.toast('Капитан «Двенадцатого» упокойлась. Приказ исполнен — вернись к Ашеру.', 'quest')
+    const qs = ctx.quests.rubezh_ship
+    if (qs && !qs.done && qs.stage === 2) advanceQuest(ctx, 'rubezh_ship', 3)
+    sfx('level')
   } else if (type === 'horde_chief') {
     // Фаза 6.4: Гхарз пал — Семя переходит по праву сильного
     ctx.flags.gharzDead = true
@@ -408,7 +417,10 @@ export function castAbility(ctx: EngineCtx, id: string) {
         : nearestEnemyOf(ctx, ctx.player, 240)
     sfx('mind')
     if (t) {
-      const dur = (2.4 + signLevel * 0.5) * (STUN_WEAK.has(t.enemyType ?? 'wolf') ? 1.6 : 1)
+      // Фаза 6.5: капитан «Двенадцатого» — эхо, слаб к Аксию (GDD 07 §3)
+      const weak = STUN_WEAK.has(t.enemyType ?? 'wolf') ? 1.6 : 1
+      const ax = AXII_WEAK.has(t.enemyType ?? 'wolf') ? 2.4 : 1
+      const dur = (2.4 + signLevel * 0.5) * weak * ax
       t.stunT = Math.max(t.stunT, dur)
       floater(ctx, t.pos, 'Аксий!', '#c9a3e8', 14)
       ring(ctx, t.pos, '#c9a3e8', 24, 0.5)
