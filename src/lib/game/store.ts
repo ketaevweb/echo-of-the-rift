@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { CareerId, Faction, FormationId, InventoryEntry, OriginId, SaveData, SignId, Stance } from './types'
+import { EffQuality, GameSettings, DEFAULT_SETTINGS, readSettings } from './settings'
 
 export type Screen = 'title' | 'game'
-export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'ending'
+export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'settings' | 'credits' | 'ending'
 
 export interface PartyHud {
   eid: number
@@ -250,9 +251,15 @@ interface GameStore {
   raid: { wave: number; waves: number } | null
   // Фаза 5
   diceRoll: DiceRollHudState | null
+  // Фаза 8: настройки (зеркало localStorage), действующий пресет и FPS
+  settings: GameSettings
+  effQuality: EffQuality
+  fps: number
   setScreen: (s: Screen) => void
   setPanel: (p: PanelId) => void
   patch: (partial: Partial<GameStore>) => void
+  /** Фаза 8: заменить часть настроек (движок применит их через applySettings). */
+  updateSettings: (partial: Partial<GameSettings>) => void
   pushToast: (text: string, kind?: ToastMsg['kind']) => void
   clearToast: (id: number) => void
   setHasSave: (v: boolean) => void
@@ -293,9 +300,14 @@ export const useGame = create<GameStore>((set) => ({
   assault: null,
   raid: null,
   diceRoll: null,
+  settings: typeof window === 'undefined' ? { ...DEFAULT_SETTINGS } : readSettings(),
+  effQuality: 'medium',
+  fps: 60,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),
   patch: (partial) => set(partial),
+  updateSettings: (partial) =>
+    set((st) => ({ settings: { ...st.settings, ...partial } })),
   pushToast: (text, kind = 'info') =>
     set((st) => ({
       toasts: [...st.toasts.slice(-4), { id: toastSeq++, text, kind }],

@@ -1,0 +1,69 @@
+// ============================================================
+// ЭХО РАЗЛОМА — настройки (Фаза 8, GDD 05/06)
+// Единый источник пресетов графики и громкостей звука.
+// Хранится в localStorage, зеркалится в zustand-сторе (store.ts).
+// ============================================================
+
+/** Пресет качества графики. 'auto' — авто-даунгрейд по FPS (GDD 06 §7). */
+export type QualityId = 'low' | 'medium' | 'high' | 'auto'
+/** Действующий пресет (результат auto-даунгрейда) — только 'low'|'medium'|'high'. */
+export type EffQuality = Exclude<QualityId, 'auto'>
+
+export interface GameSettings {
+  quality: QualityId
+  musicVol: number
+  sfxVol: number
+  ambVol: number
+  muted: boolean
+}
+
+export const SETTINGS_KEY = 'echo-rift-settings'
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  quality: 'auto',
+  musicVol: 0.55,
+  sfxVol: 0.85,
+  ambVol: 0.8,
+  muted: false,
+}
+
+export function readSettings(): GameSettings {
+  if (typeof window === 'undefined') return { ...DEFAULT_SETTINGS }
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (!raw) return { ...DEFAULT_SETTINGS }
+    const p = JSON.parse(raw) as Partial<GameSettings>
+    return {
+      quality: p.quality === 'low' || p.quality === 'medium' || p.quality === 'high' || p.quality === 'auto' ? p.quality : DEFAULT_SETTINGS.quality,
+      musicVol: clamp01(p.musicVol, DEFAULT_SETTINGS.musicVol),
+      sfxVol: clamp01(p.sfxVol, DEFAULT_SETTINGS.sfxVol),
+      ambVol: clamp01(p.ambVol, DEFAULT_SETTINGS.ambVol),
+      muted: typeof p.muted === 'boolean' ? p.muted : DEFAULT_SETTINGS.muted,
+    }
+  } catch {
+    return { ...DEFAULT_SETTINGS }
+  }
+}
+
+export function writeSettings(s: GameSettings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
+  } catch {
+    /* приватный режим — игнорируем */
+  }
+}
+
+function clamp01(v: unknown, def: number): number {
+  return typeof v === 'number' && isFinite(v) ? Math.max(0, Math.min(1, v)) : def
+}
+
+/** Порядок пресетов для авто-даунгрейда: high → medium → low. */
+export function stepDown(q: EffQuality): EffQuality {
+  return q === 'high' ? 'medium' : 'low'
+}
+
+export const QUALITY_NAME: Record<EffQuality, string> = {
+  low: 'Низкое',
+  medium: 'Среднее',
+  high: 'Высокое',
+}

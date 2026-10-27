@@ -177,6 +177,7 @@ export function chooseOption(ctx: EngineCtx, i: number) {
     )
     // Фаза 5: видимый бросок (BG3) — оверлей, потом продолжение ветки
     useGame.getState().patch({ diceRoll: { label: c.check.label, roll, bonus, total, dc: c.check.dc, success } })
+    sfx('dice') // Фаза 8: стук кубика
     sfx(success ? 'quest' : 'warn')
     window.setTimeout(() => {
       if (ctx.destroyed) return

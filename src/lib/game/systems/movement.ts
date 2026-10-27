@@ -9,6 +9,7 @@ import { WORLD, RIDGE, GRIDGE, FRIDGE, MARA_RIDGE, KRAJ } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
+import { stepSfx } from '../sfx'
 import { careerRank } from './career'
 import { meleeAttack } from './combat'
 
@@ -136,6 +137,9 @@ export function separate(ctx: EngineCtx) {
   }
 }
 
+// Фаза 8: шаги по поверхностям — накопитель фазы шага героя (модульный, движок один)
+let stepT = 0
+
 export function updatePlayer(ctx: EngineCtx, dt: number) {
   const p = ctx.player
   if (!p.alive) return
@@ -185,6 +189,17 @@ export function updatePlayer(ctx: EngineCtx, dt: number) {
   const watchSpd = 1 + 0.06 * careerRank(ctx, 'watch')
   moveWithCollisions(ctx, p, p.vel.x * watchSpd, p.vel.y * watchSpd, dt)
   p.walkPhase += dt * (Math.hypot(p.vel.x, p.vel.y) > 4 ? 1 : 0.2)
+  // Фаза 8: звук поверхностей — шаг при накоплении фазы по скорости бега
+  const spd = Math.hypot(p.vel.x, p.vel.y)
+  if (spd > 14) {
+    stepT += dt * (spd / 34)
+    if (stepT >= 1) {
+      stepT = 0
+      stepSfx(ctx.zone)
+    }
+  } else {
+    stepT = 0.6 // первый шаг после остановки звучит быстро
+  }
   const inCombat = nearestEnemyOf(ctx, p, 320) !== null
   // Перк Дозора: регенерация выносливости +2/с за ранг
   ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + (inCombat ? 6 : 14) * dt + careerRank(ctx, 'watch') * 2 * dt)

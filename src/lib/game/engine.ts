@@ -24,7 +24,9 @@ import {
   Vec,
 } from './types'
 import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, zoneOf } from './data/world'
-import { sfx, setAmbient } from './sfx'
+import { sfx, setAmbient, setMuted, setVolumes } from './sfx'
+import { musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
+import { EffQuality, QUALITY_NAME, stepDown, writeSettings } from './settings'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
 import { EngineCtx, AssaultState, RaidState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
@@ -56,6 +58,7 @@ import {
 import { castAbility as castAbilitySys } from './systems/combat'
 import { bindInput as bindInputSys, unbindInput as unbindInputSys } from './systems/input'
 import { moveWithCollisions as moveWithCollisionsSys } from './systems/movement'
+import { nearestEnemyOf } from './core/entity'
 import { cycleFormation as cycleFormationSys } from './systems/party'
 import { endPitFight } from './systems/career'
 import { RUNE_INIT } from './data/frost'
@@ -95,6 +98,7 @@ export function createEngine(canvas: HTMLCanvasElement, save: SaveData | null, o
   engineInstance = new GameEngine(canvas, save, opts)
   if (typeof window !== 'undefined') {
     ;(window as unknown as { __echoEngine?: GameEngine }).__echoEngine = engineInstance
+    ;(window as unknown as { __musicDebug?: typeof musicDebug }).__musicDebug = musicDebug
   }
   return engineInstance
 }
@@ -198,6 +202,10 @@ export class GameEngine implements EngineCtx {
   /** Фаза 7: рейд в Сердце Разлома (транзитное). */
   raid: RaidState | null = null
 
+  // --- Фаза 8: действующий пресет качества (при auto — с авто-даунгрейдом) ---
+  effQuality: EffQuality = 'medium'
+  private upStreak = 0
+
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
   private mini: HTMLCanvasElement | null = null
@@ -221,6 +229,8 @@ export class GameEngine implements EngineCtx {
     else this.newGame()
     this.bindInput()
     this.resize()
+    // Фаза 8: применяем сохранённые настройки (громкости + пресет качества)
+    this.applySettings(useGame.getState().settings)
   }
 
   // ---------------- Инициализация ----------------
@@ -330,6 +340,47 @@ export class GameEngine implements EngineCtx {
   /** Автосейв по расписанию цикла. */
   autosave() {
     this.saveGame(false)
+  }
+
+  // ---------------- Фаза 8: настройки/качество/FPS ----------------
+
+  /** Применить настройки (зеркало стора) к аудио и рендеру; сохраняет в localStorage. */
+  applySettings(s = useGame.getState().settings) {
+    setMuted(s.muted)
+    setVolumes({ music: s.musicVol, sfx: s.sfxVol, amb: s.ambVol })
+    if (s.quality !== 'auto') this.effQuality = s.quality
+    this.view3d?.setQuality(this.effQuality)
+    useGame.getState().patch({ effQuality: this.effQuality })
+    writeSettings(s)
+  }
+
+  /** FPS-метр цикла: зеркало в стор + авто-даунгрейд в режиме «Авто» (GDD 06 §7). */
+  onFps(fps: number) {
+    useGame.getState().patch({ fps })
+    const q = useGame.getState().settings.quality
+    if (q !== 'auto') return
+    // Даунгрейд: среднее < 42 FPS → ступень ниже (до low)
+    if (fps < 42 && this.effQuality !== 'low') {
+      this.effQuality = stepDown(this.effQuality)
+      this.view3d?.setQuality(this.effQuality)
+      useGame.getState().patch({ effQuality: this.effQuality })
+      this.upStreak = 0
+      this.toast(`Производительность: качество снижено до «${QUALITY_NAME[this.effQuality]}»`, 'info')
+      return
+    }
+    // Апгрейд после просадки: стабильно > 55 FPS три окна подряд — ступень вверх
+    if (fps > 55 && this.effQuality !== 'high') {
+      this.upStreak++
+      if (this.upStreak >= 3) {
+        this.effQuality = this.effQuality === 'low' ? 'medium' : 'high'
+        this.upStreak = 0
+        this.view3d?.setQuality(this.effQuality)
+        useGame.getState().patch({ effQuality: this.effQuality })
+        this.toast(`Качество повышено до «${QUALITY_NAME[this.effQuality]}»`, 'info')
+      }
+    } else {
+      this.upStreak = 0
+    }
   }
 
   /** Порядок систем симуляции — см. core/Game.stepWorld. */
@@ -476,8 +527,10 @@ export class GameEngine implements EngineCtx {
     this.renderMode = mode
     this.unbindInput()
     this.inputCanvas = mode === '3d' ? this.canvas3d! : this.canvas
-    if (mode === '3d') this.view3d = new Renderer3d(this.canvas3d!)
-    else {
+    if (mode === '3d') {
+      this.view3d = new Renderer3d(this.canvas3d!)
+      this.view3d.setQuality(this.effQuality) // Фаза 8: пресет качества и в новом 3D-виде
+    } else {
       this.view3d?.dispose()
       this.view3d = null
     }
@@ -499,6 +552,7 @@ export class GameEngine implements EngineCtx {
 
   closePanel() {
     useGame.getState().setPanel(null)
+    sfx('click')
   }
 
   setStance(eid: number) {
@@ -557,6 +611,11 @@ export class GameEngine implements EngineCtx {
                 ? 'disputed'
                 : 'valley',
     )
+    // Фаза 8: музыкальный директор — домен, бой (враг рядом или волновой штурм), пауза
+    musicDomain(this.zone)
+    const storm = this.siege !== null || this.assault !== null || this.raid !== null
+    musicCombat(storm || nearestEnemyOf(this, this.player, 340) !== null)
+    musicPaused(this.tacticalPaused)
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------
@@ -579,6 +638,7 @@ export class GameEngine implements EngineCtx {
   }
 
   render() {
+    musicTick() // Фаза 8: планировщик музыки — каждый кадр
     if (this.renderMode === '3d' && this.view3d) {
       this.view3d.render({
         time: this.time,

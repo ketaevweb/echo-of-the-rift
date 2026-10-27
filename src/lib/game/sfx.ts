@@ -1,4 +1,13 @@
-// Мини-синтезатор SFX на WebAudio — без внешних ассетов
+// ============================================================
+// ЭХО РАЗЛОМА — звук (Фаза 8: шины громкости по GDD 04 §4.1)
+// Мини-синтезатор SFX на WebAudio — без внешних ассетов.
+// Шины: sfx (эффекты) / ambient (голоса доменов) / music
+// (музыкальный директор в audio/MusicDirector.ts) → master.
+// Громкости и mute живут в settings.ts (localStorage).
+// ============================================================
+
+import { ZoneId } from './core/ctx'
+
 type SfxName =
   | 'click'
   | 'hit'
@@ -17,10 +26,20 @@ type SfxName =
   | 'potion'
   | 'portal'
   | 'warn'
+  // Фаза 8: кубик d20 и шаги по поверхностям
+  | 'dice'
+  | 'step_grass'
+  | 'step_stone'
+  | 'step_snow'
+  | 'step_ash'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+let sfxBus: GainNode | null = null
+let ambBus: GainNode | null = null
+let musicBus: GainNode | null = null
 let muted = false
+let volumes = { music: 0.55, sfx: 0.85, amb: 0.8 }
 
 function ensure(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -31,9 +50,25 @@ function ensure(): AudioContext | null {
     master = ctx.createGain()
     master.gain.value = 0.22
     master.connect(ctx.destination)
+    sfxBus = ctx.createGain()
+    sfxBus.gain.value = volumes.sfx
+    sfxBus.connect(master)
+    ambBus = ctx.createGain()
+    ambBus.gain.value = volumes.amb
+    ambBus.connect(master)
+    musicBus = ctx.createGain()
+    musicBus.gain.value = volumes.music
+    musicBus.connect(master)
   }
   if (ctx.state === 'suspended') void ctx.resume()
   return ctx
+}
+
+/** Доступ аудиослоя музыки к контексту и шине (MusicDirector). */
+export function audioCore(): { ctx: AudioContext; musicBus: GainNode } | null {
+  const c = ensure()
+  if (!c || !musicBus) return null
+  return { ctx: c, musicBus }
 }
 
 export function setMuted(v: boolean) {
@@ -45,9 +80,28 @@ export function isMuted() {
   return muted
 }
 
+/** Громкости шин (0..1): музыка / эффекты / эмбиент. */
+export function setVolumes(v: { music: number; sfx: number; amb: number }) {
+  volumes = { ...v }
+  if (sfxBus) sfxBus.gain.value = volumes.sfx
+  if (ambBus) ambBus.gain.value = volumes.amb
+  if (musicBus) musicBus.gain.value = volumes.music
+}
+
+export function getVolumes() {
+  return { ...volumes }
+}
+
+// --- Фаза 8: хук музыкальных стингеров (подключает MusicDirector) ---
+type StingerKind = 'boss' | 'level' | 'quest'
+let stingerHook: ((k: StingerKind) => void) | null = null
+export function setStingerHook(fn: ((k: StingerKind) => void) | null) {
+  stingerHook = fn
+}
+
 function tone(freq: number, dur: number, type: OscillatorType, vol: number, slideTo?: number) {
   const c = ensure()
-  if (!c || !master || muted) return
+  if (!c || !sfxBus || muted) return
   const osc = c.createOscillator()
   const g = c.createGain()
   osc.type = type
@@ -58,14 +112,16 @@ function tone(freq: number, dur: number, type: OscillatorType, vol: number, slid
   g.gain.setValueAtTime(vol, c.currentTime)
   g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur)
   osc.connect(g)
-  g.connect(master)
+  g.connect(sfxBus)
   osc.start()
   osc.stop(c.currentTime + dur + 0.02)
 }
 
-function noise(dur: number, vol: number, filterFreq: number) {
+function noise(dur: number, vol: number, filterFreq: number, dest?: AudioNode) {
   const c = ensure()
-  if (!c || !master || muted) return
+  if (!c || muted) return
+  const bus = dest ?? sfxBus
+  if (!bus) return
   const len = Math.floor(c.sampleRate * dur)
   const buffer = c.createBuffer(1, len, c.sampleRate)
   const data = buffer.getChannelData(0)
@@ -79,7 +135,7 @@ function noise(dur: number, vol: number, filterFreq: number) {
   g.gain.value = vol
   src.connect(filter)
   filter.connect(g)
-  g.connect(master)
+  g.connect(bus)
   src.start()
 }
 
@@ -126,10 +182,12 @@ export function sfx(name: SfxName) {
       tone(440, 0.15, 'triangle', 0.14)
       setTimeout(() => tone(660, 0.15, 'triangle', 0.14), 120)
       setTimeout(() => tone(880, 0.3, 'triangle', 0.14), 240)
+      stingerHook?.('level')
       break
     case 'quest':
       tone(392, 0.18, 'triangle', 0.12)
       setTimeout(() => tone(587, 0.25, 'triangle', 0.12), 140)
+      stingerHook?.('quest')
       break
     case 'coin':
       tone(1200, 0.06, 'square', 0.1)
@@ -141,6 +199,7 @@ export function sfx(name: SfxName) {
     case 'boss':
       tone(70, 0.9, 'sawtooth', 0.24, 45)
       noise(0.7, 0.2, 400)
+      stingerHook?.('boss')
       break
     case 'potion':
       tone(300, 0.12, 'sine', 0.12, 500)
@@ -152,7 +211,31 @@ export function sfx(name: SfxName) {
       tone(320, 0.9, 'triangle', 0.07, 900)
       noise(0.8, 0.1, 600)
       break
+    case 'dice':
+      // Фаза 5 (BG3): кубик катится — серия щелчков, затухающих к результату
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => tone(900 + Math.random() * 700, 0.03, 'square', 0.07), i * 70 + Math.random() * 40)
+      }
+      break
+    case 'step_grass':
+      noise(0.07, 0.055, 650)
+      break
+    case 'step_stone':
+      noise(0.05, 0.06, 1600)
+      tone(140 + Math.random() * 40, 0.03, 'triangle', 0.03)
+      break
+    case 'step_snow':
+      noise(0.09, 0.065, 950)
+      break
+    case 'step_ash':
+      noise(0.08, 0.05, 420)
+      break
   }
+}
+
+/** Шаг по поверхности зоны (Фаза 8, GDD 04 §4.1 — звук поверхностей). */
+export function stepSfx(zone: ZoneId) {
+  sfx(zone === 'frost' ? 'step_snow' : zone === 'mara' ? 'step_ash' : zone === 'granite' ? 'step_stone' : zone === 'disputed' ? 'step_stone' : 'step_grass')
 }
 
 // ---------------- Эмбиент (Фаза 3): петля ветра/топей ----------------
@@ -179,7 +262,7 @@ const AMBIENT_PARAMS: Record<AmbientMode, { freq: number; q: number; gain: numbe
 /** Медленный ветер (долина) или низкий гул топей (Вельд). Вызывать регулярно. */
 export function setAmbient(mode: AmbientMode) {
   const c = ensure()
-  if (!c || !master) return
+  if (!c || !ambBus) return
   if (ambMode === mode && amb) return
   ambMode = mode
   if (!amb) {
@@ -203,7 +286,7 @@ export function setAmbient(mode: AmbientMode) {
     gain.gain.value = 0
     src.connect(filter)
     filter.connect(gain)
-    gain.connect(master)
+    gain.connect(ambBus)
     src.start()
     amb = { src, filter, gain }
   }

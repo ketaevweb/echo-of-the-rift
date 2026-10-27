@@ -375,3 +375,30 @@ Stage Summary:
 - Фаза 7 закрыта: рейд ME2 (4 волны + роли + матрица выживания), суд Пожирателя Эха (не HP-бой, дилемма с золотой секретной веткой), 5 концовок по числам GDD с приоритетом 5→4→1→2→3, судьбы компаньонов в эпилоге (3 варианта), ключи всех построенных доменов (6-й — под Внешний Рубеж).
 - DoD: все 5 концовок достижимы и проверены E2E; судьбы показываются; флаги персистентны (judged в сейве).
 - Следующий шаг по роадмапу — Фаза 8: полировка и релиз v1.0.
+
+---
+Task ID: 16
+Agent: Z.ai Code (main)
+Task: Фаза 8 — Полировка и релиз v1.0: качество-пресеты с авто-даунгрейдом, музыкальный директор, звук поверхностей, UI-звуки, настройки, титры, README.
+
+Work Log:
+- settings.ts (новый): пресеты качества (low/medium/high/auto) + громкости (музыка/эффекты/эмбиент) + mute; localStorage 'echo-rift-settings', read/write/clamp, stepDown() и QUALITY_NAME.
+- sfx.ts (реорганизация): шины громкости sfxBus/ambBus/musicBus → master (mute); setVolumes/getVolumes/audioCore(); новые звуки — 'dice' (кубик d20), шаги по поверхностям step_grass/step_stone/step_snow/step_ash + stepSfx(zone); хук setStingerHook для музыкальных стингеров (boss/level/quest дёргают и музыкальный слой).
+- audio/MusicDirector.ts (новый): горизонтальные слои по GDD 04 §4.1 — explore (пэд-аккорды домена, 6 ладов по палитрам GDD: дорийская долина, болотный минор Вельда, фригийский Гранит, sus-лад Пределья, тритоновый гул Мары, лидийские Спорные), колокольчики, combat (пульс баса ~143bpm + квинта), кроссфейд 2 с, lowpass «под водой» (620 Гц) в тактической паузе, стингеры; планировщик с lookahead 0.35 с от rAF; musicDebug() для QA.
+- Renderer3d.setQuality(): low (ratio 1, тени off) / medium (1.5, 1024) / high (dpr≤2, 2048); пересоздание shadow map + needsUpdate материалов; View3dBridge + setQuality.
+- store.ts: settings/effQuality/fps в сторе; PanelId + 'settings' | 'credits'; updateSettings().
+- core/Game.ts: FPS-метр в GameLoop (EMA, окно 3 с) → LoopHost.onFps.
+- engine.ts: applySettings() (громкости + пресет + writeSettings), onFps() — авто-даунгрейд при <42 FPS (ступень вниз, тост) и авто-апгрейд при >55 FPS три окна подряд; syncUi — musicDomain/musicCombat (враг в 340 или siege/assault/raid)/musicPaused; render() → musicTick(); closePanel — click; setRenderMode применяет пресет к новому Renderer3d; __musicDebug на window.
+- movement.ts: шаги героя по поверхностям зон (накопитель фазы по скорости).
+- quest.ts: sfx('dice') при видимом броске.
+- Panels.tsx: SettingsPanel (режим рендера, 4 пресета качества + «действует», живой FPS, 3 ползунка громкости на shadcn Slider, mute) + кнопка «Настройки» в паузе; CreditsPanel/CreditsBody (вдохновения, технологии, системы, документация, дисклеймер) + «Титры» в EndingPanel.
+- TitleScreen.tsx: метка «ВЕРСИЯ 1.0», кнопка «ТИТРЫ» с оверлеем (реэкспорт CreditsBody).
+- README.md: финализация v1.0 — статус «Фазы 0–8 закрыты», таблица доменов по факту, настройки, структура (render3d/audio/settings), бэклог после v1.0.
+- E2E (agent-browser, QA-ворот G8): титул (v1.0 + оверлей титров) → новая игра 3D; Esc → Настройки; качество Низкое → тени off, Высокое → тени on, localStorage persist; музыка: started/domain valley, бой (волк рядом) → combat=true, уход из боя → combat=false, Space → paused=true/false (lowpass); шаги при 180 кадрах ходьбы — без ошибок; панели C/M и сейв/лоад — регресс чист (позиция 833,141 восстановлена); Legacy 2D вкл/выкл из настроек — мир рендерится; авто-даунгрейд в headless (FPS 20): high → medium → low по окнам 3 с, тосты, FPS-строка красная; консоль браузера и dev.log — без ошибок; tsc + lint зелёные.
+
+Stage Summary:
+- Фаза 8 закрыта, релиз v1.0 готов: все 8 фаз роадмапа (G0–G8) пройдены.
+- Качество: авто-даунгрейд/апгрейд реально работает (проверено на 20 FPS headless), настройки персистентны.
+- Аудио: полный директор (слои/кроссфейд/пауза/стингеры), голоса доменов, шаги по 4 поверхностям, UI-звуки, кубик.
+- Титры на титуле и в концовке; README синхронизирован с GDD.
+- Следующий шаг — бэклог после v1.0 (GDD 04 §4.3): TTS-озвучка, темы боссов по фазам, ремап клавиш.

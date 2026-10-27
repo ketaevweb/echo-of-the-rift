@@ -88,6 +88,8 @@ export interface LoopHost {
   renderMinimap(): void
   /** Автосохранение (обычно saveGame(false)). */
   autosave(): void
+  /** Фаза 8: FPS-метр цикла — движок ведёт авто-даунгрейд качества (GDD 06 §7). */
+  onFps?(fps: number): void
 }
 
 const SYNC_PERIOD = 0.12 // сек между syncUi/миникартой
@@ -98,6 +100,9 @@ export class GameLoop {
   private raf = 0
   private syncT = 0
   private autosaveT = 0
+  // Фаза 8: скользящее среднее FPS (экспоненциальное) + окно оценки 3 с
+  private fpsEma = 60
+  private fpsWindow = 0
 
   constructor(private host: LoopHost) {}
 
@@ -105,6 +110,14 @@ export class GameLoop {
     const step = (t: number) => {
       if (this.host.destroyed) return
       const dt = this.clock.tick(t)
+      if (dt > 0) {
+        this.fpsEma = this.fpsEma * 0.92 + (1 / Math.max(dt, 0.0001)) * 0.08
+        this.fpsWindow += dt
+        if (this.fpsWindow >= 3) {
+          this.fpsWindow = 0
+          this.host.onFps?.(Math.round(this.fpsEma))
+        }
+      }
       if (!this.host.isFrozen() && !this.host.tacticalPaused) {
         this.host.playtime += dt
         this.host.update(dt)

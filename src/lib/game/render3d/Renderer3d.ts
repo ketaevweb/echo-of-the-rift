@@ -194,6 +194,32 @@ export class Renderer3d {
     this.tactical = on
   }
 
+  /** Фаза 8: пресет качества (GDD 05 Ф8) — pixelRatio + тени.
+   *  low: ratio 1, тени выкл; medium: 1.5, тени 1024; high: dpr≤2, тени 2048. */
+  setQuality(q: 'low' | 'medium' | 'high') {
+    if (this.disposed) return
+    const dpr = window.devicePixelRatio || 1
+    this.renderer.setPixelRatio(q === 'low' ? 1 : q === 'medium' ? Math.min(1.5, dpr) : Math.min(2, dpr))
+    this.renderer.shadowMap.enabled = q !== 'low'
+    if (q !== 'low') {
+      const size = q === 'medium' ? 1024 : 2048
+      if (this.sun.shadow.mapSize.x !== size) {
+        this.sun.shadow.mapSize.set(size, size)
+        // смена размера карты требует пересоздания shadow map
+        this.sun.shadow.map?.dispose()
+        this.sun.shadow.map = null
+      }
+    }
+    // пересоздание программ материалов после переключения теней
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.material) return
+      if (Array.isArray(mesh.material)) mesh.material.forEach((m) => (m.needsUpdate = true))
+      else mesh.material.needsUpdate = true
+    })
+    this.resize()
+  }
+
   private bindOrbit() {
     const c = this.canvas
     c.addEventListener('pointerdown', this.onOrbitDown)

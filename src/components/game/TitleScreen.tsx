@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { ChevronDown, ChevronUp, Play, RotateCcw, Swords } from 'lucide-react'
+import { ChevronDown, ChevronUp, Play, RotateCcw, ScrollText, Swords, X } from 'lucide-react'
 import { boot, ORIGINS, useGame } from '@/lib/game/store'
+import { CreditsBody } from './Panels'
 import { GameIcon } from './GameIcon'
 
 const INSPIRED = ['The Witcher 3', 'Dragon Age: Origins', 'Skyrim', "Baldur's Gate 3", 'Gothic 2', 'Mass Effect 2']
@@ -23,6 +24,7 @@ export default function TitleScreen() {
   const hasSave = useGame((s) => s.hasSave)
   const [confirmNew, setConfirmNew] = useState(false)
   const [showControls, setShowControls] = useState(false)
+  const [showCredits, setShowCredits] = useState(false)
   const [origin, setOrigin] = useState(boot.origin)
 
   const start = (mode: 'new' | 'continue') => {
@@ -53,6 +55,7 @@ export default function TitleScreen() {
           <h1 className="game-title-font mt-3 text-5xl font-bold leading-none text-[#f5e6c4] drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)] sm:text-7xl">
             ЭХО РАЗЛОМА
           </h1>
+          <p className="mt-1.5 text-xs tracking-[0.3em] text-[#9a8f78]">ВЕРСИЯ 1.0</p>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-[#cfc0a0] sm:text-base">
             РПГ-прототип, сотканный из шести великих игр: ведьмачьи знаки и контракты, тактический отряд
             Dragon Age, северный мир и крики силы, кубики d20 Baldur&apos;s Gate, наставники Готики
@@ -134,14 +137,23 @@ export default function TitleScreen() {
             )}
           </div>
 
-          {/* Управление */}
-          <button
-            onClick={() => setShowControls((v) => !v)}
-            className="mt-6 flex items-center gap-2 text-xs tracking-widest text-[#9a8f78] transition hover:text-[#d9a441]"
-          >
-            {showControls ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            УПРАВЛЕНИЕ И ОСОБЕННОСТИ
-          </button>
+          {/* Управление и титры (Фаза 8) */}
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <button
+              onClick={() => setShowControls((v) => !v)}
+              className="flex items-center gap-2 text-xs tracking-widest text-[#9a8f78] transition hover:text-[#d9a441]"
+            >
+              {showControls ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              УПРАВЛЕНИЕ И ОСОБЕННОСТИ
+            </button>
+            <button
+              onClick={() => setShowCredits(true)}
+              className="flex items-center gap-2 text-xs tracking-widest text-[#9a8f78] transition hover:text-[#d9a441]"
+            >
+              <ScrollText className="h-4 w-4" />
+              ТИТРЫ
+            </button>
+          </div>
           {showControls && (
             <div className="mt-3 grid max-w-xl gap-4 rounded border border-[#5a4632]/70 bg-[#181410]/90 p-4 text-xs text-[#cfc0a0] sm:grid-cols-2">
               <div>
@@ -169,6 +181,25 @@ export default function TitleScreen() {
           )}
         </div>
       </main>
+
+      {/* Титры (Фаза 8) */}
+      {showCredits && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="game-panel game-scroll max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-lg p-5">
+            <div className="mb-3 flex items-center justify-between border-b border-[#5a4632] pb-3">
+              <h2 className="game-title-font text-lg tracking-[0.25em] text-[#f5c96b]">ТИТРЫ</h2>
+              <button
+                onClick={() => setShowCredits(false)}
+                className="rounded border border-[#5a4632] p-1.5 text-[#9a8f78] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+                aria-label="Закрыть титры"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <CreditsBody />
+          </div>
+        </div>
+      )}
 
       {/* Нижняя строка */}
       <footer className="absolute inset-x-0 bottom-0 z-10 border-t border-[#5a4632]/50 bg-[#12100c]/80 px-6 py-3 backdrop-blur-sm">

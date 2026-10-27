@@ -94,6 +94,8 @@ export interface View3dBridge {
   getCameraYaw(): number
   /** Фаза 4: изометрический отъём камеры в тактической паузе. */
   setTactical(on: boolean): void
+  /** Фаза 8: пресет качества графики (pixelRatio + тени). */
+  setQuality(q: 'low' | 'medium' | 'high'): void
   resize(): void
   dispose(): void
 }

@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Coins, ScrollText, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Slider } from '@/components/ui/slider'
 import { getEngine, BESTIARY_INFO } from '@/lib/game/engine'
 import { ITEMS } from '@/lib/game/data/items'
 import { isMuted, setMuted } from '@/lib/game/sfx'
+import { EffQuality, GameSettings, QUALITY_NAME, QualityId } from '@/lib/game/settings'
 import { boot, useGame } from '@/lib/game/store'
 import { GameIcon } from './GameIcon'
 
@@ -451,9 +453,7 @@ function PausePanel() {
         <MenuBtn onClick={reloadContinue} disabled={!hasSave}>
           Загрузить последнее сохранение
         </MenuBtn>
-        <MenuBtn onClick={() => getEngine()?.setRenderMode(renderMode === '3d' ? '2d' : '3d')}>
-          Графика: {renderMode === '3d' ? '3D (Three.js)' : 'Legacy 2D'}
-        </MenuBtn>
+        <MenuBtn onClick={() => getEngine()?.openPanel('settings')}>Настройки</MenuBtn>
         <MenuBtn
           onClick={() => {
             const v = !muted
@@ -484,6 +484,191 @@ function PausePanel() {
           Выйти в главное меню
         </MenuBtn>
       </div>
+    </Panel>
+  )
+}
+
+// ---------------- Фаза 8: настройки (GDD 06 §2/§7) ----------------
+
+const QUALITY_OPTS: Array<{ id: QualityId; name: string }> = [
+  { id: 'auto', name: 'Авто' },
+  { id: 'high', name: 'Высокое' },
+  { id: 'medium', name: 'Среднее' },
+  { id: 'low', name: 'Низкое' },
+]
+
+function VolSlider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
+      <div className="flex items-center justify-between text-sm text-[#e8d5a8]">
+        <span>{label}</span>
+        <span className="tabular-nums text-[#f5c96b]">{Math.round(value * 100)}%</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={0}
+        max={1}
+        step={0.05}
+        onValueChange={(v) => onChange(v[0] ?? 0)}
+        className="mt-2 [&_[data-slot=slider-track]]:bg-[#3a2e20] [&_[data-slot=slider-range]]:bg-[#d9a441]"
+        aria-label={label}
+      />
+    </div>
+  )
+}
+
+function SettingsPanel() {
+  const settings = useGame((s) => s.settings)
+  const effQuality = useGame((s) => s.effQuality)
+  const fps = useGame((s) => s.fps)
+  const renderMode = useGame((s) => s.renderMode)
+  const apply = (partial: Partial<GameSettings>) => {
+    useGame.getState().updateSettings(partial)
+    getEngine()?.applySettings()
+  }
+  return (
+    <Panel title="Настройки" subtitle="Эхо Разлома · v1.0">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">ГРАФИКА</p>
+          <Row>
+            <span className="text-sm text-[#e8d5a8]">Режим рендера</span>
+            <button
+              onClick={() => getEngine()?.setRenderMode(renderMode === '3d' ? '2d' : '3d')}
+              className="rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-3 py-1.5 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25"
+            >
+              {renderMode === '3d' ? '3D (Three.js)' : 'Legacy 2D'}
+            </button>
+          </Row>
+          <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#e8d5a8]">Качество</span>
+              <span className="text-[11px] text-[#8a8068]">
+                действует: <b className="text-[#c9b06b]">{QUALITY_NAME[effQuality as EffQuality]}</b>
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
+              {QUALITY_OPTS.map((q) => (
+                <button
+                  key={q.id}
+                  onClick={() => apply({ quality: q.id })}
+                  aria-pressed={settings.quality === q.id}
+                  className={`rounded border px-2 py-1.5 text-xs transition ${
+                    settings.quality === q.id
+                      ? 'border-[#d9a441] bg-[#d9a441]/15 text-[#f5c96b]'
+                      : 'border-[#5a4632] text-[#cfc0a0] hover:border-[#8a7a5a]'
+                  }`}
+                >
+                  {q.name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-[#8a8068]">
+              «Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.
+            </p>
+          </div>
+          <Row>
+            <span className="text-sm text-[#e8d5a8]">FPS</span>
+            <span className={`text-sm font-bold tabular-nums ${fps >= 50 ? 'text-[#8fc98a]' : fps >= 40 ? 'text-[#e8c56b]' : 'text-[#e08a6b]'}`}>
+              {fps}
+            </span>
+          </Row>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">ЗВУК</p>
+          <VolSlider label="Музыка" value={settings.musicVol} onChange={(v) => apply({ musicVol: v })} />
+          <VolSlider label="Эффекты" value={settings.sfxVol} onChange={(v) => apply({ sfxVol: v })} />
+          <VolSlider label="Эмбиент" value={settings.ambVol} onChange={(v) => apply({ ambVol: v })} />
+          <Row>
+            <span className="text-sm text-[#e8d5a8]">Общий звук</span>
+            <button
+              onClick={() => apply({ muted: !settings.muted })}
+              className="rounded border border-[#5a4632] px-3 py-1.5 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+            >
+              {settings.muted ? 'Выключен' : 'Включён'}
+            </button>
+          </Row>
+        </div>
+        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3 text-[12px] leading-relaxed text-[#a89a7d]">
+          <p className="mb-1 font-semibold text-[#c9b06b]">Управление</p>
+          WASD / ЛКМ — движение · 1–4 знаки · Q/E — зелья · F — взаимодействие · Пробел — тактическая пауза ·
+          V — строй · Tab — цель · C/I/J/M — панели · Esc — меню
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+// ---------------- Фаза 8: титры (GDD 04 §6) ----------------
+
+export function CreditsBody() {
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div className="text-center">
+        <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">ЭХО РАЗЛОМА</p>
+        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">ВЕРСИЯ 1.0 · ФАЗЫ 0–8 ЗАКРЫТЫ</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ВДОХНОВЕНИЯ</p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
+            <li>The Witcher 3 — знаки, контракты, бестиарий</li>
+            <li>Dragon Age: Origins — отряд и тактическая пауза</li>
+            <li>Skyrim — мир Севера и крики силы</li>
+            <li>Baldur&apos;s Gate 3 — d20 и броски с кубиком</li>
+            <li>Gothic 2 — наставники и очки обучения</li>
+            <li>Mass Effect 2 — диалоги, таймеры, рейд-финал</li>
+          </ul>
+        </div>
+        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ТЕХНОЛОГИИ</p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
+            <li>Next.js 16 · TypeScript 5 · App Router</li>
+            <li>Three.js — 3D-мир и свет</li>
+            <li>Zustand · Tailwind CSS 4 · shadcn/ui</li>
+            <li>WebAudio — синтез звука и адаптивная музыка</li>
+            <li>canvas 2D — легаси-рендер и миникарта</li>
+          </ul>
+        </div>
+        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">СИСТЕМЫ</p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
+            <li>d20-ядро, диалоги с проверками и таймерами</li>
+            <li>Партия: приказы, строи, одобрение, синергии</li>
+            <li>Шесть доменов со своими правилами</li>
+            <li>Финал: рейд, суд Пожирателя, 5 концовок</li>
+            <li>Сейвы с версионированием и автосейв</li>
+          </ul>
+        </div>
+        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ДОКУМЕНТАЦИЯ</p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
+            <li>GDD v2.0 — 10 документов (docs/GDD)</li>
+            <li>Видение, лор, мир, системы, роадмап</li>
+            <li>UI/UX, контент, QA-ворота G0–G8, глоссарий</li>
+            <li>PDF-книга GDD в docs/</li>
+          </ul>
+        </div>
+      </div>
+      <p className="text-center text-[11px] italic text-[#8a8068]">
+        Фанатский некоммерческий прототип. Все права на упомянутые игры принадлежат их правообладателям.
+      </p>
+    </div>
+  )
+}
+
+function CreditsPanel() {
+  return (
+    <Panel title="Титры" wide>
+      <CreditsBody />
     </Panel>
   )
 }
@@ -551,10 +736,11 @@ function EndingPanel() {
             </div>
           ))}
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <MenuBtn primary onClick={() => getEngine()?.closePanel()}>
             Свободная игра
           </MenuBtn>
+          <MenuBtn onClick={() => getEngine()?.openPanel('credits')}>Титры</MenuBtn>
           <MenuBtn
             onClick={() => {
               getEngine()?.toTitle()
@@ -584,6 +770,10 @@ export default function Panels() {
       return <TrainerPanel />
     case 'map':
       return <MapPanel />
+    case 'settings':
+      return <SettingsPanel />
+    case 'credits':
+      return <CreditsPanel />
     case 'pause':
       return <PausePanel />
     case 'ending':
