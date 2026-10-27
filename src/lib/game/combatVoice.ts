@@ -2,7 +2,8 @@
 // ЭХО РАЗЛОМА — воспроизведение боевых реплик (v1.4, GDD 04 §4.3)
 // Барки — короткие реплики поверх боя. В отличие от диалоговой
 // озвучки (voice.ts) играют МГНОВЕННО: аудио — статичные WAV из
-// public/audio/combat/ (пайплайн scripts/gen-combat-voice.ts).
+// public/audio/combat/ (RU, канон) и public/audio/combat/en/
+// (v1.8 — EN-варианты того же пайплайна, флаг --en генератора).
 // Правила (чтобы не было «какаду»):
 //  · глобальный кулдаун 2.5 с (спавн босса — исключение, глушит барк);
 //  · кулдаун на пул (lowhp 30 с, kill 20 с, synergy 3 с, down 6 с, boss 8 с);
@@ -13,7 +14,13 @@
 // ============================================================
 
 import { useGame } from './store'
+import { getLocale, t } from './i18n'
 import { allCombatLines, BarkEvent, BOSS_SPAWN_LINES, COMPANION_LINES, CombatLine, CompanionId } from './data/combatVoice'
+
+/** v1.8: путь WAV по локали — EN-локаль слушает EN-набор (RU — канон-фолбэк). */
+function lineSrc(line: CombatLine): string {
+  return getLocale() === 'en' ? line.src.replace('/audio/combat/', '/audio/combat/en/') : line.src
+}
 
 const GLOBAL_CD = 2.5
 const POOL_CD: Record<Exclude<BarkEvent, 'spawn'>, number> = {
@@ -54,7 +61,7 @@ function playLine(line: CombatLine, event: BarkEvent) {
   const s = useGame.getState().settings
   if (!s.voiceOn || s.voiceVol <= 0) return
   try {
-    const el = new Audio(line.src)
+    const el = new Audio(lineSrc(line))
     el.volume = Math.max(0, Math.min(1, s.voiceVol))
     el.onplay = () => {
       playing = true
@@ -78,7 +85,7 @@ function playLine(line: CombatLine, event: BarkEvent) {
         playing = false
       }
     })
-    lastBark = { event, id: line.id, text: line.text, at: Date.now() }
+    lastBark = { event, id: line.id, text: t(line.text), at: Date.now() }
   } catch {
     /* аудио недоступно — бой важнее */
   }
@@ -154,14 +161,14 @@ export function resetBossBark() {
   prevBossType = null
 }
 
-/** Прелоад статичных WAV (вызывается при старте движка — после клика игрока). */
+/** Прелоад статичных WAV текущей локали (вызывается при старте движка — после клика игрока). */
 export function preloadCombatVoice() {
   if (typeof window === 'undefined') return
   try {
     for (const l of ALL_LINES) {
       const a = new Audio()
       a.preload = 'auto'
-      a.src = l.src
+      a.src = lineSrc(l)
       void a.load()
     }
   } catch {

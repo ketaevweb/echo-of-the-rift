@@ -92,7 +92,7 @@ say "SWITCH BACK TO RU IN GAME"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Русский'); b.click(); return 'clicked'; })()" >/dev/null
 sleep 1.5
 echo -n "settings ru: "
-agent-browser eval "(() => { const t=document.body.innerText; return JSON.stringify({ title: t.includes('НАСТРОЙКИ'), gfx: t.includes('ГРАФИКА'), hint: t.includes('озвучка реплик остаётся русской') }); })()"
+agent-browser eval "(() => { const t=document.body.innerText; return JSON.stringify({ title: t.includes('НАСТРОЙКИ'), gfx: t.includes('ГРАФИКА'), hint: t.includes('озвучиваются на языке интерфейса') }); })()"
 agent-browser eval "window.__echoEngine.closePanel(); 'closed'"
 sleep 1.5
 echo -n "hud ru: "

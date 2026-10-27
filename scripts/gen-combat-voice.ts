@@ -1,17 +1,20 @@
 /**
- * Task 20 — v1.4 «Озвучка боя».
+ * Task 20 — v1.4 «Озвучка боя»; v1.8 — EN-набор (--en).
  * Генерирует боевые реплики (барки) через z-ai-web-dev-sdk (ТОЛЬКО бэкенд)
- * и кладёт WAV в public/audio/combat/. Источник текстов — data/combatVoice.ts
- * (единый источник: UI и генератор читают одни и те же строки).
+ * и кладёт WAV в public/audio/combat/ (RU, канон) либо public/audio/combat/en/
+ * (EN, флаг --en). Источник текстов — data/combatVoice.ts (единый источник);
+ * EN-текст резолвится по словарю dict/systems.ts (ключ = RU-текст).
  *
- * Использование: bun scripts/gen-combat-voice.ts [id1 id2 ...]
+ * Использование: bun scripts/gen-combat-voice.ts [--en] [id1 id2 ...]
  * Без аргументов — все недостающие. Идемпотентен: существующие файлы скипает.
  */
 import ZAI from 'z-ai-web-dev-sdk'
 import fs from 'fs'
 import path from 'path'
+import { EN } from '../src/lib/game/data/i18n-en'
 
-const OUT_DIR = path.join(process.cwd(), 'public', 'audio', 'combat')
+const RU_DIR = path.join(process.cwd(), 'public', 'audio', 'combat')
+const EN_DIR = path.join(RU_DIR, 'en')
 
 const VOICES = { male: 'xiaochen', female: 'tongtong' } as const
 
@@ -51,8 +54,8 @@ const SPECS: Spec[] = [
   { id: 'boss-captain-2', voice: 'male', text: 'Двенадцатый не отступает.' },
 ]
 
-async function genOne(zai: Awaited<ReturnType<typeof ZAI.create>>, spec: Spec): Promise<string> {
-  const out = path.join(OUT_DIR, `${spec.id}.wav`)
+async function genOne(zai: Awaited<ReturnType<typeof ZAI.create>>, spec: Spec, outDir: string): Promise<string> {
+  const out = path.join(outDir, `${spec.id}.wav`)
   if (fs.existsSync(out)) return 'skip'
 
   let lastErr = ''
@@ -79,9 +82,22 @@ async function genOne(zai: Awaited<ReturnType<typeof ZAI.create>>, spec: Spec): 
 }
 
 async function main() {
+  // v1.8: флаг --en — EN-набор (текст из словаря по RU-ключу, та же папка идентификаторов)
+  const argv = process.argv.slice(2)
+  const en = argv.includes('--en')
+  const OUT_DIR = en ? EN_DIR : RU_DIR
   fs.mkdirSync(OUT_DIR, { recursive: true })
-  const only = process.argv.slice(2)
-  const queue = only.length ? SPECS.filter((s) => only.includes(s.id)) : SPECS
+  const only = argv.filter((a) => a !== '--en')
+  let queue = only.length ? SPECS.filter((s) => only.includes(s.id)) : SPECS
+  if (en) {
+    // в EN-режиме текст берётся из словаря; без перевода — жёсткая ошибка (не молчаливый RU-фолбэк)
+    const missing = queue.filter((s) => !EN[s.text] || EN[s.text] === s.text)
+    if (missing.length) {
+      console.error('Нет EN-перевода в словаре для:', missing.map((s) => `${s.id} «${s.text}»`).join(', '))
+      process.exit(1)
+    }
+    queue = queue.map((s) => ({ ...s, text: EN[s.text] }))
+  }
   if (queue.length === 0) {
     console.error('Нет совпадений по id:', only.join(', '))
     process.exit(1)
@@ -90,7 +106,7 @@ async function main() {
   let done = 0
   const failures: string[] = []
   for (const spec of queue) {
-    const r = await genOne(zai, spec)
+    const r = await genOne(zai, spec, OUT_DIR)
     done++
     console.log(`[${done}/${queue.length}] ${spec.id}: ${r}`)
     if (r.startsWith('FAIL')) failures.push(spec.id)
