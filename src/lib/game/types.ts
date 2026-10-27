@@ -155,6 +155,9 @@ export interface DialogueCtx {
   has: (item: string, qty?: number) => boolean
   lp: number
   gold: number
+  /** Фаза 7: условия суда — Тишь (0..100) и счёт ключей-осколков (0..6). */
+  silence: number
+  keys: number
 }
 
 export interface PortraitDef {

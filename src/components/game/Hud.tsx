@@ -125,6 +125,7 @@ export default function Hud() {
   const shouts = useGame((s) => s.shouts)
   const siege = useGame((s) => s.siege)
   const assault = useGame((s) => s.assault)
+  const raid = useGame((s) => s.raid)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -235,6 +236,18 @@ export default function Hud() {
           </p>
           <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
             Не пропусти мародёров к сердцу Рощи — Space для приказов
+          </p>
+        </div>
+      )}
+
+      {/* Рейд в Сердце Разлома (Фаза 7): 4 волны эха + роли отряда */}
+      {raid && (
+        <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#a06bd9]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
+          <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#c9a3e8]">
+            РЕЙД · ВОЛНА {Math.min(raid.wave + 1, raid.waves)}/{raid.waves}
+          </p>
+          <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
+            Торвальд — авангард, Кайя — артиллерия. Держите сердце Разлома
           </p>
         </div>
       )}

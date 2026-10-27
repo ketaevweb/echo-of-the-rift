@@ -320,7 +320,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
   { id: 'alpha', enemy: 'alpha', pos: { x: 720, y: 450 } },
   { id: 'captain', enemy: 'captain', pos: { x: 2590, y: 1690 } },
-  { id: 'boss', enemy: 'boss', pos: { x: 2950, y: 270 } },
+  // Фаза 7: босс Разлома убран из спавна — Пожиратель Эха является только на суд после 4 волн рейда
 ]
 
 export const INTERACTABLES: InteractableDef[] = [

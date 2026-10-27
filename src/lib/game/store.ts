@@ -119,7 +119,13 @@ export interface ToastMsg {
 }
 
 export interface EndingHudState {
+  /** Фаза 7: id и имя концовки (GDD 01 §6) + цвет акцента. */
+  id: string
+  name: string
+  color: string
   epilogue: string[]
+  /** Судьбы компаньонов (погиб / жив-герой / жив-сломлен). */
+  fates: Array<{ name: string; text: string }>
   stats: Array<[string, string]>
 }
 
@@ -240,6 +246,8 @@ interface GameStore {
   siege: { wave: number; waves: number; gateHp: number } | null
   // Фаза 6.4: набег Орды на Рощу (волны)
   assault: { wave: number; waves: number } | null
+  // Фаза 7: рейд в Сердце Разлома (волны)
+  raid: { wave: number; waves: number } | null
   // Фаза 5
   diceRoll: DiceRollHudState | null
   setScreen: (s: Screen) => void
@@ -283,6 +291,7 @@ export const useGame = create<GameStore>((set) => ({
   shouts: [],
   siege: null,
   assault: null,
+  raid: null,
   diceRoll: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),

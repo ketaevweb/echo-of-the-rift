@@ -27,7 +27,7 @@ import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATE
 import { sfx, setAmbient } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
-import { EngineCtx, AssaultState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
+import { EngineCtx, AssaultState, RaidState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
 import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
@@ -158,6 +158,8 @@ export class GameEngine implements EngineCtx {
   targetEid: number | null = null
   time = 0
   endingAt: number | null = null
+  /** Фаза 7: выбранная в суде концовка. */
+  pendingEndingId: string | null = null
   currentArea = ''
   destroyed = false
   buffT = 0
@@ -193,6 +195,8 @@ export class GameEngine implements EngineCtx {
 
   // --- Фаза 6.4: Спорные Земли (набег Орды, транзитное — не сейвится) ---
   assault: AssaultState | null = null
+  /** Фаза 7: рейд в Сердце Разлома (транзитное). */
+  raid: RaidState | null = null
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D

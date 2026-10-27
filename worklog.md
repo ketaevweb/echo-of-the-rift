@@ -352,3 +352,26 @@ Stage Summary:
 - Фаза 6.4 закрыта полностью: домен BG3 «выборы, меняющие ландшафт» работает end-to-end (диалог → флаг → физическая перестройка мира → персистентность), набег Орды — волновой штурм с приказами партии, Гхарз — босс с телеграфами и фазами.
 - GDD v2.0 (10 документов + PDF) — канон и баланс проекта в репо.
 - Условный прогресс по роадмапу: Фазы 0–5 закрыты, Фаза 6: домены 6.1 Гранит/6.2 Пределье/6.3 Мара/6.4 Спорные закрыты; осталась Фаза 7 (финал) и Фаза 8 (полировка/релиз).
+
+---
+Task ID: 15
+Agent: Z.ai Code (main)
+Task: Фаза 7 — Финал (ME2): рейд в Сердце Разлома, суд Пожирателя Эха, 5 концовок, судьбы отряда.
+
+Work Log:
+- data/finale.ts (новый): RAID_HEART/RAID_TRIGGER/RAID_BREAK, RAID_WAVES 4 волны (1 Авангард horrors, 2 Артиллерия shades+hexer, 3 Медик abom+ghouls, 4 Проводник draugr+horror), RAID_ROLES (Торвальд-авангард/в1, Кайя-артиллерия/в2), LOYALTY_FLAG (Торвальд=bastionHeld «пока держится сталь», Кайя=groveSaved «голос из рощи» — адаптация GDD к построенному контенту), 5 концовок ENDINGS с числами GDD 01 §6 (Раскол вечности → Тишь → Заря → Печать → Эхо; KEYS_GOAL=5 — Внешний Рубеж K6 ещё не построен), companionFates 3 варианта × 2 компаньона, endingState().
+- systems/finale.ts (новый): startRaid (идемпотент, партия в hold у сердца, quest raid → 2), spawnRaidEnemy (кромка арены, zoneId 'raid'), survivalCheck — матрица GDD 07 §7 (лоялен+одобрение ≥25 — жив; лоялен+<25 — с волны 2 бросок d20+одобрение/10 против СЛ 15 с тостом; не лоялен — гибнет на волне роли), killCompanion (flags.<id>Dead), startJudgment (Пожиратель Эха как npc-интеракт + авто-диалог), resolveEnding (явный выбор: merge→Эхо/rift→Раскол/silence→Тишь; seal→цепочка приоритетов 5→4→1→2→3), updateFinale (триггер близости <400 при main stage 5 + barrierOpen, волны/паузы как в набеге), raidHud.
+- Квесты: MQ-08 'raid' «Сердце Разлома» (4 стадии) и MQ-09 'judgment' «Суд Пожирателя» (2 стадии) в QUESTS; main stage 5 переписан на рейд.
+- Ключи доменов (GDD 07 §1): ITEMS + key_valley/key_veld/key_frost/key_mara; grantKey() в quest.ts (флаг+предмет+тост «собрано N из 6»); гранты: checkProof→key_valley, ash_mother kill→key_veld, runeDoorOpen→key_frost, siegeVictory→key_mara.
+- Суд: dialogues.ts judgment_devourer (динамический start: intro_rift при секретах+лояльностях+ключах 5+silence≤30; intro_doom при silence≥75 с выбором «Опустить руки»; базовый intro — seal/merge), action 'ending:*' в quest.ts (case 'ending' → resolveEnding); dialogueCtx расширен silence+keys (+DialogueCtx в types).
+- Канон GDD 09 §3: Пожиратель Бурь → Пожиратель Эха (ENEMY_NAME.boss, BESTIARY_INFO, портырет, лор Селены); UNIQUE_SPAWNS boss убран (суд — не HP-бой), старый хук boss_intro в ai.ts удалён, kill 'boss' больше не триггерит финал.
+- openEnding rework: def из ENDINGS (имя/цвет/intro), судьбы компаньонов companionFates, статы с KEYS_ALL (N/6), grove/silence-строки гейтятся для концовки Тишь; store EndingHudState {id,name,color,epilogue,fates,stats}; Panels EndingPanel — заголовок «КОНЦОВКА: ИМЯ», блок «СУДЬБЫ ОТРЯДА»; Hud — панель «РЕЙД · ВОЛНА N/4»; uiSync — raidHud + raid/judgment в трекере побочек.
+- Game.ts: updateFinale(ctx, dt) после updateDisputed.
+- Багфиксы по ходу E2E: ① survivalCheck вызывался только с волны 2 — смерть за нелояльность на волне роли (Торвальд/в1) не срабатывала → вызов с каждой волной, броски approval только с ≥2; ② updateCompanion авто-поднимал павших → судная смерть игнорировалась → guard по flags.<id>Dead (спутник не встаёт).
+- E2E agent-browser (5 концовок + матрица выживания): рейд стартует по триггеру, HUD «РЕЙД · ВОЛНА N/4», 4 волны отбиты (Игни-цикл + pump update(0.016) под троттлингом фоновой вкладки); суд открылся сам после 4-й волны; смерть Торвальда на волне 1 при bastionHeld=false (флаг+тост, возрождение заблокировано); концовки: Печать (fallback+судьба «погиб»), Заря (5 ключей+одобрение 85+2/2 лояльности+silence 0 — «Мир рождается заново»), Раскол вечности (золотой узел при seedBlessed+emberTalk), Эхо («Хранитель-Пожиратель»), Тишь (узел рока при silence 80, «Гексмарк пуст»); консоль/линт/tsc чистые.
+- Скриншоты: .ref/f7-01-ending.png (Печать), f7-02-seal-death.png (Печать+погиб), f7-03b.png (Заря), f7-04-rift.png (Раскол), f7-05-silence.png (Тишь).
+
+Stage Summary:
+- Фаза 7 закрыта: рейд ME2 (4 волны + роли + матрица выживания), суд Пожирателя Эха (не HP-бой, дилемма с золотой секретной веткой), 5 концовок по числам GDD с приоритетом 5→4→1→2→3, судьбы компаньонов в эпилоге (3 варианта), ключи всех построенных доменов (6-й — под Внешний Рубеж).
+- DoD: все 5 концовок достижимы и проверены E2E; судьбы показываются; флаги персистентны (judged в сейве).
+- Следующий шаг по роадмапу — Фаза 8: полировка и релиз v1.0.

@@ -21,6 +21,8 @@ import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, openShop, openTrainer } from './progression'
 import { saveGame } from './save'
 import { floater, ring } from './combat'
+import { resolveEnding, companionFates } from './finale'
+import { ENDINGS, KEYS_ALL } from '../data/finale'
 import { spawnAshMother } from './ai'
 import { approvalOnQuestDone } from './party'
 import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, startPitFight } from './career'
@@ -46,6 +48,11 @@ export function dialogueCtx(ctx: EngineCtx) {
     has: (item: string, qty = 1) => countItem(ctx, item) >= qty,
     lp: ctx.lp,
     gold: ctx.gold,
+    // Фаза 7: условия суда — Тишь и счёт ключей-осколков
+    silence: ctx.silence,
+    keys: ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed'].filter(
+      (k) => ctx.flags[k],
+    ).length,
   }
 }
 
@@ -278,6 +285,11 @@ export function runAction(ctx: EngineCtx, action: string) {
         // Ключ-осколок домена (Фаза 6): флаг + предмет-трофей
         ctx.flags[arg1] = true
         addItem(ctx, arg1 === 'key_granite' ? 'core_key' : arg1, 1)
+        break
+      case 'ending':
+        // Фаза 7: выбор в суде Пожирателя — резолвер 5 концовок (GDD 01 §6)
+        closeDialogue(ctx)
+        resolveEnding(ctx, arg1 as 'seal' | 'merge' | 'silence' | 'rift')
         break
       case 'sign':
         if (arg1 === 'shout' && !ctx.signs.shout.unlocked) {
@@ -563,8 +575,21 @@ export function checkProof(ctx: EngineCtx) {
   if (q.stage === 4 && !q.done) {
     if (ctx.flags.alphaDead || ctx.flags.captainDead || ctx.flags.mistJoined) {
       advanceQuest(ctx, 'main', 5)
+      grantKey(ctx, 'key_valley', 'Оплот') // Фаза 7: домен старта даёт ключ в конце Акта I
     }
   }
+}
+
+/** Фаза 7: ключ-осколок домена — флаг + предмет-трофей + счётчик в тосте. */
+export function grantKey(ctx: EngineCtx, keyId: string, domain: string) {
+  if (ctx.flags[keyId]) return
+  ctx.flags[keyId] = true
+  addItem(ctx, keyId, 1)
+  const keys = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed'].filter(
+    (k) => ctx.flags[k],
+  ).length
+  ctx.toast(`Ключ-осколок: ${domain} — собрано ${keys} из 6`, 'quest')
+  sfx('level')
 }
 
 export function questMarker(ctx: EngineCtx): Vec | null {
@@ -707,6 +732,9 @@ export function updateEnding(ctx: EngineCtx) {
 }
 
 export function openEnding(ctx: EngineCtx) {
+  // Фаза 7: 5 концовок по GDD 01 §6 (id выбран резолвером суда)
+  const endingId = ctx.pendingEndingId ?? 'seal'
+  const def = ENDINGS[endingId] ?? ENDINGS.seal
   const factionLine: Record<Faction, string[]> = {
     none: [
       'Ты ушёл из долины до рассвета, никому ничего не сказав. Долг Смотрителя исполнен — а судьба Хеймхолла теперь в руках его людей.',
@@ -721,16 +749,11 @@ export function openEnding(ctx: EngineCtx) {
     ],
   }
   const epilogue: string[] = [
-    'Пожиратель Бурь рассыпался пеплом, и небо над Хеймхоллом срослось швом из первых лучей солнца.',
+    ...def.intro,
     ...factionLine[ctx.faction],
   ]
-  if (ctx.companionIds.kaya && ctx.companionIds.torvald) {
-    epilogue.push(
-      'Кайя ушла дальше на север — искать истоки Разлома. Торвальд остался: сказал, что в деревне наконец появилось приличное пиво.',
-    )
-  }
-  // Фаза 5: высокая Тишь портит даже лучший финал
-  if (ctx.silence >= 60) {
+  // Фаза 5: высокая Тишь портит даже лучший финал (кроме концовки «Тишь» — там это и есть финал)
+  if (endingId !== 'silence' && ctx.silence >= 60) {
     epilogue.push(
       'Но краски долины так и не вернулись: где-то в швах мира осталась Тишь — цена тех выборов, что были дешевле слов.',
     )
@@ -740,13 +763,15 @@ export function openEnding(ctx: EngineCtx) {
     )
   }
   epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
-  // Фаза 6.4: судьба Спорных Землей — след выбора в ландшафте
-  if (ctx.flags.groveBurned) {
-    epilogue.push('Спорные Земли говорят только углём: вереск выгорел, Роща — пепел, а Орда пела, пока горели чужие шатры.')
-  } else if (ctx.flags.groveSaved) {
-    epilogue.push('Спорные Земли вереском зацвели: Семя благословлено, фонари Рощи горят до сих пор, и беженцы называют тебя тем, кто не продался.')
-  } else if (ctx.flags.hordeBroken) {
-    epilogue.push('Пепельная Орда рассеялась после набега на Рощу, но Семя в сердце рощи так и не нашло покоя.')
+  // Фаза 6.4: судьба Спорных Землей — след выбора в ландшафте (кроме Тиши — там уже пусто)
+  if (endingId !== 'silence') {
+    if (ctx.flags.groveBurned) {
+      epilogue.push('Спорные Земли говорят только углём: вереск выгорел, Роща — пепел, а Орда пела, пока горели чужие шатры.')
+    } else if (ctx.flags.groveSaved) {
+      epilogue.push('Спорные Земли вереском зацвели: Семя благословлено, фонари Рощи горят до сих пор, и беженцы называют тебя тем, кто не продался.')
+    } else if (ctx.flags.hordeBroken) {
+      epilogue.push('Пепельная Орда рассеялась после набега на Рощу, но Семя в сердце рощи так и не нашло покоя.')
+    }
   }
   // Фаза 6: карьера Гранита вписана в судьбу героя
   if (ctx.career.faction) {
@@ -755,7 +780,7 @@ export function openEnding(ctx: EngineCtx) {
     )
   }
   const mins = Math.floor(ctx.playtime / 60)
-  const keys = ['key_granite', 'key_disputed'].filter((k) => ctx.flags[k]).length
+  const keys = KEYS_ALL.filter((k) => ctx.flags[k]).length
   const stats: Array<[string, string]> = [
     ['Уровень', String(ctx.level)],
     ['Убито врагов', String(ctx.kills)],
@@ -767,5 +792,7 @@ export function openEnding(ctx: EngineCtx) {
     ['Карьера Колонии', ctx.career.faction ? `${CAREER_NAME[ctx.career.faction]}, ранг ${heroRank(ctx)}` : 'нет'],
     ['Ключи-осколки', `${keys}/6`],
   ]
-  useGame.getState().patch({ ending: { epilogue, stats }, panel: 'ending' })
+  // Фаза 7: судьбы компаньонов по матрице GDD 07 §7 (погиб / жив-герой / жив-сломлен)
+  const fates = companionFates(ctx)
+  useGame.getState().patch({ ending: { id: def.id, name: def.name, color: def.color, epilogue, fates, stats }, panel: 'ending' })
 }

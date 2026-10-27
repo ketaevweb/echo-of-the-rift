@@ -19,7 +19,7 @@ import { nearestEnemyOf } from '../core/entity'
 import { heightAt } from '../render3d/heightmap'
 import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, signPower } from './progression'
-import { advanceQuest, checkProof } from './quest'
+import { advanceQuest, checkProof, grantKey } from './quest'
 import { approvalOnDowned, approvalOnKill, trySynergyFrostAndFlame, trySynergyWallAndHammer } from './party'
 import { careerRank, endPitFight } from './career'
 import { dragonSoulAbsorb } from './frost'
@@ -158,6 +158,7 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     ctx.flags.ashMotherDead = true
     goldLoot = 120
     addItem(ctx, 'ash_heart', 1)
+    grantKey(ctx, 'key_veld', 'Вельд') // Фаза 7: K1 — Материарх пала
     if (ctx.quests.veld.stage === 2) advanceQuest(ctx, 'veld', 3)
   } else if (type === 'scorpion') {
     if (Math.random() < 0.45) addItem(ctx, 'granite_ore', 1)
@@ -253,10 +254,9 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     checkProof(ctx)
   }
   if (type === 'boss') {
+    // Фаза 7: Пожиратель Эха — суд, не HP-бой; финал идёт через рейд + judgment
     ctx.flags.bossDead = true
-    advanceQuest(ctx, 'main', 6)
     useGame.getState().patch({ bossBar: null })
-    ctx.endingAt = ctx.time + 1.8
   }
   if (ctx.targetEid === e.eid) ctx.targetEid = null
 }

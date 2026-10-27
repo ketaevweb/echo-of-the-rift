@@ -14,7 +14,7 @@ import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { makeEntity, nearestParty } from '../core/entity'
 import { damage, floater, meleeAttack, ring, spawnTelegraph } from './combat'
-import { advanceQuest } from './quest'
+import { advanceQuest, grantKey } from './quest'
 
 // ---------------- Слова силы (Стены Слов) ----------------
 
@@ -91,6 +91,7 @@ function checkRuneSolution(ctx: EngineCtx) {
   floater(ctx, { x: 6020, y: 560 }, 'РУНЫ ПОЮТ!', '#bfe3ea', 18)
   ctx.toast('Рунные камни запели в лад — пелена над пещерой опала!', 'quest')
   sfx('level')
+  grantKey(ctx, 'key_frost', 'Пределье') // Фаза 7: K3 — руны-головоломка
   const q = ctx.quests.frost_words
   if (q && !q.done && q.stage > 0 && q.stage < 3) advanceQuest(ctx, 'frost_words', 3)
 }

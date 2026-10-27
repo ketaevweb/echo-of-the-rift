@@ -225,6 +225,8 @@ export function spawnCompanion(ctx: EngineCtx, id: 'kaya' | 'torvald') {
 
 export function updateCompanion(ctx: EngineCtx, e: Entity, dt: number) {
   if (!e.alive) {
+    // Фаза 7: судная смерть в рейде (лояльность не выполнена) — спутник не встаёт
+    if (ctx.flags[`${e.id}Dead`]) return
     e.downT -= dt
     if (e.downT <= 0) {
       e.alive = true
@@ -470,15 +472,6 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
       }
     }
     return
-  }
-  // Интро босса долины (у Мор-Матери/Мастера Ямы свои события — только свой enemyType)
-  if (e.enemyType === 'boss' && !ctx.flags.bossIntroDone) {
-    if (Math.hypot(ctx.player.pos.x - e.pos.x, ctx.player.pos.y - e.pos.y) < 340) {
-      ctx.flags.bossIntroDone = true
-      e.aggroR = 400
-      openDialogue(ctx, 'boss_intro')
-      return
-    }
   }
   // Интро Мастера Ямы (Фаза 6): таймер-выбор у арены
   if (e.enemyType === 'pit_master' && !ctx.flags.pitIntroDone) {

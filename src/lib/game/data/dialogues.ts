@@ -10,6 +10,7 @@ export const PORTRAITS: Record<string, PortraitDef> = {
   Торвальд: { icon: 'ShieldHalf', color: '#7a8a4a', title: 'Воитель' },
   'Древний Алтарь': { icon: 'Landmark', color: '#c9b06b', title: 'Камни Древних' },
   'Пожиратель Бурь': { icon: 'Skull', color: '#a06bd9', title: 'Голос из Разлома' },
+  'Пожиратель Эха': { icon: 'Skull', color: '#a06bd9', title: 'Пустота, питающаяся памятью миров' },
   Альра: { icon: 'FlaskConical', color: '#7a9a6a', title: 'Алхимик Хеймхолла' },
   'Доска объявлений': { icon: 'ScrollText', color: '#c9b06b', title: 'Контракты Хеймхолла' },
   // Фаза 6: Гранитная Долина
@@ -598,38 +599,42 @@ export const DIALOGUES: Record<string, DialogueTree> = {
     },
   },
 
-  // ---------------- Босс ----------------
-  boss_intro: {
-    id: 'boss_intro',
-    start: 'intro',
+  // ---------------- Суд Пожирателя Эха (Фаза 7, MQ-09) ----------------
+  judgment_devourer: {
+    id: 'judgment_devourer',
+    start: (c) => {
+      const canRift =
+        c.keys >= 5 && c.flag('bastionHeld') && c.flag('groveSaved') && c.flag('seedBlessed') && c.flag('emberTalk') && c.silence <= 30
+      if (canRift) return 'intro_rift'
+      if (c.silence >= 75) return 'intro_doom'
+      return 'intro'
+    },
     nodes: {
       intro: {
-        speaker: 'Пожиратель Бурь',
-        text: 'Ты пахнешь судьбой, крошка-убийца. Я ел королей. Я ел богов с их молитвами. Твоя долина — между зубами. Скажи мне... какой вкус у отчаяния?',
-        timer: 8,
-        onTimeout: 0,
+        speaker: 'Пожиратель Эха',
+        text: 'Я ел королей. Я ел богов вместе с их молитвами. Но ты... ты принёс мне счёт. Осколки поют, имена звучат — мир отзывается на твоё имя. Выбирай, Эхорождённый: печать или пасть. Я — просто весы.',
         choices: [
-          { text: '(Обнажить клинок) Утренний.', action: 'boss:fight;silence:+6', goto: null },
-          {
-            text: '«Разлом сожрёт тебя первым — и я от него не отдам».',
-            tag: 'Убеждение',
-            check: { dc: 15, label: 'Убеждение (СЛ 15)' },
-            goto: 'weaken',
-            gotoFail: 'taunt_fail',
-            action: 'boss:fight;boss:weaken;silence:-4',
-          },
-          { text: '(Отступить)', goto: null },
+          { text: '«Запечатай Разлом. Ценой — эха. Пусть мир живёт тихо». (Печать/Заря)', action: 'ending:seal', goto: null },
+          { text: '«Влиться в Ядро. Пусть я стану порогом». (Эхо — тёмная жертва)', action: 'ending:merge', goto: null },
         ],
       },
-      weaken: {
-        speaker: 'Пожиратель Бурь',
-        text: 'Гррх... слова... жгут изнутри... Ты испортил мне аппетит, крошка. Придётся есть тебя первым — и с плохим настроением.',
-        choices: [{ text: '(Атаковать!)', goto: null }],
+      intro_rift: {
+        speaker: 'Пожиратель Эха',
+        text: 'Шесть осколков поют в лад. Стена стояла, Роща цветёт, Семя благословлено, и даже угли говорили с тобой на «ты». Мне нечем тебя съесть — ты собрал то, чего я не могу переварить: весь мир целиком.',
+        choices: [
+          { text: '«Собери Гексмарк заново — без Ядра. Свободный сад из шести миров». (Раскол вечности)', action: 'ending:rift', goto: null },
+          { text: '«Запечатай Разлом. Пусть мир живёт». (Печать/Заря)', action: 'ending:seal', goto: null },
+          { text: '«Влиться в Ядро. Пусть я стану порогом». (Эхо — тёмная жертва)', action: 'ending:merge', goto: null },
+        ],
       },
-      taunt_fail: {
-        speaker: 'Пожиратель Бурь',
-        text: 'ХА! Маленький голосок для такой большой пасти. Я собирался съесть тебя первым. Теперь — медленно.',
-        choices: [{ text: '(Атаковать!)', action: 'boss:fight', goto: null }],
+      intro_doom: {
+        speaker: 'Пожиратель Эха',
+        text: 'Слышишь? Тише, чем в начале разговора. Краски уже гаснут: ты платил за победу тем, что дешевле слов. Мой счёт сошёлся. Осталось только подписать — или всё же бороться?',
+        choices: [
+          { text: '«Запечатай Разлом — даже так». (Печать/Заря)', action: 'ending:seal', goto: null },
+          { text: '«Влиться в Ядро. Пусть я стану порогом». (Эхо — тёмная жертва)', action: 'ending:merge', goto: null },
+          { text: '(Опустить руки — позволить Тиши). (Тишь)', action: 'ending:silence', goto: null },
+        ],
       },
     },
   },

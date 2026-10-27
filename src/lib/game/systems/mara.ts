@@ -14,7 +14,7 @@ import { d } from '../core/util'
 import { EngineCtx, SiegeState } from '../core/ctx'
 import { makeEntity, nearestParty } from '../core/entity'
 import { damage, floater, meleeAttack, ring, spawnTelegraph } from './combat'
-import { advanceQuest } from './quest'
+import { advanceQuest, grantKey } from './quest'
 
 // ---------------- Оборона Бастиона (волны + приказы) ----------------
 
@@ -91,6 +91,7 @@ function spawnSiegeEnemy(ctx: EngineCtx, type: Entity['enemyType']) {
 function siegeVictory(ctx: EngineCtx) {
   ctx.siege = null
   ctx.flags.bastionHeld = true
+  grantKey(ctx, 'key_mara', 'Мара') // Фаза 7: K4 — Бастион удержан
   sfx('level')
   ctx.shake = 4
   ring(ctx, BASTION_GATE, '#d9a441', 150, 1.2)

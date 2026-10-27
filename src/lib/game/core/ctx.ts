@@ -39,6 +39,16 @@ export interface AssaultState {
   breakT: number
 }
 
+/** Рейд в Сердце Разлома (Фаза 7, ME2): транзитное состояние (в сейв не пишется).
+ *  wave — индекс волны, pending/spawnT/breakT — как в набеге,
+ *  judged — суд завершён (концовка выбрана). */
+export interface RaidState {
+  wave: number
+  pending: string[]
+  spawnT: number
+  breakT: number
+}
+
 // ---------------- Мост 3D-рендера (Фаза 1) ----------------
 
 /** Снимок состояния движка для 3D-рендера (структурно = SceneView3d). */
@@ -148,6 +158,8 @@ export interface EngineCtx {
   time: number
   currentArea: string
   endingAt: number | null
+  /** Фаза 7: выбранная в суде концовка (id из data/finale.ENDINGS) — читает openEnding. */
+  pendingEndingId: string | null
   buffT: number
   destroyed: boolean
 
@@ -194,6 +206,8 @@ export interface EngineCtx {
   // --- Фаза 6.4: Спорные Земли (BG3, набег Орды) ---
   /** Активный набег Орды на Рощу: волны мародёров (null — нет штурма). */
   assault: AssaultState | null
+  /** Фаза 7: рейд в Сердце Разлома (транзитное — после загрузки перезапускается триггером близости). */
+  raid: RaidState | null
 
   // --- Фаза 5: происхождение, Тишь, кинокамера диалогов ---
   /** Происхождение героя — источник уникальных реплик (cond: origin:X). */

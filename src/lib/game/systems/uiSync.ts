@@ -18,6 +18,7 @@ import { nearestInteraction, stageText } from './quest'
 import { CAREER_NAME, CAREER_PERKS, heroRank, RANK_NAME } from './career'
 import { siegeHud } from './mara'
 import { assaultHud } from './disputed'
+import { raidHud } from './finale'
 
 export function syncUi(ctx: EngineCtx): void {
   const st = useGame.getState()
@@ -107,6 +108,9 @@ export function syncUi(ctx: EngineCtx): void {
   const dispQ = quests.find((q) => q.id === 'disputed')!
   const dispHQ = quests.find((q) => q.id === 'disputed_hoard')!
   const dispSQ = quests.find((q) => q.id === 'disputed_scout')!
+  // Фаза 7: рейд и суд — в трекере как побочные до момента старта
+  const raidQ = quests.find((q) => q.id === 'raid')!
+  const judgQ = quests.find((q) => q.id === 'judgment')!
   const sideQ = [
     contractQ,
     veldQ,
@@ -121,6 +125,8 @@ export function syncUi(ctx: EngineCtx): void {
     dispQ,
     dispHQ,
     dispSQ,
+    raidQ,
+    judgQ,
   ].find((q) => q.stage > 0 && !q.done) ?? null
   const boss = ctx.entities.find(
     (e) =>
@@ -218,5 +224,7 @@ export function syncUi(ctx: EngineCtx): void {
     siege: siegeHud(ctx),
     // Фаза 6.4: набег Орды — зеркало HUD
     assault: assaultHud(ctx),
+    // Фаза 7: рейд в Сердце Разлома — зеркало HUD
+    raid: raidHud(ctx),
   })
 }

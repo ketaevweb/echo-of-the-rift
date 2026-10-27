@@ -522,13 +522,27 @@ function EndingPanel() {
   const ending = useGame((s) => s.ending)
   if (!ending) return null
   return (
-    <Panel title="Разлом затих" wide>
+    <Panel title={`КОНЦОВКА: ${ending.name.toUpperCase()}`} wide>
       <div className="flex flex-col gap-3">
+        <p className="game-title-font text-center text-sm tracking-[0.3em]" style={{ color: ending.color }}>
+          {ending.name}
+        </p>
         {ending.epilogue.map((p, i) => (
           <p key={i} className={`text-sm leading-relaxed ${i === 0 ? 'text-[#f5c96b]' : 'text-[#cfc0a0]'}`}>
             {p}
           </p>
         ))}
+        {ending.fates.length > 0 && (
+          <div className="mt-2 flex flex-col gap-2">
+            <p className="game-title-font text-[11px] tracking-[0.25em] text-[#8a8068]">СУДЬБЫ ОТРЯДА</p>
+            {ending.fates.map((f) => (
+              <div key={f.name} className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
+                <p className="text-xs font-bold text-[#e8d5a8]">{f.name}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#9a8f78]">{f.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {ending.stats.map(([k, v]) => (
             <div key={k} className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
