@@ -12,6 +12,7 @@ import { PIT, PIT_MASTER } from '../data/world'
 import { ENEMY_STATS } from '../data/abilities'
 import { ENEMY_NAME } from '../data/tables'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { EngineCtx } from '../core/ctx'
 import { makeEntity } from '../core/entity'
 import { damage, floater, ring, spawnTelegraph } from './combat'
@@ -48,7 +49,7 @@ export const CAREER_PERKS: Record<CareerId, string[]> = {
 /** Вступить в карьеру фракции (одна карьера на героя — Gothic-правило выбора). */
 export function joinCareer(ctx: EngineCtx, id: CareerId) {
   if (ctx.career.faction) {
-    ctx.toast(`Ты уже связан с «${CAREER_NAME[ctx.career.faction]}». Прежний лагерь не забывает предателей.`, 'warn')
+    ctx.toast(t('Ты уже связан с «{name}». Прежний лагерь не забывает предателей.', { name: t(CAREER_NAME[ctx.career.faction]) }), 'warn')
     return
   }
   ctx.career.faction = id
@@ -59,7 +60,7 @@ export function joinCareer(ctx: EngineCtx, id: CareerId) {
   for (const other of ['order', 'coven', 'watch'] as CareerId[]) {
     if (other !== id) ctx.career.rep[other] = Math.max(0, ctx.career.rep[other] - 5)
   }
-  ctx.toast(`Ты вступил в ${CAREER_NAME[id]}! Новобранец Колонии.`, 'quest')
+  ctx.toast(t('Ты вступил в {name}! Новобранец Колонии.', { name: t(CAREER_NAME[id]) }), 'quest')
   sfx('level')
   ctx.syncUi()
 }
@@ -70,7 +71,7 @@ export function addRep(ctx: EngineCtx, id: CareerId, delta: number) {
   const after = Math.max(0, Math.min(100, before + delta))
   if (after === before) return
   ctx.career.rep[id] = after
-  if (delta > 0) ctx.toast(`Слава в «${CAREER_NAME[id]}»: ${after}/100`, 'info')
+  if (delta > 0) ctx.toast(t('Слава в «{name}»: {n}/100', { name: t(CAREER_NAME[id]), n: after }), 'info')
   ctx.syncUi()
 }
 
@@ -87,7 +88,7 @@ export function heroRank(ctx: EngineCtx): number {
 /** Повышение ранга у вербовщика: репутация + взнос; чужие лагеря ревнуют. */
 export function rankUp(ctx: EngineCtx, id: CareerId) {
   if (ctx.career.faction !== id) {
-    ctx.toast(`Сначала вступи в ${CAREER_NAME[id]}.`, 'warn')
+    ctx.toast(t('Сначала вступи в {name}.', { name: t(CAREER_NAME[id]) }), 'warn')
     return
   }
   const cur = ctx.career.rank[id]
@@ -97,11 +98,11 @@ export function rankUp(ctx: EngineCtx, id: CareerId) {
   }
   const req = RANK_REQ[cur + 1]
   if (ctx.career.rep[id] < req.rep) {
-    ctx.toast(`Нужна слава ${req.rep}+ (сейчас ${ctx.career.rep[id]}).`, 'warn')
+    ctx.toast(t('Нужна слава {req}+ (сейчас {cur}).', { req: req.rep, cur: ctx.career.rep[id] }), 'warn')
     return
   }
   if (ctx.gold < req.gold) {
-    ctx.toast(`Взнос: ${req.gold} золота.`, 'warn')
+    ctx.toast(t('Взнос: {n} золота.', { n: req.gold }), 'warn')
     return
   }
   ctx.gold -= req.gold
@@ -110,7 +111,7 @@ export function rankUp(ctx: EngineCtx, id: CareerId) {
   for (const other of ['order', 'coven', 'watch'] as CareerId[]) {
     if (other !== id) ctx.career.rep[other] = Math.max(0, ctx.career.rep[other] - 8)
   }
-  ctx.toast(`${CAREER_NAME[id]}: новый ранг «${RANK_NAME[cur + 1]}»!`, 'level')
+  ctx.toast(t('{name}: новый ранг «{rank}»!', { name: t(CAREER_NAME[id]), rank: t(RANK_NAME[cur + 1]) }), 'level')
   sfx('level')
   ring(ctx, ctx.player.pos, '#f5c96b', 70, 0.8)
   ctx.syncUi()
@@ -170,7 +171,7 @@ export function startPitFight(ctx: EngineCtx, tier: number) {
   const def = PIT_FIGHTS.find((f) => f.tier === tier)
   if (!def || ctx.pitTier > 0) return
   if (ctx.gold < def.bet) {
-    ctx.toast(`Ставка ${def.bet} золота — у тебя нет столько.`, 'warn')
+    ctx.toast(t('Ставка {n} золота — у тебя нет столько.', { n: def.bet }), 'warn')
     return
   }
   ctx.gold -= def.bet
@@ -196,7 +197,7 @@ export function startPitFight(ctx: EngineCtx, tier: number) {
   }
   ctx.targetEid = null
   spawnPitWave(ctx)
-  ctx.toast(`ЯМНЫЙ БОЙ: ${def.name}. Ставка ${def.bet} золота — толпа ревёт!`, 'quest')
+  ctx.toast(t('ЯМНЫЙ БОЙ: {name}. Ставка {n} золота — толпа ревёт!', { name: t(def.name), n: def.bet }), 'quest')
   sfx('boss')
   ctx.syncUi()
 }
@@ -254,7 +255,7 @@ export function updatePit(ctx: EngineCtx) {
   if (alive) return
   if (ctx.pitWave + 1 < def.waves.length) {
     ctx.pitWave++
-    ctx.toast(`Волна ${ctx.pitWave + 1}! Двери ямы скрипят...`, 'warn')
+    ctx.toast(t('Волна {n}! Двери ямы скрипят...', { n: ctx.pitWave + 1 }), 'warn')
     sfx('boss')
     spawnPitWave(ctx)
     return
@@ -264,7 +265,10 @@ export function updatePit(ctx: EngineCtx) {
   ctx.gold += profit
   ctx.pitTier = 0
   ctx.pitWave = 0
-  ctx.toast(`ТОЛПА РВЁТ ГЛОТКИ! Выигрыш: +${profit} золота (ставка ${def.bet} возвращена с лихвой).`, 'loot')
+  ctx.toast(
+    t('ТОЛПА РВЁТ ГЛОТКИ! Выигрыш: +{win} золота (ставка {bet} возвращена с лихвой).', { win: profit, bet: def.bet }),
+    'loot',
+  )
   floater(ctx, ctx.player.pos, 'ПОБЕДА В ЯМЕ!', '#f5c96b', 18)
   if (ctx.career.faction) addRep(ctx, ctx.career.faction, 3)
   else ctx.toast('Без карьеры слава ямы мертва: вступи в лагерь Колонии.', 'info')

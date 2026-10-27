@@ -72,6 +72,7 @@ import {
 } from './systems/quest'
 import { syncUi as syncUiSys, findActiveBoss } from './systems/uiSync'
 import { preloadCombatVoice, resetBossBark } from './combatVoice'
+import { t } from './i18n'
 
 /** Телепорт через врата прерывает ямный бой (арена остаётся в Граните). */
 function endPitFightSafe(ctx: GameEngine) {
@@ -371,7 +372,7 @@ export class GameEngine implements EngineCtx {
       this.view3d?.setQuality(this.effQuality)
       useGame.getState().patch({ effQuality: this.effQuality })
       this.upStreak = 0
-      this.toast(`Производительность: качество снижено до «${QUALITY_NAME[this.effQuality]}»`, 'info')
+      this.toast(t('Производительность: качество снижено до «{q}»', { q: t(QUALITY_NAME[this.effQuality]) }), 'info')
       return
     }
     // Апгрейд после просадки: стабильно > 55 FPS три окна подряд — ступень вверх
@@ -382,7 +383,7 @@ export class GameEngine implements EngineCtx {
         this.upStreak = 0
         this.view3d?.setQuality(this.effQuality)
         useGame.getState().patch({ effQuality: this.effQuality })
-        this.toast(`Качество повышено до «${QUALITY_NAME[this.effQuality]}»`, 'info')
+        this.toast(t('Качество повышено до «{q}»', { q: t(QUALITY_NAME[this.effQuality]) }), 'info')
       }
     } else {
       this.upStreak = 0
@@ -503,7 +504,7 @@ export class GameEngine implements EngineCtx {
       gate = RB_GATES.disputedSide
     }
     sfx('portal')
-    useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })
+    useGame.getState().patch({ zoneFade: { label: t(gate.label), phase: 'out' } })
     window.setTimeout(() => {
       if (this.destroyed) return
       const p = { ...gate.exit }
@@ -522,7 +523,7 @@ export class GameEngine implements EngineCtx {
       this.zone = zone
       this.currentArea = '' // заставит updateArea показать плашку зоны
       endPitFightSafe(this)
-      useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'in' } })
+      useGame.getState().patch({ zoneFade: { label: t(gate.label), phase: 'in' } })
       this.syncUi()
       window.setTimeout(() => {
         if (this.destroyed) return
@@ -576,7 +577,10 @@ export class GameEngine implements EngineCtx {
     if (next === 'hold') e.home = { ...e.pos }
     else e.dest = null // уходя с «держать», сбрасываем приказ движения
     this.toast(
-      `${e.name}: ${next === 'follow' ? 'следовать' : next === 'hold' ? 'держать позицию' : 'атаковать всех'}`,
+      t('{name}: {order}', {
+        name: t(e.name),
+        order: t(next === 'follow' ? 'следовать' : next === 'hold' ? 'держать позицию' : 'атаковать всех'),
+      }),
       'info',
     )
     sfx('click')

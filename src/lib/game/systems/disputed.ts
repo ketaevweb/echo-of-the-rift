@@ -11,6 +11,7 @@ import { ENEMY_NAME } from '../data/tables'
 import { GROVE, GROVE_HEART, HORDE_BREAK, HORDE_CAMP, HORDE_WAVES, SHIFT_PROPS } from '../data/world'
 import { Entity } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { AssaultState, EngineCtx } from '../core/ctx'
 import { makeEntity, nearestParty } from '../core/entity'
@@ -185,8 +186,8 @@ export function updateDisputed(ctx: EngineCtx, dt: number) {
     if (A.breakT <= 0) {
       A.pending = [...HORDE_WAVES[A.wave]]
       A.spawnT = 0
-      floater(ctx, GROVE.pos, `ВОЛНА ${A.wave + 1}!`, '#d96b3a', 18)
-      ctx.toast(`Набег Орды: волна ${A.wave + 1} из ${HORDE_WAVES.length}!`, 'warn')
+      floater(ctx, GROVE.pos, t('ВОЛНА {n}!', { n: A.wave + 1 }), '#d96b3a', 18)
+      ctx.toast(t('Набег Орды: волна {n} из {total}!', { n: A.wave + 1, total: HORDE_WAVES.length }), 'warn')
       sfx('boss')
     }
     return
@@ -213,7 +214,7 @@ export function updateDisputed(ctx: EngineCtx, dt: number) {
       return
     }
     A.breakT = HORDE_BREAK
-    ctx.toast(`Волна отбита! Орда перегруппировывается — следующая волна через ${HORDE_BREAK} с.`, 'quest')
+    ctx.toast(t('Волна отбита! Орда перегруппировывается — следующая волна через {sec} с.', { sec: HORDE_BREAK }), 'quest')
     sfx('level')
     ctx.syncUi()
   }

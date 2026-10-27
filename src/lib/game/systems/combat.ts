@@ -12,6 +12,9 @@ import { BESTIARY_INFO, OIL_TARGETS } from '../data/tables'
 import { PLAYER_SPAWN, SPAWN_ZONES } from '../data/world'
 import { Entity, Particle, SignId, Telegraph, Vec } from '../types'
 import { useGame } from '../store'
+// v1.6: алиас tr — внутри damage()/meleeAttack() параметр-сущность `t` затеняет импорт;
+// сама функция floater() ниже продолжает использовать t (тело не тронуто)
+import { t, t as tr } from '../i18n'
 import { sfx } from '../sfx'
 import { angleDiff, d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
@@ -98,7 +101,7 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
     const absorbed = Math.min(t.shield, amt)
     t.shield -= absorbed
     amt -= absorbed
-    if (absorbed > 0) floater(ctx, t.pos, 'Квен −' + absorbed, '#d9a441', 12)
+    if (absorbed > 0) floater(ctx, t.pos, tr('Квен −{n}', { n: absorbed }), '#d9a441', 12)
   }
   if (amt > 0) {
     t.hp -= amt
@@ -107,7 +110,7 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
       floater(
         ctx,
         t.pos,
-        opts.crit ? 'КРИТ ' + amt : String(amt),
+        opts.crit ? tr('КРИТ {n}', { n: amt }) : String(amt),
         opts.color ?? (t.team === 'party' ? '#e0653a' : '#f5c96b'),
         opts.crit ? 20 : 15,
       )
@@ -132,7 +135,7 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
     else if (t.kind === 'companion') {
       t.downT = 12
       approvalOnDowned(ctx, t) // Фаза 4: компаньон выведен из боя — доверие падает
-      floater(ctx, t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
+      floater(ctx, t.pos, tr('{name} выведен из боя!', { name: tr(t.name) }), '#e0653a', 14)
       // v1.4: реплика выбитого компаньона
       if (t.id === 'kaya' || t.id === 'torvald') bark('down', { companionId: t.id })
     } else if (t.kind === 'player') onPlayerDeath(ctx)
@@ -188,7 +191,7 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
       ctx.quests.granite_scorpions.counter++
       const c = ctx.quests.granite_scorpions.counter
       if (c >= 5) ctx.toast('Пять панцирей собраны — к Финну в Колонию!', 'quest')
-      else ctx.toast(`Клеймо скорпионов: ${c}/5`, 'info')
+      else ctx.toast(t('Клеймо скорпионов: {c}/5', { c }), 'info')
     }
   } else if (type === 'pit_master') {
     ctx.flags.pitMasterDead = true
@@ -261,16 +264,16 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
   }
   if (goldLoot > 0) {
     ctx.gold += goldLoot
-    floater(ctx, e.pos, '+' + goldLoot + ' золота', '#e8d5a8', 13)
+    floater(ctx, e.pos, t('+{n} золота', { n: goldLoot }), '#e8d5a8', 13)
   }
   if (!ctx.bestiary.has(type)) {
     ctx.bestiary.add(type)
-    ctx.toast('Бестиарий: ' + BESTIARY_INFO[type].name, 'quest')
+    ctx.toast(t('Бестиарий: {name}', { name: t(BESTIARY_INFO[type].name) }), 'quest')
   }
   if (type === 'wolf' && ctx.quests.main.stage === 2 && !ctx.quests.main.done) {
     ctx.quests.main.counter++
     if (ctx.quests.main.counter >= 4) advanceQuest(ctx, 'main', 3)
-    else ctx.toast(`Волки: ${ctx.quests.main.counter}/4`, 'info')
+    else ctx.toast(t('Волки: {c}/4', { c: ctx.quests.main.counter }), 'info')
   }
   if (type === 'alpha') {
     ctx.flags.alphaDead = true
@@ -297,7 +300,7 @@ function bumpGlands(ctx: EngineCtx) {
     q.counter++
     const c = q.counter
     if (c >= 5) ctx.toast('Пять мор-желёз собраны — к досенту Хольту в Бастион!', 'quest')
-    else ctx.toast(`Желёзы скверны: ${c}/5`, 'info')
+    else ctx.toast(t('Желёзы скверны: {c}/5', { c }), 'info')
   }
 }
 
@@ -309,7 +312,7 @@ function bumpScouts(ctx: EngineCtx, type: Entity['enemyType']) {
     q.counter++
     const c = q.counter
     if (c >= 4) ctx.toast('Четыре метки стёрты — к Тарбену!', 'quest')
-    else ctx.toast(`Глаза Орды: ${c}/4`, 'info')
+    else ctx.toast(t('Глаза Орды: {c}/4', { c }), 'info')
   }
 }
 
@@ -367,7 +370,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
     }
     if (def.stamina) {
       ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + def.stamina)
-      floater(ctx, ctx.player.pos, '+' + def.stamina + ' ОВ', '#bfe3ea', 13)
+      floater(ctx, ctx.player.pos, t('+{n} ОВ', { n: def.stamina }), '#bfe3ea', 13)
     }
     removeItem(ctx, id, 1)
     ctx.player.cds['potion'] = ab.cooldown
@@ -427,7 +430,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
   } else if (id === 'quen') {
     const sh = Math.round((25 + 12 * ctx.level) * power)
     ctx.player.shield = sh
-    floater(ctx, ctx.player.pos, 'Квен: ' + sh, '#d9a441', 14)
+    floater(ctx, ctx.player.pos, t('Квен: {n}', { n: sh }), '#d9a441', 14)
     ring(ctx, ctx.player.pos, '#d9a441', 40, 0.6)
     sfx('shield')
   } else if (id === 'axii') {
@@ -555,7 +558,10 @@ export function updateStatuses(ctx: EngineCtx, e: Entity, dt: number) {
 
 // ---------------- Эффекты ----------------
 
-export function floater(ctx: EngineCtx, pos: Vec, text: string, color: string, size: number) {
+export function floater(ctx: EngineCtx, pos: Vec, textRaw: string, color: string, size: number) {
+  // v1.6: единая точка перевода флоатеров — статические строки бьются по словарю,
+  // составные приходят уже шаблонами t() из систем
+  const text = t(textRaw)
   ctx.floaters.push({
     x: pos.x + rndRange(-6, 6),
     y: pos.y - 18,

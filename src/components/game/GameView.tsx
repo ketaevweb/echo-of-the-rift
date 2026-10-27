@@ -3,11 +3,13 @@
 import { useEffect, useRef } from 'react'
 import { createEngine, getEngine } from '@/lib/game/engine'
 import { boot, readRenderMode, readSave, useGame } from '@/lib/game/store'
+import { t, useLocale } from '@/lib/game/i18n'
 import Hud from './Hud'
 import DialogueOverlay from './DialogueOverlay'
 import Panels from './Panels'
 
 export default function GameView() {
+  useLocale() // v1.6: перерисовка при переключении языка
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const canvas3dRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -57,12 +59,12 @@ export default function GameView() {
       <canvas
         ref={canvas3dRef}
         className={`absolute inset-0 h-full w-full touch-none ${is3d ? 'block cursor-crosshair' : 'hidden'}`}
-        aria-label="Трёхмерный мир Эха Разлома"
+        aria-label={t('Трёхмерный мир Эха Разлома')}
       />
       <canvas
         ref={canvasRef}
         className={`absolute inset-0 h-full w-full touch-none ${is3d ? 'hidden' : 'block cursor-crosshair'}`}
-        aria-label="Игровое поле Эха Разлома"
+        aria-label={t('Игровое поле Эха Разлома')}
       />
       <Hud />
       <DialogueOverlay />
@@ -77,7 +79,7 @@ export default function GameView() {
         >
           <p className="game-title-font text-4xl tracking-[0.4em] text-[#9ad0a8]/90">{zoneFade.label.toUpperCase()}</p>
           <div className="mt-4 h-px w-56 bg-gradient-to-r from-transparent via-[#9ad0a8]/70 to-transparent" />
-          <p className="mt-3 text-xs tracking-widest text-[#6a7a68]">ТУМАН ЧАСТИТ ПУТЬ...</p>
+          <p className="mt-3 text-xs tracking-widest text-[#6a7a68]">{t('ТУМАН ЧАСТИТ ПУТЬ...')}</p>
         </div>
       )}
     </div>

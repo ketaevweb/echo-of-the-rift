@@ -10,6 +10,7 @@ import { ABILITY_BAR_IDS } from '../data/tables'
 import { Vec } from '../types'
 import { PanelId, useGame } from '../store'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { EngineCtx } from '../core/ctx'
 import { pickEntity } from '../core/entity'
 import { chooseOption, closeDialogue, doInteract, openDialogue, pickInteractable, runInteractable } from './quest'
@@ -126,7 +127,7 @@ function cycleTarget(ctx: EngineCtx) {
   const next = foes[(idx + 1) % foes.length]
   ctx.targetEid = next.eid
   sfx('click')
-  ctx.toast(`Цель: ${next.name}`, 'info')
+  ctx.toast(t('Цель: {name}', { name: t(next.name) }), 'info')
 }
 
 /** Приказ компаньону «идти сюда» (Фаза 4, тактическая пауза). */
@@ -136,7 +137,7 @@ function orderCompanionMove(ctx: EngineCtx, eid: number, to: Vec) {
   e.dest = { ...to }
   e.stance = 'hold'
   e.home = { ...to } // «держать» — удерживать этот пятачок
-  ctx.toast(`${e.name}: выдвигаюсь!`, 'info')
+  ctx.toast(t('{name}: выдвигаюсь!', { name: t(e.name) }), 'info')
   sfx('click')
 }
 
@@ -228,7 +229,7 @@ function handleTacticalClick(ctx: EngineCtx, ev: PointerEvent) {
     if (ent && ent.alive) {
       ctx.selEid = ctx.selEid === picked.eid ? null : picked.eid
       sfx('click')
-      ctx.toast(ctx.selEid ? `${ent.name}: жду приказа` : 'Выбор снят', 'info')
+      ctx.toast(ctx.selEid ? t('{name}: жду приказа', { name: t(ent.name) }) : 'Выбор снят', 'info')
       ctx.syncUi()
       return
     }
@@ -239,7 +240,7 @@ function handleTacticalClick(ctx: EngineCtx, ev: PointerEvent) {
     if (ent) {
       ctx.targetEid = ent.eid
       sfx('click')
-      ctx.toast(`Отряд, цель: ${ent.name}!`, 'info')
+      ctx.toast(t('Отряд, цель: {name}!', { name: t(ent.name) }), 'info')
       ctx.syncUi()
       return
     }

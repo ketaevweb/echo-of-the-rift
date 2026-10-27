@@ -5,6 +5,7 @@ import { Heart, Map, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, Vo
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
+import { t, useLocale } from '@/lib/game/i18n'
 import { GameIcon } from './GameIcon'
 
 /** Цели счётчиков побочных квестов для трекера (N из M). */
@@ -50,7 +51,7 @@ function PartyFrame({
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[#e8d5a8]">{p.name}</p>
             <p className="truncate text-[10px] text-[#8a8068]">
-              {isPlayer ? p.role : STANCE_LABEL[p.stance] ?? ''}
+              {isPlayer ? p.role : t(STANCE_LABEL[p.stance] ?? '')}
             </p>
           </div>
         </div>
@@ -63,7 +64,7 @@ function PartyFrame({
       </div>
       {/* Фаза 4: одобрение компаньона — при ≥60 открываются парные приёмы */}
       {!isPlayer && (
-        <div className="mt-1 flex items-center gap-1.5" title={trusted ? 'Доверие высоко — парные приёмы доступны' : 'Доверие растёт от боёв и квестов. При 60 — парные приёмы'}>
+        <div className="mt-1 flex items-center gap-1.5" title={trusted ? t('Доверие высоко — парные приёмы доступны') : t('Доверие растёт от боёв и квестов. При 60 — парные приёмы')}>
           <Heart className={`h-2.5 w-2.5 shrink-0 ${trusted ? 'text-[#e08a6b]' : 'text-[#6a5f4a]'}`} />
           <div className="h-1 w-full overflow-hidden rounded-sm bg-[#241c14]">
             <div
@@ -79,9 +80,9 @@ function PartyFrame({
           <button
             onClick={() => engine?.setStance(p.eid)}
             className="rounded border border-[#3a2e20] bg-[#241c14] px-2 py-0.5 text-[10px] text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
-            title="Сменить приказ"
+            title={t('Сменить приказ')}
           >
-            Приказ: {STANCE_LABEL[p.stance]}
+            {t('Приказ: {x}', { x: t(STANCE_LABEL[p.stance] ?? '') })}
           </button>
           {p.abilities.map((a) => {
             const cdPct = a.cdMax > 0 ? (a.cd / a.cdMax) * 100 : 0
@@ -91,7 +92,7 @@ function PartyFrame({
                 onClick={() => engine?.castCompanionAbility(p.eid, a.id, null)}
                 disabled={a.cd > 0 || !p.alive}
                 className="relative h-7 w-7 overflow-hidden rounded border border-[#3a2e20] bg-[#241c14] text-[#cfc0a0] transition hover:border-[#d9a441] disabled:opacity-60"
-                title={`${a.name}${a.cd > 0 ? ` — откат ${a.cd.toFixed(1)}с` : ''}`}
+                title={`${a.name}${a.cd > 0 ? t(' — откат {s}с', { s: a.cd.toFixed(1) }) : ''}`}
               >
                 <GameIcon name={a.icon} className="mx-auto h-4 w-4" />
                 {a.cd > 0 && (
@@ -107,6 +108,7 @@ function PartyFrame({
 }
 
 export default function Hud() {
+  useLocale() // v1.6: перерисовка при переключении языка
   const party = useGame((s) => s.party)
   const player = useGame((s) => s.player)
   const abilities = useGame((s) => s.abilities)
@@ -173,7 +175,7 @@ export default function Hud() {
             <button
               onClick={() => getEngine()?.openPanel('map')}
               className="text-[#9a8f78] transition hover:text-[#d9a441]"
-              title="Полная карта [M]"
+              title={t('Полная карта [M]')}
             >
               <Map className="h-3.5 w-3.5" />
             </button>
@@ -217,13 +219,13 @@ export default function Hud() {
       {siege && (
         <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#c94f3d]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#e08a6b]">
-            ОБОРОНА БАСТИОНА · ВОЛНА {Math.min(siege.wave + 1, siege.waves)}/{siege.waves}
+            {t('ОБОРОНА БАСТИОНА · ВОЛНА {a}/{b}', { a: Math.min(siege.wave + 1, siege.waves), b: siege.waves })}
           </p>
           <div className="mt-1.5">
             <Bar value={siege.gateHp} max={100} color="bg-[#d9a441]" bg="bg-[#241a10]" />
           </div>
           <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
-            Частокол: {Math.max(0, Math.ceil(siege.gateHp))}% — не дай мору его прогрызть
+            {t('Частокол: {p}% — не дай мору его прогрызть', { p: Math.max(0, Math.ceil(siege.gateHp)) })}
           </p>
         </div>
       )}
@@ -232,10 +234,10 @@ export default function Hud() {
       {assault && (
         <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#b0563a]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#e08a6b]">
-            НАБЕГ ОРДЫ · ВОЛНА {Math.min(assault.wave + 1, assault.waves)}/{assault.waves}
+            {t('НАБЕГ ОРДЫ · ВОЛНА {a}/{b}', { a: Math.min(assault.wave + 1, assault.waves), b: assault.waves })}
           </p>
           <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
-            Не пропусти мародёров к сердцу Рощи — Space для приказов
+            {t('Не пропусти мародёров к сердцу Рощи — Space для приказов')}
           </p>
         </div>
       )}
@@ -244,10 +246,10 @@ export default function Hud() {
       {raid && (
         <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#a06bd9]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#c9a3e8]">
-            РЕЙД · ВОЛНА {Math.min(raid.wave + 1, raid.waves)}/{raid.waves}
+            {t('РЕЙД · ВОЛНА {a}/{b}', { a: Math.min(raid.wave + 1, raid.waves), b: raid.waves })}
           </p>
           <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
-            Торвальд — авангард, Кайя — артиллерия. Держите сердце Разлома
+            {t('Торвальд — авангард, Кайя — артиллерия. Держите сердце Разлома')}
           </p>
         </div>
       )}
@@ -298,15 +300,19 @@ export default function Hud() {
         <>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <p className="game-title-font rounded border border-[#d9a441]/70 bg-[#181410]/90 px-6 py-2 text-xl tracking-[0.4em] text-[#f5c96b]">
-              ТАКТИЧЕСКАЯ ПАУЗА
+              {t('ТАКТИЧЕСКАЯ ПАУЗА')}
             </p>
           </div>
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded border border-[#5a4632]/70 bg-[#181410]/90 px-4 py-2 text-center backdrop-blur-sm">
             <p className="text-[11px] leading-relaxed text-[#cfc0a0]">
-              <span className="text-[#f5c96b]">ЛКМ по компаньону</span> — выбрать · <span className="text-[#f5c96b]">ЛКМ по земле</span> — приказ движения · <span className="text-[#f5c96b]">ЛКМ по врагу</span> — цель отряда
+              <span className="text-[#f5c96b]">{t('ЛКМ по компаньону')}</span> — {t('выбрать')} ·{' '}
+              <span className="text-[#f5c96b]">{t('ЛКМ по земле')}</span> — {t('приказ движения')} ·{' '}
+              <span className="text-[#f5c96b]">{t('ЛКМ по врагу')}</span> — {t('цель отряда')}
             </p>
             <p className="mt-0.5 text-[10px] text-[#8a8068]">
-              <span className="text-[#f5c96b]">V</span> — строй: {formation === 'wedge' ? 'клин' : 'линия'} · <span className="text-[#f5c96b]">Tab</span> — цель · <span className="text-[#f5c96b]">Пробел</span> — отпустить мир
+              <span className="text-[#f5c96b]">V</span> {t('— строй:')} {t(formation === 'wedge' ? 'клин' : 'линия')} ·{' '}
+              <span className="text-[#f5c96b]">Tab</span> {t('— цель')} ·{' '}
+              <span className="text-[#f5c96b]">Пробел</span> {t('— отпустить мир')}
             </p>
           </div>
         </>
@@ -331,20 +337,20 @@ export default function Hud() {
             <button
               key={b.id}
               onClick={() => getEngine()?.openPanel(b.id as 'char')}
-              title={b.title}
+              title={t(b.title)}
               className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             >
               <GameIcon name={b.icon} className="h-4 w-4" />
-              <span className="sr-only">{b.title}</span>
+              <span className="sr-only">{t(b.title)}</span>
             </button>
           ))}
           <button
             onClick={() => getEngine()?.openPanel('pause')}
-            title="Меню [Esc]"
+            title={t('Меню [Esc]')}
             className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
           >
             <GameIcon name="Settings" className="h-4 w-4" />
-            <span className="sr-only">Меню</span>
+            <span className="sr-only">{t('Меню')}</span>
           </button>
           <button
             onClick={() => {
@@ -352,11 +358,11 @@ export default function Hud() {
               setMuted(next)
               setMutedUi(next)
             }}
-            title="Звук"
+            title={t('Звук')}
             className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441]"
           >
             {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            <span className="sr-only">Звук</span>
+            <span className="sr-only">{t('Звук')}</span>
           </button>
         </div>
       </div>
@@ -381,8 +387,14 @@ export default function Hud() {
                   }`}
                   title={
                     open
-                      ? `${sh.name} [${sh.hotkey}] — слово «${sh.word}» ${sh.lv >= 2 ? 'II' : 'I'}${sh.cd > 0 ? ` — откат ${sh.cd.toFixed(1)}с` : ''}`
-                      : `${sh.name} — слово не открыто. Ищи Стены Слов в Стылом Пределье.`
+                      ? t('{name} [{hotkey}] — слово «{word}» {lv}{cd}', {
+                          name: sh.name,
+                          hotkey: sh.hotkey,
+                          word: sh.word,
+                          lv: sh.lv >= 2 ? 'II' : 'I',
+                          cd: sh.cd > 0 ? t(' — откат {s}с', { s: sh.cd.toFixed(1) }) : '',
+                        })
+                      : t('{name} — слово не открыто. Ищи Стены Слов в Стылом Пределье.', { name: sh.name })
                   }
                 >
                   {sh.id === 'shout_force' ? (
@@ -421,7 +433,12 @@ export default function Hud() {
                   onClick={() => getEngine()?.castAbility(a.id)}
                   disabled={!a.unlocked || a.cd > 0}
                   className={`ability-slot group relative h-12 w-12 overflow-hidden rounded ${!a.unlocked ? 'opacity-40' : ''}`}
-                  title={`${a.name} [${a.hotkey}]${a.staminaCost ? ` — ${a.staminaCost} ОВ` : ''}\n${a.desc}`}
+                  title={t('{name} [{hotkey}]{stam}\n{desc}', {
+                    name: a.name,
+                    hotkey: a.hotkey,
+                    stam: a.staminaCost ? t(' — {n} ОВ', { n: a.staminaCost }) : '',
+                    desc: a.desc,
+                  })}
                 >
                   <GameIcon name={a.icon} className="mx-auto mt-2 h-6 w-6 text-[#e8d5a8]" />
                   <span className="absolute left-1 top-0.5 text-[9px] font-bold text-[#d9a441]">{a.hotkey}</span>
@@ -450,7 +467,7 @@ export default function Hud() {
             <div className="mx-auto mb-1 flex w-fit items-center gap-1.5 rounded border border-[#d9a441]/50 bg-[#181410]/90 px-2 py-0.5">
               <GameIcon name="Droplets" className="h-3 w-3 text-[#d9a441]" />
               <span className="text-[10px] text-[#f5c96b]">{oil.name}</span>
-              <span className="text-[10px] tabular-nums text-[#9a8f78]">{oil.remain}с</span>
+              <span className="text-[10px] tabular-nums text-[#9a8f78]">{t('{s}с', { s: oil.remain })}</span>
             </div>
           )}
           {/* XP полоска */}

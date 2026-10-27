@@ -23,6 +23,7 @@ import { Entity } from '../types'
 import { hotkeyLabelForAbility, labelFor } from '../bindings'
 import { bossSpawnBark } from '../combatVoice'
 import { CompanionId } from '../data/combatVoice'
+import { t } from '../i18n'
 
 /** Активный босс (жив, в бою) — для bossBar и темы босса (v1.1). */
 export function findActiveBoss(ctx: EngineCtx): Entity | null {
@@ -48,8 +49,8 @@ export function syncUi(ctx: EngineCtx): void {
     {
       eid: ctx.player.eid,
       id: 'player',
-      name: 'Смотритель',
-      role: ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Смотритель',
+      name: t('Смотритель'),
+      role: t(ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Смотритель'),
       hp: Math.max(0, Math.round(ctx.hp)),
       maxHp: ctx.maxHp,
       alive: ctx.player.alive,
@@ -63,8 +64,8 @@ export function syncUi(ctx: EngineCtx): void {
     party.push({
       eid: e.eid,
       id: e.id,
-      name: e.name,
-      role: e.role ?? '',
+      name: t(e.name),
+      role: t(e.role ?? ''),
       hp: Math.max(0, Math.round(e.hp)),
       maxHp: e.maxHp,
       alive: e.alive,
@@ -91,8 +92,8 @@ export function syncUi(ctx: EngineCtx): void {
     const cdKey = ab.kind === 'potion' ? 'potion' : id
     return {
       id,
-      name: ab.name,
-      desc: ab.desc,
+      name: t(ab.name),
+      desc: t(ab.desc),
       icon: ab.icon,
       hotkey: hotkeyLabelForAbility(ab.id) ?? ab.hotkey,
       cd: ctx.player.cds[cdKey] ?? 0,
@@ -103,13 +104,15 @@ export function syncUi(ctx: EngineCtx): void {
   })
   const quests: QuestHud[] = QUESTS.map((qd) => ({
     id: qd.id,
-    name: qd.name,
+    name: t(qd.name),
     stage: ctx.quests[qd.id].stage,
     done: ctx.quests[qd.id].done,
     counter: ctx.quests[qd.id].counter,
-    summary: qd.summary,
+    summary: t(qd.summary),
     stageText:
-      ctx.quests[qd.id].stage > 0 || ctx.quests[qd.id].done ? stageText(ctx, qd.id) : qd.stages[0].text,
+      ctx.quests[qd.id].stage > 0 || ctx.quests[qd.id].done
+        ? t(stageText(ctx, qd.id))
+        : t(qd.stages[0].text),
     side: qd.side ?? false,
   }))
   const mainQ = quests.find((q) => q.id === 'main')!
@@ -169,7 +172,7 @@ export function syncUi(ctx: EngineCtx): void {
   const shouts: ShoutHud[] = [
     {
       id: 'shout_force',
-      name: 'Крик: Сила',
+      name: t('Крик: Сила'),
       icon: 'Wind',
       hotkey: labelFor('shout_force'),
       word: 'ФУС',
@@ -179,7 +182,7 @@ export function syncUi(ctx: EngineCtx): void {
     },
     {
       id: 'shout_frost',
-      name: 'Крик: Мороз',
+      name: t('Крик: Мороз'),
       icon: 'Snowflake',
       hotkey: labelFor('shout_frost'),
       word: 'ЛОК',
@@ -192,11 +195,11 @@ export function syncUi(ctx: EngineCtx): void {
   const career: CareerHud | null = ctx.career.faction
     ? {
         faction: ctx.career.faction,
-        factionName: CAREER_NAME[ctx.career.faction],
+        factionName: t(CAREER_NAME[ctx.career.faction]),
         rank: heroRank(ctx),
-        rankName: RANK_NAME[heroRank(ctx)],
+        rankName: t(RANK_NAME[heroRank(ctx)]),
         rep: ctx.career.rep[ctx.career.faction],
-        perks: CAREER_PERKS[ctx.career.faction],
+        perks: CAREER_PERKS[ctx.career.faction].map((p) => t(p)),
       }
     : null
   const n = ctx.isFrozen() ? null : nearestInteraction(ctx)
@@ -225,26 +228,32 @@ export function syncUi(ctx: EngineCtx): void {
     quests,
     trackerQuest: mainQ.done ? null : mainQ,
     contractQuest: sideQ,
-    bossBar: boss ? { name: ENEMY_NAME[boss.enemyType!] ?? 'Хозяин', hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
-    interactHint: n ? `${n.label} — [${labelFor('interact')}]` : null,
+    bossBar: boss ? { name: t(ENEMY_NAME[boss.enemyType!] ?? 'Хозяин'), hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
+    interactHint: n
+      ? n.npc
+        ? t('Поговорить: {x} — [{key}]', { x: t(n.npc.name), key: labelFor('interact') })
+        : n.it
+          ? t('{prompt}: {x} — [{key}]', { prompt: t(n.it.prompt), x: t(n.it.name), key: labelFor('interact') })
+          : t('{label} — [{key}]', { label: t(n.label), key: labelFor('interact') })
+      : null,
     bestiary: [...ctx.bestiary],
     // Фаза 3: масло, сутки, зона
-    oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
+    oil: ctx.oilT > 0 && ctx.oilKind ? { name: t(ITEMS[ctx.oilKind]?.name ?? 'Масло'), remain: Math.ceil(ctx.oilT) } : null,
     daytime: ctx.dayClock,
     zoneLabel:
       ctx.zone === 'veld'
-        ? 'ВЕЛЬД'
+        ? t('ВЕЛЬД')
         : ctx.zone === 'granite'
-          ? 'ГРАНИТНАЯ ДОЛИНА'
+          ? t('ГРАНИТНАЯ ДОЛИНА')
           : ctx.zone === 'frost'
-            ? 'СТЫЛОЕ ПРЕДЕЛЬЕ'
+            ? t('СТЫЛОЕ ПРЕДЕЛЬЕ')
             : ctx.zone === 'mara'
-              ? 'БАГРОВАЯ МАРА'
+              ? t('БАГРОВАЯ МАРА')
               : ctx.zone === 'disputed'
-                ? 'СПОРНЫЕ ЗЕМЛИ'
+                ? t('СПОРНЫЕ ЗЕМЛИ')
                 : ctx.zone === 'rubezh'
-                  ? 'ВНЕШНИЙ РУБЕЖ'
-                  : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+                  ? t('ВНЕШНИЙ РУБЕЖ')
+                  : t('ХЕЙМХОЛЛ И ОКРЕСТНОСТИ'),
     formation: ctx.formation,
     career,
     shouts,

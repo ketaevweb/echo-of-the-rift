@@ -10,6 +10,7 @@ import { ENEMY_NAME } from '../data/tables'
 import { BASTION_GATE, BREACH_CAMPS, SIEGE_BREAK, SIEGE_GATE_HP, SIEGE_WAVES } from '../data/world'
 import { Entity } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx, SiegeState } from '../core/ctx'
 import { makeEntity, nearestParty } from '../core/entity'
@@ -128,8 +129,8 @@ export function updateMara(ctx: EngineCtx, dt: number) {
     if (S.breakT <= 0) {
       S.pending = [...SIEGE_WAVES[S.wave]]
       S.spawnT = 0
-      floater(ctx, BASTION_GATE, `ВОЛНА ${S.wave + 1}!`, '#e0653a', 18)
-      ctx.toast(`Оборона Бастиона: волна ${S.wave + 1} из ${SIEGE_WAVES.length}!`, 'warn')
+      floater(ctx, BASTION_GATE, t('ВОЛНА {n}!', { n: S.wave + 1 }), '#e0653a', 18)
+      ctx.toast(t('Оборона Бастиона: волна {n} из {total}!', { n: S.wave + 1, total: SIEGE_WAVES.length }), 'warn')
       sfx('boss')
     }
     return
@@ -157,7 +158,10 @@ export function updateMara(ctx: EngineCtx, dt: number) {
     }
     S.gateHp = Math.min(SIEGE_GATE_HP, S.gateHp + 10)
     S.breakT = SIEGE_BREAK
-    ctx.toast(`Волна отбита! Частокол чинят (${Math.round(S.gateHp)}%). Следующая волна — через ${SIEGE_BREAK} с.`, 'quest')
+    ctx.toast(
+      t('Волна отбита! Частокол чинят ({hp}%). Следующая волна — через {sec} с.', { hp: Math.round(S.gateHp), sec: SIEGE_BREAK }),
+      'quest',
+    )
     sfx('level')
     ctx.syncUi()
     return

@@ -10,6 +10,7 @@ import { ENEMY_NAME } from '../data/tables'
 import { RUNE_SOLUTION, RUNE_STONES, RUNE_SYMBOLS, ROOST } from '../data/world'
 import { Entity } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { makeEntity, nearestParty } from '../core/entity'
@@ -26,12 +27,15 @@ export function learnWord(ctx: EngineCtx, word: 'force' | 'frost') {
   ctx.shoutLv[word] = Math.min(2, was + 1)
   ctx.flags[flag] = true
   const name = word === 'force' ? 'СИЛА' : 'МОРОЗ'
-  floater(ctx, ctx.player.pos, '«' + name + '»', '#f5c96b', 20)
+  floater(ctx, ctx.player.pos, t('«{name}»', { name: t(name) }), '#f5c96b', 20)
   ring(ctx, ctx.player.pos, '#f5c96b', 70, 0.9)
   ctx.toast(
     was === 0
-      ? `Стена Слова отдаёт своё слово: «${name}»! Крик изучен (${word === 'force' ? 'R' : 'T'}).`
-      : `Второе слово «${name}» впитано — крик стал сильнее.`,
+      ? t('Стена Слова отдаёт своё слово: «{name}»! Крик изучен ({key}).', {
+          name: t(name),
+          key: word === 'force' ? 'R' : 'T',
+        })
+      : t('Второе слово «{name}» впитано — крик стал сильнее.', { name: t(name) }),
     'level',
   )
   sfx('level')

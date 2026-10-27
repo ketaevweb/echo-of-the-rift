@@ -11,6 +11,7 @@ import { ATTR_NAMES } from '../data/tables'
 import { SignId } from '../types'
 import { TrainerHudState, useGame } from '../store'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { EngineCtx } from '../core/ctx'
 import { floater, ring } from './combat'
 import { careerRank } from './career'
@@ -63,7 +64,7 @@ export function xpNext(ctx: EngineCtx) {
 
 export function gainXp(ctx: EngineCtx, n: number) {
   ctx.xp += n
-  floater(ctx, ctx.player.pos, '+' + n + ' опыта', '#c9b06b', 12)
+  floater(ctx, ctx.player.pos, t('+{n} опыта', { n }), '#c9b06b', 12)
   let next = xpNext(ctx)
   while (ctx.xp >= next) {
     ctx.xp -= next
@@ -73,7 +74,7 @@ export function gainXp(ctx: EngineCtx, n: number) {
     ctx.hp = ctx.maxHp
     ctx.player.hp = ctx.maxHp
     ctx.stamina = ctx.maxStamina
-    ctx.toast(`Уровень ${ctx.level}! +5 очков обучения`, 'level')
+    ctx.toast(t('Уровень {n}! +5 очков обучения', { n: ctx.level }), 'level')
     sfx('level')
     ring(ctx, ctx.player.pos, '#f5c96b', 60, 0.9)
     next = xpNext(ctx)
@@ -88,7 +89,7 @@ export function spendLp(ctx: EngineCtx, attr: 'might' | 'vigor' | 'intellect' | 
   ctx.lp -= 3
   ctx.attributes[attr]++
   recalcStats(ctx)
-  ctx.toast(`${ATTR_NAMES[attr]} повышена!`, 'level')
+  ctx.toast(t('{name} повышена!', { name: t(ATTR_NAMES[attr]) }), 'level')
   sfx('level')
   ctx.syncUi()
 }
@@ -104,7 +105,8 @@ const SHOPS: Record<'grim' | 'alra' | 'brock', { name: string; stock: string[] }
 
 export function openShop(ctx: EngineCtx, merchant: 'grim' | 'alra' | 'brock' = 'grim') {
   const s = SHOPS[merchant]
-  useGame.getState().patch({ shop: { merchantName: s.name, stock: [...s.stock] }, panel: 'shop' })
+  // v1.6: имя торговца — из data/world.ts, переводят его словари контента; здесь только t()-обёртка
+  useGame.getState().patch({ shop: { merchantName: t(s.name), stock: [...s.stock] }, panel: 'shop' })
 }
 
 export function buildTrainerOptions(ctx: EngineCtx): TrainerHudState {
@@ -122,10 +124,10 @@ export function buildTrainerOptions(ctx: EngineCtx): TrainerHudState {
     const goldCost = sd.key === 'speech' ? 60 : 40 + r * 20
     opts.push({
       id: 'skill:' + sd.key,
-      name: `${sd.name} (${r}/5)`,
-      desc: sd.desc,
+      name: t('{name} ({r}/5)', { name: t(sd.name), r }),
+      desc: t(sd.desc),
       kind: 'skill',
-      cost: `${lpCost} ОН + ${goldCost} зол.`,
+      cost: t('{lp} ОН + {gold} зол.', { lp: lpCost, gold: goldCost }),
       maxed,
       affordable: !maxed && ctx.lp >= lpCost && ctx.gold >= goldCost,
     })
@@ -142,20 +144,20 @@ export function buildTrainerOptions(ctx: EngineCtx): TrainerHudState {
       const goldCost = sd.id === 'axii' ? 90 : 60
       opts.push({
         id: 'sign:' + sd.id,
-        name: `Изучить знак: ${sd.name}`,
-        desc: ABILITY_MAP[sd.id].desc,
+        name: t('Изучить знак: {name}', { name: t(sd.name) }),
+        desc: t(ABILITY_MAP[sd.id].desc),
         kind: 'sign',
-        cost: `${lpCost} ОН + ${goldCost} зол.`,
+        cost: t('{lp} ОН + {gold} зол.', { lp: lpCost, gold: goldCost }),
         maxed: false,
         affordable: ctx.lp >= lpCost && ctx.gold >= goldCost,
       })
     } else if (st.level < 3) {
       opts.push({
         id: 'signup:' + sd.id,
-        name: `${sd.name} → уровень ${st.level + 1}`,
-        desc: 'Усилить знак: больше урона и длительности.',
+        name: t('{name} → уровень {n}', { name: t(sd.name), n: st.level + 1 }),
+        desc: t('Усилить знак: больше урона и длительности.'),
         kind: 'sign',
-        cost: '2 ОН + 80 зол.',
+        cost: t('2 ОН + 80 зол.'),
         maxed: false,
         affordable: ctx.lp >= 2 && ctx.gold >= 80,
       })
@@ -199,7 +201,7 @@ export function trainOption(ctx: EngineCtx, id: string) {
       ctx.gold -= goldCost
       st.unlocked = true
       st.level = 1
-      ctx.toast(`Знак изучен: ${ABILITY_MAP[signId].name}!`, 'level')
+      ctx.toast(t('Знак изучен: {name}!', { name: t(ABILITY_MAP[signId].name) }), 'level')
       sfx('level')
     } else if (st.level < 3) {
       if (ctx.lp < 2 || ctx.gold < 80) {
@@ -209,7 +211,7 @@ export function trainOption(ctx: EngineCtx, id: string) {
       ctx.lp -= 2
       ctx.gold -= 80
       st.level++
-      ctx.toast(`${ABILITY_MAP[signId].name} усилен до уровня ${st.level}!`, 'level')
+      ctx.toast(t('{name} усилен до уровня {n}!', { name: t(ABILITY_MAP[signId].name), n: st.level }), 'level')
       sfx('level')
     }
   }

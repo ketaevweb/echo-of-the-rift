@@ -15,6 +15,7 @@ import { BESTIARY_INFO } from '../data/tables'
 import { CareerId, Entity, Faction, InteractableDef, OriginId, Vec } from '../types'
 import { useGame } from '../store'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { addItem, countItem, removeItem } from './inventory'
@@ -179,7 +180,13 @@ export function chooseOption(ctx: EngineCtx, i: number) {
     const total = roll + bonus
     const success = roll !== 1 && (roll === 20 || total >= c.check.dc)
     ctx.toast(
-      `${c.check.label}: d20 ${roll} + ${bonus} = ${total} — ${success ? 'успех!' : 'провал'}`,
+      t('{label}: d20 {roll} + {bonus} = {total} — {verdict}', {
+        label: t(c.check.label),
+        roll,
+        bonus,
+        total,
+        verdict: success ? t('успех!') : t('провал'),
+      }),
       success ? 'quest' : 'warn',
     )
     // Фаза 5: видимый бросок (BG3) — оверлей, потом продолжение ветки
@@ -256,7 +263,7 @@ export function runAction(ctx: EngineCtx, action: string) {
       case 'bestiary':
         if (!ctx.bestiary.has(arg1)) {
           ctx.bestiary.add(arg1)
-          ctx.toast('Бестиарий: ' + (BESTIARY_INFO[arg1]?.name ?? arg1), 'quest')
+          ctx.toast(t('Бестиарий: {name}', { name: t(BESTIARY_INFO[arg1]?.name ?? arg1) }), 'quest')
           sfx('quest')
         }
         break
@@ -265,7 +272,7 @@ export function runAction(ctx: EngineCtx, action: string) {
           const wasNew = !ctx.companionIds[arg1]
           ctx.spawnCompanion(arg1)
           if (wasNew) {
-            ctx.toast(`${arg1 === 'kaya' ? 'Кайя' : 'Торвальд'} присоединяется к отряду!`, 'quest')
+            ctx.toast(t('{name} присоединяется к отряду!', { name: t(arg1 === 'kaya' ? 'Кайя' : 'Торвальд') }), 'quest')
             sfx('quest')
           }
         }
@@ -400,7 +407,7 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
       if (q.stage === 1 && q.counter >= 3) {
         advanceQuest(ctx, questId, 2)
       } else {
-        ctx.toast(`Мор-сгусток: ${q.counter}/3`, 'quest')
+        ctx.toast(t('Мор-сгусток: {c}/3', { c: q.counter }), 'quest')
         saveGame(ctx, false)
         ctx.syncUi()
       }
@@ -419,7 +426,7 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
       if (q.stage === 1 && q.counter >= 3) {
         advanceQuest(ctx, questId, 2)
       } else {
-        ctx.toast(`Узел беженцев: ${q.counter}/3`, 'quest')
+        ctx.toast(t('Узел беженцев: {c}/3', { c: q.counter }), 'quest')
         saveGame(ctx, false)
         ctx.syncUi()
       }
@@ -436,8 +443,8 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
     ctx.removedProps.add(it.id)
     ctx.flags['clue_' + it.id] = true
     const clue = FROST_CLUES.find((c) => c.id === it.id)
-    floater(ctx, it.pos, clue?.name ?? 'След', '#bfe3ea', 14)
-    if (clue) ctx.toast(clue.text, 'info')
+    floater(ctx, it.pos, t(clue?.name ?? 'След'), '#bfe3ea', 14)
+    if (clue) ctx.toast(t(clue.text), 'info')
     sfx('quest')
     const q = ctx.quests[questId]
     if (q && !q.done) {
@@ -445,7 +452,7 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
       if (q.stage === 1 && q.counter >= 3) {
         advanceQuest(ctx, questId, 2)
       } else {
-        ctx.toast(`След пожара: ${q.counter}/3`, 'quest')
+        ctx.toast(t('След пожара: {c}/3', { c: q.counter }), 'quest')
         saveGame(ctx, false)
         ctx.syncUi()
       }
@@ -457,12 +464,12 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
     ctx.removedProps.add(it.id)
     ctx.flags['ore_' + it.id] = true
     sfx('coin')
-    ctx.toast('Добыто: ' + ITEMS[item].name, 'loot')
+    ctx.toast(t('Добыто: {name}', { name: t(ITEMS[item].name) }), 'loot')
     const q = ctx.quests.granite_ore
     if (q.stage === 1 && !q.done) {
       q.counter++
       if (q.counter >= 4) ctx.toast('Руды достаточно — к Броку в Колонию!', 'quest')
-      else ctx.toast(`Гранитная руда: ${q.counter}/4`, 'info')
+      else ctx.toast(t('Гранитная руда: {c}/4', { c: q.counter }), 'info')
     }
     ctx.syncUi()
   } else if (it.action.startsWith('clue:')) {
@@ -471,8 +478,8 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
     ctx.removedProps.add(it.id)
     ctx.flags['clue_' + it.id] = true
     const clue = VELD_CLUES.find((c) => c.id === it.id)
-    floater(ctx, it.pos, clue?.name ?? 'След', '#d9c04f', 14)
-    if (clue) ctx.toast(clue.text, 'info')
+    floater(ctx, it.pos, t(clue?.name ?? 'След'), '#d9c04f', 14)
+    if (clue) ctx.toast(t(clue.text), 'info')
     sfx('quest')
     const q = ctx.quests[questId]
     if (q && !q.done) {
@@ -482,7 +489,7 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
         spawnAshMother(ctx)
         advanceQuest(ctx, questId, 2)
       } else {
-        ctx.toast(`След: ${q.counter}/3`, 'quest')
+        ctx.toast(t('След: {c}/3', { c: q.counter }), 'quest')
         saveGame(ctx, false)
         ctx.syncUi()
       }
@@ -493,12 +500,12 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
     ctx.removedProps.add(it.id)
     ctx.flags['herb_' + it.id] = true
     sfx('coin')
-    ctx.toast('Собрано: ' + ITEMS[item].name, 'loot')
+    ctx.toast(t('Собрано: {name}', { name: t(ITEMS[item].name) }), 'loot')
     const q = ctx.quests.mist
     if (q.stage === 1 && !q.done) {
       q.counter++
       if (q.counter >= 3) ctx.toast('Лунные травы собраны — к Селене!', 'quest')
-      else ctx.toast(`Лунная трава: ${q.counter}/3`, 'info')
+      else ctx.toast(t('Лунная трава: {c}/3', { c: q.counter }), 'info')
     }
     ctx.syncUi()
   }
@@ -574,7 +581,7 @@ export function advanceQuest(ctx: EngineCtx, id: string, stage: number) {
     spawnPitMaster(ctx)
     ctx.toast('Заслон Ямы гремит: Мастер ждёт тебя на арене.', 'warn')
   }
-  ctx.toast(`${def.name}: ${stageText(ctx, id)}`, 'quest')
+  ctx.toast(t('{name}: {stage}', { name: t(def.name), stage: stageText(ctx, id) }), 'quest')
   sfx('quest')
   saveGame(ctx, false)
   ctx.syncUi()
@@ -607,7 +614,7 @@ export function grantKey(ctx: EngineCtx, keyId: string, domain: string) {
   const keys = ['key_valley', 'key_veld', 'key_granite', 'key_frost', 'key_mara', 'key_disputed', 'key_rubezh'].filter(
     (k) => ctx.flags[k],
   ).length
-  ctx.toast(`Ключ-осколок: ${domain} — собрано ${keys} из 7`, 'quest')
+  ctx.toast(t('Ключ-осколок: {domain} — собрано {n} из 7', { domain: t(domain), n: keys }), 'quest')
   sfx('level')
 }
 
@@ -719,21 +726,21 @@ export function updateArea(ctx: EngineCtx) {
   // восток за Стылым Хребтом — Стылое Пределье, восток за Рубежным Кряжем — Спорные Земли
   let name =
     ctx.zone === 'veld'
-      ? 'Вельд'
+      ? t('Вельд')
       : ctx.zone === 'granite'
-        ? 'Гранитная Долина'
+        ? t('Гранитная Долина')
         : ctx.zone === 'frost'
-          ? 'Стылое Пределье'
+          ? t('Стылое Пределье')
           : ctx.zone === 'mara'
-            ? 'Багровая Мара'
+            ? t('Багровая Мара')
             : ctx.zone === 'disputed'
-              ? 'Спорные Земли'
-              : 'Долина'
+              ? t('Спорные Земли')
+              : t('Долина')
   for (const a of AREAS) {
     if (a.id === 'wilds') continue
     const [x, y, w, h] = a.rect
     if (ctx.player.pos.x > x && ctx.player.pos.x < x + w && ctx.player.pos.y > y && ctx.player.pos.y < y + h) {
-      name = a.name
+      name = t(a.name)
       break
     }
   }
@@ -756,15 +763,15 @@ export function openEnding(ctx: EngineCtx) {
   const def = ENDINGS[endingId] ?? ENDINGS.seal
   const factionLine: Record<Faction, string[]> = {
     none: [
-      'Ты ушёл из долины до рассвета, никому ничего не сказав. Долг Смотрителя исполнен — а судьба Хеймхолла теперь в руках его людей.',
+      t('Ты ушёл из долины до рассвета, никому ничего не сказав. Долг Смотрителя исполнен — а судьба Хеймхолла теперь в руках его людей.'),
     ],
     flame: [
-      'Орден Пламени воздвиг у Разлома сторожевую башню. Капитан Ирма лично подняла твоё имя на её ворота.',
-      'Сталь и строй — теперь этого достаточно. Пока достаточно.',
+      t('Орден Пламени воздвиг у Разлома сторожевую башню. Капитан Ирма лично подняла твоё имя на её ворота.'),
+      t('Сталь и строй — теперь этого достаточно. Пока достаточно.'),
     ],
     mist: [
-      'Ковен Тумана переписал печать, и Разлом затянулся туманом. Архимаг Селена назвала тебя «голосом между мирами».',
-      'Туман помнит. Туман ждёт.',
+      t('Ковен Тумана переписал печать, и Разлом затянулся туманом. Архимаг Селена назвала тебя «голосом между мирами».'),
+      t('Туман помнит. Туман ждёт.'),
     ],
   }
   const epilogue: string[] = [
@@ -774,42 +781,47 @@ export function openEnding(ctx: EngineCtx) {
   // Фаза 5: высокая Тишь портит даже лучший финал (кроме концовки «Тишь» — там это и есть финал)
   if (endingId !== 'silence' && ctx.silence >= 60) {
     epilogue.push(
-      'Но краски долины так и не вернулись: где-то в швах мира осталась Тишь — цена тех выборов, что были дешевле слов.',
+      t('Но краски долины так и не вернулись: где-то в швах мира осталась Тишь — цена тех выборов, что были дешевле слов.'),
     )
   } else if (ctx.silence <= 15) {
     epilogue.push(
-      'Небо над долиной того же цвета, что и до Разлома: человечность — редкая валюта, ты потратил её бережно.',
+      t('Небо над долиной того же цвета, что и до Разлома: человечность — редкая валюта, ты потратил её бережно.'),
     )
   }
-  epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
+  epilogue.push(t('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.'))
   // Фаза 6.4: судьба Спорных Землей — след выбора в ландшафте (кроме Тиши — там уже пусто)
   if (endingId !== 'silence') {
     if (ctx.flags.groveBurned) {
-      epilogue.push('Спорные Земли говорят только углём: вереск выгорел, Роща — пепел, а Орда пела, пока горели чужие шатры.')
+      epilogue.push(t('Спорные Земли говорят только углём: вереск выгорел, Роща — пепел, а Орда пела, пока горели чужие шатры.'))
     } else if (ctx.flags.groveSaved) {
-      epilogue.push('Спорные Земли вереском зацвели: Семя благословлено, фонари Рощи горят до сих пор, и беженцы называют тебя тем, кто не продался.')
+      epilogue.push(t('Спорные Земли вереском зацвели: Семя благословлено, фонари Рощи горят до сих пор, и беженцы называют тебя тем, кто не продался.'))
     } else if (ctx.flags.hordeBroken) {
-      epilogue.push('Пепельная Орда рассеялась после набега на Рощу, но Семя в сердце рощи так и не нашло покоя.')
+      epilogue.push(t('Пепельная Орда рассеялась после набега на Рощу, но Семя в сердце рощи так и не нашло покоя.'))
     }
   }
   // Фаза 6: карьера Гранита вписана в судьбу героя
   if (ctx.career.faction) {
     epilogue.push(
-      `${CAREER_NAME[ctx.career.faction]} помнит, на чьей стороне ты стоял в войне за барьер — и это значит больше, чем любое золото.`,
+      t('{name} помнит, на чьей стороне ты стоял в войне за барьер — и это значит больше, чем любое золото.', {
+        name: t(CAREER_NAME[ctx.career.faction]),
+      }),
     )
   }
   const mins = Math.floor(ctx.playtime / 60)
   const keys = KEYS_ALL.filter((k) => ctx.flags[k]).length
   const stats: Array<[string, string]> = [
-    ['Уровень', String(ctx.level)],
-    ['Убито врагов', String(ctx.kills)],
-    ['Золото', String(ctx.gold)],
-    ['Время в игре', `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`],
-    ['Фракция', ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель'],
-    ['Спутники', `${(ctx.companionIds.kaya ? 1 : 0) + (ctx.companionIds.torvald ? 1 : 0)} из 2`],
-    ['Тишь', `${ctx.silence}/100`],
-    ['Карьера Колонии', ctx.career.faction ? `${CAREER_NAME[ctx.career.faction]}, ранг ${heroRank(ctx)}` : 'нет'],
-    ['Ключи-осколки', `${keys}/6`],
+    [t('Уровень'), String(ctx.level)],
+    [t('Убито врагов'), String(ctx.kills)],
+    [t('Золото'), String(ctx.gold)],
+    [t('Время в игре'), `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`],
+    [t('Фракция'), t(ctx.faction === 'flame' ? 'Орден Пламени' : ctx.faction === 'mist' ? 'Ковен Тумана' : 'Вольный смотритель')],
+    [t('Спутники'), t('{n} из 2', { n: (ctx.companionIds.kaya ? 1 : 0) + (ctx.companionIds.torvald ? 1 : 0) })],
+    [t('Тишь'), `${ctx.silence}/100`],
+    [
+      t('Карьера Колонии'),
+      ctx.career.faction ? t('{name}, ранг {n}', { name: t(CAREER_NAME[ctx.career.faction]), n: heroRank(ctx) }) : t('нет'),
+    ],
+    [t('Ключи-осколки'), `${keys}/6`],
   ]
   // Фаза 7: судьбы компаньонов по матрице GDD 07 §7 (погиб / жив-герой / жив-сломлен)
   const fates = companionFates(ctx)

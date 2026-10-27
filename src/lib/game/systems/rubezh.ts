@@ -12,6 +12,7 @@ import { ENEMY_NAME } from '../data/tables'
 import { CREW_NAMES, RELAY_ORDER, RELAYS, STASIS_HALL } from '../data/world'
 import { Entity } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { makeEntity } from '../core/entity'
@@ -55,7 +56,7 @@ export function activateRelay(ctx: EngineCtx, relayId: string, uiId: string) {
     ctx.toast('Хребет сигналов поёт! Дроны-разведчики Ашера вышли на плато — поддержка рейда обеспечена.', 'quest')
     saveGame(ctx, false)
   } else {
-    ctx.toast(`Ретранслятор синхронизирован (${q.counter}/${RELAY_ORDER.length}).`, 'info')
+    ctx.toast(t('Ретранслятор синхронизирован ({n}/{total}).', { n: q.counter, total: RELAY_ORDER.length }), 'info')
   }
   ctx.syncUi()
 }
@@ -78,7 +79,7 @@ export function readCrewPod(ctx: EngineCtx, uiId: string) {
     advanceQuest(ctx, 'rubezh_crew', 2)
     ctx.toast(`Двенадцать имён возвращены из стазиса. К Ашеру — он должен их услышать.`, 'quest')
   } else {
-    ctx.toast(`Стазис-капсула: ${name} (${c}/12)`, 'info')
+    ctx.toast(t('Стазис-капсула: {name} ({c}/12)', { name: t(name), c }), 'info')
   }
   sfx('quest')
   saveGame(ctx, false)
@@ -101,7 +102,7 @@ export function surveyRing(ctx: EngineCtx, uiId: string) {
     advanceQuest(ctx, 'rubezh_rings', 2)
     ctx.toast('Три кольца нанесены на карту: аварийная полоса «Двенадцатого» восстановлена оф-тропой.', 'quest')
   } else {
-    ctx.toast(`Посадочные кольца: ${c}/3`, 'info')
+    ctx.toast(t('Посадочные кольца: {c}/3', { c }), 'info')
   }
   sfx('quest')
   saveGame(ctx, false)

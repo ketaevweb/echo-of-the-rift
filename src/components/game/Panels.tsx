@@ -21,6 +21,7 @@ import {
   setBindings,
 } from '@/lib/game/bindings'
 import { boot, useGame } from '@/lib/game/store'
+import { setLocale, t, useLocale } from '@/lib/game/i18n'
 import { GameIcon } from './GameIcon'
 
 function Panel({
@@ -45,7 +46,7 @@ function Panel({
           <button
             onClick={() => getEngine()?.closePanel()}
             className="rounded border border-[#5a4632] p-1.5 text-[#9a8f78] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
-            aria-label="Закрыть"
+            aria-label={t('Закрыть')}
           >
             <X className="h-4 w-4" />
           </button>
@@ -79,7 +80,7 @@ function AttrLine({ name, value, attr, hint }: { name: string; value: number; at
         disabled={lp < 3}
         className="shrink-0 rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-3 py-1.5 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        +1 (3 ОН)
+        {t('+1 (3 ОН)')}
       </button>
     </Row>
   )
@@ -96,78 +97,78 @@ function CharPanel() {
     { id: 'axii', name: 'Аксий — обман' },
   ]
   return (
-    <Panel title="Персонаж" subtitle={`Уровень ${player.level} · Опыт ${player.xp}/${player.xpNext}`} wide>
+    <Panel title={t('Персонаж')} subtitle={t('Уровень {n} · Опыт {x}/{y}', { n: player.level, x: player.xp, y: player.xpNext })} wide>
       <div className="grid gap-5 md:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">АТРИБУТЫ · ОН: {player.lp}</p>
-          <AttrLine name="Мощь" value={player.attributes.might} attr="might" hint="Атака и урон клинком" />
-          <AttrLine name="Стойкость" value={player.attributes.vigor} attr="vigor" hint="Здоровье и класс брони" />
-          <AttrLine name="Разум" value={player.attributes.intellect} attr="intellect" hint="Сила знаков" />
-          <AttrLine name="Обаяние" value={player.attributes.charisma} attr="charisma" hint="Убеждение в диалогах" />
-          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">НАВЫКИ (НАСТАВНИК)</p>
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('АТРИБУТЫ · ОН: {n}', { n: player.lp })}</p>
+          <AttrLine name={t('Мощь')} value={player.attributes.might} attr="might" hint={t('Атака и урон клинком')} />
+          <AttrLine name={t('Стойкость')} value={player.attributes.vigor} attr="vigor" hint={t('Здоровье и класс брони')} />
+          <AttrLine name={t('Разум')} value={player.attributes.intellect} attr="intellect" hint={t('Сила знаков')} />
+          <AttrLine name={t('Обаяние')} value={player.attributes.charisma} attr="charisma" hint={t('Убеждение в диалогах')} />
+          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('НАВЫКИ (НАСТАВНИК)')}</p>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <Row className="!justify-start">Клинок: <b className="ml-auto text-[#f5c96b]">{player.skills.blade}/5</b></Row>
-            <Row className="!justify-start">Живучесть: <b className="ml-auto text-[#f5c96b]">{player.skills.vitality}/5</b></Row>
-            <Row className="!justify-start">Знаки: <b className="ml-auto text-[#f5c96b]">{player.skills.signs}/5</b></Row>
-            <Row className="!justify-start">Красноречие: <b className="ml-auto text-[#f5c96b]">{player.skills.speech}/5</b></Row>
+            <Row className="!justify-start">{t('Клинок:')} <b className="ml-auto text-[#f5c96b]">{player.skills.blade}/5</b></Row>
+            <Row className="!justify-start">{t('Живучесть:')} <b className="ml-auto text-[#f5c96b]">{player.skills.vitality}/5</b></Row>
+            <Row className="!justify-start">{t('Знаки:')} <b className="ml-auto text-[#f5c96b]">{player.skills.signs}/5</b></Row>
+            <Row className="!justify-start">{t('Красноречие:')} <b className="ml-auto text-[#f5c96b]">{player.skills.speech}/5</b></Row>
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">СНАРЯЖЕНИЕ</p>
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('СНАРЯЖЕНИЕ')}</p>
           <Row>
             <span className="flex items-center gap-2 text-sm text-[#e8d5a8]">
-              <GameIcon name="Sword" className="h-4 w-4 text-[#c9b06b]" /> Оружие
+              <GameIcon name="Sword" className="h-4 w-4 text-[#c9b06b]" /> {t('Оружие')}
             </span>
-            <span className="text-sm text-[#f5c96b]">{player.weapon ? ITEMS[player.weapon].name : '— кулаки —'}</span>
+            <span className="text-sm text-[#f5c96b]">{player.weapon ? t(ITEMS[player.weapon].name) : t('— кулаки —')}</span>
           </Row>
           <Row>
             <span className="flex items-center gap-2 text-sm text-[#e8d5a8]">
-              <GameIcon name="Shirt" className="h-4 w-4 text-[#c9b06b]" /> Броня
+              <GameIcon name="Shirt" className="h-4 w-4 text-[#c9b06b]" /> {t('Броня')}
             </span>
-            <span className="text-sm text-[#f5c96b]">{player.armor ? ITEMS[player.armor].name : '— нет —'}</span>
+            <span className="text-sm text-[#f5c96b]">{player.armor ? t(ITEMS[player.armor].name) : t('— нет —')}</span>
           </Row>
-          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">ЗНАКИ</p>
+          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('ЗНАКИ')}</p>
           {signList.map((s) => {
             const st = player.signs[s.id]
             return (
               <Row key={s.id}>
-                <span className={`text-sm ${st.unlocked ? 'text-[#e8d5a8]' : 'text-[#6a6152]'}`}>{s.name}</span>
+                <span className={`text-sm ${st.unlocked ? 'text-[#e8d5a8]' : 'text-[#6a6152]'}`}>{t(s.name)}</span>
                 <span className={`text-xs ${st.unlocked ? 'text-[#f5c96b]' : 'text-[#6a6152]'}`}>
-                  {st.unlocked ? `ур. ${st.level}` : 'не изучен'}
+                  {st.unlocked ? t('ур. {n}', { n: st.level }) : t('не изучен')}
                 </span>
               </Row>
             )
           })}
           <Row>
             <span className={`text-sm ${player.signs.shout.unlocked ? 'text-[#e8d5a8]' : 'text-[#6a6152]'}`}>
-              Голос Древних — крик силы
+              {t('Голос Древних — крик силы')}
             </span>
             <span className={`text-xs ${player.signs.shout.unlocked ? 'text-[#f5c96b]' : 'text-[#6a6152]'}`}>
-              {player.signs.shout.unlocked ? 'изучен' : 'алтарь у Камней'}
+              {player.signs.shout.unlocked ? t('изучен') : t('алтарь у Камней')}
             </span>
           </Row>
-          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">СОСТОЯНИЕ</p>
+          <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('СОСТОЯНИЕ')}</p>
           <Row>
-            <span className="text-sm text-[#e8d5a8]">Золото</span>
+            <span className="text-sm text-[#e8d5a8]">{t('Золото')}</span>
             <span className="flex items-center gap-1 text-sm font-bold text-[#e8d5a8]">
               <Coins className="h-4 w-4 text-[#e8c56b]" /> {player.gold}
             </span>
           </Row>
           <Row>
-            <span className="text-sm text-[#e8d5a8]">Фракция</span>
+            <span className="text-sm text-[#e8d5a8]">{t('Фракция')}</span>
             <span className="text-sm text-[#f5c96b]">
-              {player.faction === 'flame' ? 'Орден Пламени' : player.faction === 'mist' ? 'Ковен Тумана' : 'Вольный'}
+              {t(player.faction === 'flame' ? 'Орден Пламени' : player.faction === 'mist' ? 'Ковен Тумана' : 'Вольный')}
             </span>
           </Row>
           {career && (
             <>
-              <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">КАРЬЕРА КОЛОНИИ (ФАЗА 6)</p>
+              <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('КАРЬЕРА КОЛОНИИ (ФАЗА 6)')}</p>
               <Row>
                 <span className="text-sm text-[#e8d5a8]">{career.factionName}</span>
                 <span className="text-sm text-[#f5c96b]">{career.rankName}</span>
               </Row>
               <Row>
-                <span className="text-sm text-[#e8d5a8]">Слава лагеря</span>
+                <span className="text-sm text-[#e8d5a8]">{t('Слава лагеря')}</span>
                 <span className="text-sm text-[#f5c96b]">{career.rep}/100</span>
               </Row>
               {career.perks.map((p) => (
@@ -188,29 +189,29 @@ function InvPanel() {
   const player = useGame((s) => s.player)
   if (!player) return null
   const equipped = [
-    { slot: 'weapon' as const, label: 'Оружие', item: player.weapon },
-    { slot: 'armor' as const, label: 'Броня', item: player.armor },
+    { slot: 'weapon' as const, label: t('Оружие'), item: player.weapon },
+    { slot: 'armor' as const, label: t('Броня'), item: player.armor },
   ]
   return (
-    <Panel title="Инвентарь" subtitle={`Золото: ${player.gold}`}>
+    <Panel title={t('Инвентарь')} subtitle={t('Золото: {n}', { n: player.gold })}>
       <div className="flex flex-col gap-2">
         {equipped.map((eq) => (
           <Row key={eq.slot}>
             <span className="text-sm text-[#e8d5a8]">
-              {eq.label}: <span className="text-[#f5c96b]">{eq.item ? ITEMS[eq.item].name : '— пусто —'}</span>
+              {eq.label}: <span className="text-[#f5c96b]">{eq.item ? t(ITEMS[eq.item].name) : t('— пусто —')}</span>
             </span>
             {eq.item && (
               <button
                 onClick={() => getEngine()?.unequipItem(eq.slot)}
                 className="rounded border border-[#5a4632] px-3 py-1 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
               >
-                Снять
+                {t('Снять')}
               </button>
             )}
           </Row>
         ))}
-        <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">СУМКА</p>
-        {inventory.length === 0 && <p className="text-sm text-[#8a8068]">Пусто. Как в карманах после таверны.</p>}
+        <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('СУМКА')}</p>
+        {inventory.length === 0 && <p className="text-sm text-[#8a8068]">{t('Пусто. Как в карманах после таверны.')}</p>}
         {inventory.map((inv) => {
           const def = ITEMS[inv.item]
           if (!def) return null
@@ -220,9 +221,9 @@ function InvPanel() {
                 <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                 <div className="min-w-0">
                   <p className="truncate text-sm text-[#e8d5a8]">
-                    {def.name} {inv.qty > 1 && <span className="text-[#c9b06b]">×{inv.qty}</span>}
+                    {t(def.name)} {inv.qty > 1 && <span className="text-[#c9b06b]">×{inv.qty}</span>}
                   </p>
-                  <p className="truncate text-[11px] text-[#8a8068]">{def.desc}</p>
+                  <p className="truncate text-[11px] text-[#8a8068]">{t(def.desc)}</p>
                 </div>
               </div>
               <div className="flex shrink-0 gap-1.5">
@@ -231,7 +232,7 @@ function InvPanel() {
                     onClick={() => getEngine()?.equipItem(inv.item)}
                     className="rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-2.5 py-1 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25"
                   >
-                    Надеть
+                    {t('Надеть')}
                   </button>
                 ) : null}
                 {def.type === 'potion' && (
@@ -239,7 +240,7 @@ function InvPanel() {
                     onClick={() => getEngine()?.useItem(inv.item)}
                     className="rounded border border-[#8fbf7f]/60 bg-[#8fbf7f]/10 px-2.5 py-1 text-xs text-[#a8d89a] transition hover:bg-[#8fbf7f]/25"
                   >
-                    Выпить
+                    {t('Выпить')}
                   </button>
                 )}
                 {def.type === 'oil' && (
@@ -247,19 +248,19 @@ function InvPanel() {
                     onClick={() => getEngine()?.useItem(inv.item)}
                     className="rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-2.5 py-1 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25"
                   >
-                    Нанести
+                    {t('Нанести')}
                   </button>
                 )}
                 {def.type !== 'quest' && (
                   <span className="flex items-center rounded border border-[#3a2e20] px-2 py-1 text-[11px] text-[#8a8068]">
-                    {Math.floor(def.price * 0.4)} зол.
+                    {t('{n} зол.', { n: Math.floor(def.price * 0.4) })}
                   </span>
                 )}
               </div>
             </Row>
           )
         })}
-        <p className="mt-2 text-[11px] text-[#8a8068]">Продать вещи можно у торговца Грима в Хеймхолле.</p>
+        <p className="mt-2 text-[11px] text-[#8a8068]">{t('Продать вещи можно у торговца Грима в Хеймхолле.')}</p>
       </div>
     </Panel>
   )
@@ -270,14 +271,14 @@ function JournalPanel() {
   const bestiary = useGame((s) => s.bestiary)
   const order = ['wolf', 'alpha', 'bandit', 'archer', 'captain', 'horror', 'boss']
   return (
-    <Panel title="Журнал" wide>
+    <Panel title={t('Журнал')} wide>
       <Tabs defaultValue="quests">
         <TabsList className="bg-[#241c14] border border-[#5a4632]">
           <TabsTrigger value="quests" className="data-[state=active]:text-[#f5c96b]">
-            Квесты
+            {t('Квесты')}
           </TabsTrigger>
           <TabsTrigger value="bestiary" className="data-[state=active]:text-[#f5c96b]">
-            Бестиарий
+            {t('Бестиарий')}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="quests" className="mt-4 flex flex-col gap-3">
@@ -308,14 +309,14 @@ function JournalPanel() {
             const known = bestiary.includes(k)
             return (
               <div key={k} className={`rounded border p-3 ${known ? 'border-[#3a2e20] bg-[#211a12]/70' : 'border-[#2a2218] bg-[#1a1510]/60'}`}>
-                <p className={`text-sm font-semibold ${known ? 'text-[#e8d5a8]' : 'text-[#6a6152]'}`}>{known ? info.name : '???'}</p>
+                <p className={`text-sm font-semibold ${known ? 'text-[#e8d5a8]' : 'text-[#6a6152]'}`}>{known ? t(info.name) : '???'}</p>
                 {known ? (
                   <>
-                    <p className="mt-1 text-[12px] leading-snug text-[#b0a488]">{info.text}</p>
-                    <p className="mt-1 text-[12px] text-[#d9a441]">Слабость: {info.weakness}</p>
+                    <p className="mt-1 text-[12px] leading-snug text-[#b0a488]">{t(info.text)}</p>
+                    <p className="mt-1 text-[12px] text-[#d9a441]">{t('Слабость: {x}', { x: t(info.weakness) })}</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-[12px] text-[#5a5245]">Запись появится после первой победы над таким врагом.</p>
+                  <p className="mt-1 text-[12px] text-[#5a5245]">{t('Запись появится после первой победы над таким врагом.')}</p>
                 )}
               </div>
             )
@@ -332,10 +333,10 @@ function ShopPanel() {
   const player = useGame((s) => s.player)
   if (!shop || !player) return null
   return (
-    <Panel title="Торговля" subtitle={`${shop.merchantName} · твоё золото: ${player.gold}`} wide>
+    <Panel title={t('Торговля')} subtitle={t('{merchant} · твоё золото: {n}', { merchant: t(shop.merchantName), n: player.gold })} wide>
       <div className="grid gap-5 md:grid-cols-2">
         <div>
-          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">ТОВАР ГРИМА</p>
+          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">{t('ТОВАР ГРИМА')}</p>
           <div className="flex flex-col gap-2">
             {shop.stock.map((id) => {
               const def = ITEMS[id]
@@ -345,8 +346,8 @@ function ShopPanel() {
                   <div className="flex min-w-0 items-center gap-2">
                     <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-[#e8d5a8]">{def.name}</p>
-                      <p className="truncate text-[11px] text-[#8a8068]">{def.desc}</p>
+                      <p className="truncate text-sm text-[#e8d5a8]">{t(def.name)}</p>
+                      <p className="truncate text-[11px] text-[#8a8068]">{t(def.desc)}</p>
                     </div>
                   </div>
                   <button
@@ -354,7 +355,7 @@ function ShopPanel() {
                     disabled={!can}
                     className={`shrink-0 rounded border px-2.5 py-1 text-xs ${can ? 'border-[#d9a441]/60 bg-[#d9a441]/10 text-[#f5c96b] hover:bg-[#d9a441]/25' : 'border-[#3a2e20] text-[#6a6152]'}`}
                   >
-                    {def.price} зол.
+                    {t('{n} зол.', { n: def.price })}
                   </button>
                 </Row>
               )
@@ -362,10 +363,10 @@ function ShopPanel() {
           </div>
         </div>
         <div>
-          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">ПРОДАТЬ (40% ЦЕНЫ)</p>
+          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">{t('ПРОДАТЬ (40% ЦЕНЫ)')}</p>
           <div className="game-scroll flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
             {inventory.filter((i) => ITEMS[i.item] && ITEMS[i.item].type !== 'quest').length === 0 && (
-              <p className="text-sm text-[#8a8068]">Торг нечем.</p>
+              <p className="text-sm text-[#8a8068]">{t('Торг нечем.')}</p>
             )}
             {inventory
               .filter((i) => ITEMS[i.item] && ITEMS[i.item].type !== 'quest')
@@ -376,14 +377,14 @@ function ShopPanel() {
                     <span className="flex min-w-0 items-center gap-2 text-sm text-[#e8d5a8]">
                       <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                       <span className="truncate">
-                        {def.name} {i.qty > 1 && <span className="text-[#c9b06b]">×{i.qty}</span>}
+                        {t(def.name)} {i.qty > 1 && <span className="text-[#c9b06b]">×{i.qty}</span>}
                       </span>
                     </span>
                     <button
                       onClick={() => getEngine()?.sellItem(i.item)}
                       className="shrink-0 rounded border border-[#8fbf7f]/50 bg-[#8fbf7f]/10 px-2.5 py-1 text-xs text-[#a8d89a] transition hover:bg-[#8fbf7f]/25"
                     >
-                      +{Math.floor(def.price * 0.4)} зол.
+                      {t('+{n} зол.', { n: Math.floor(def.price * 0.4) })}
                     </button>
                   </Row>
                 )
@@ -400,13 +401,13 @@ function TrainerPanel() {
   const player = useGame((s) => s.player)
   if (!trainer || !player) return null
   return (
-    <Panel title="Наставник Дорн" subtitle={`Твои очки обучения: ${player.lp} · золото: ${player.gold}`}>
+    <Panel title={t('Наставник Дорн')} subtitle={t('Твои очки обучения: {n} · золото: {m}', { n: player.lp, m: player.gold })}>
       <div className="flex flex-col gap-2">
         {trainer.options.map((o) => (
           <Row key={o.id}>
             <div className="min-w-0">
-              <p className="text-sm text-[#e8d5a8]">{o.name}</p>
-              <p className="truncate text-[11px] text-[#8a8068]">{o.desc}</p>
+              <p className="text-sm text-[#e8d5a8]">{t(o.name)}</p>
+              <p className="truncate text-[11px] text-[#8a8068]">{t(o.desc)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="text-[11px] text-[#c9b06b]">{o.cost}</span>
@@ -415,7 +416,7 @@ function TrainerPanel() {
                 disabled={!o.affordable || o.maxed}
                 className={`rounded border px-2.5 py-1 text-xs ${o.maxed ? 'border-[#3a2e20] text-[#6a6152]' : o.affordable ? 'border-[#d9a441]/60 bg-[#d9a441]/10 text-[#f5c96b] hover:bg-[#d9a441]/25' : 'border-[#3a2e20] text-[#6a6152]'}`}
               >
-                {o.maxed ? 'Предел' : 'Учить'}
+                {o.maxed ? t('Предел') : t('Учить')}
               </button>
             </div>
           </Row>
@@ -431,15 +432,15 @@ function MapPanel() {
     if (canvasRef.current) getEngine()?.renderFullMap(canvasRef.current)
   }, [])
   return (
-    <Panel title="Карта долины" subtitle="Янтарь — твоя позиция, кольцо — текущая цель" wide>
+    <Panel title={t('Карта долины')} subtitle={t('Янтарь — твоя позиция, кольцо — текущая цель')} wide>
       <canvas ref={canvasRef} width={1024} height={768} className="h-auto w-full rounded border border-[#5a4632]" />
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[#8a8068] sm:grid-cols-3">
-        <span>◈ Хеймхолл — деревня и NPCs</span>
-        <span>◈ Сумрачный лес — волки, контракт</span>
-        <span>◈ Камни Древних — алтарь и спутники</span>
-        <span>◈ Озеро Лун — лунные травы</span>
-        <span>◈ Лагерь — разбойники, испытание</span>
-        <span>◈ Сердце Разлома — финал</span>
+        <span>{t('◈ Хеймхолл — деревня и NPCs')}</span>
+        <span>{t('◈ Сумрачный лес — волки, контракт')}</span>
+        <span>{t('◈ Камни Древних — алтарь и спутники')}</span>
+        <span>{t('◈ Озеро Лун — лунные травы')}</span>
+        <span>{t('◈ Лагерь — разбойники, испытание')}</span>
+        <span>{t('◈ Сердце Разлома — финал')}</span>
       </div>
     </Panel>
   )
@@ -456,16 +457,16 @@ function PausePanel() {
   const renderMode = useGame((s) => s.renderMode)
   const [muted, setMutedState] = useState(isMuted())
   return (
-    <Panel title="Пауза" subtitle="Долина подождёт. Ненадолго.">
+    <Panel title={t('Пауза')} subtitle={t('Долина подождёт. Ненадолго.')}>
       <div className="flex flex-col gap-2">
         <MenuBtn onClick={() => getEngine()?.closePanel()} primary>
-          Продолжить
+          {t('Продолжить')}
         </MenuBtn>
-        <MenuBtn onClick={() => getEngine()?.saveGame(true)}>Сохранить игру</MenuBtn>
+        <MenuBtn onClick={() => getEngine()?.saveGame(true)}>{t('Сохранить игру')}</MenuBtn>
         <MenuBtn onClick={reloadContinue} disabled={!hasSave}>
-          Загрузить последнее сохранение
+          {t('Загрузить последнее сохранение')}
         </MenuBtn>
-        <MenuBtn onClick={() => getEngine()?.openPanel('settings')}>Настройки</MenuBtn>
+        <MenuBtn onClick={() => getEngine()?.openPanel('settings')}>{t('Настройки')}</MenuBtn>
         <MenuBtn
           onClick={() => {
             const v = !muted
@@ -473,17 +474,17 @@ function PausePanel() {
             setMutedState(v)
           }}
         >
-          Звук: {muted ? 'выкл' : 'вкл'}
+          {t('Звук: {x}', { x: muted ? t('выкл') : t('вкл') })}
         </MenuBtn>
         <div className="mt-2 rounded border border-[#3a2e20] bg-[#211a12]/70 p-3 text-[12px] leading-relaxed text-[#a89a7d]">
-          <p className="mb-1 font-semibold text-[#c9b06b]">Управление</p>
-          WASD / ЛКМ — движение · ЛКМ по врагу — цель · 1–4 знаки · 5 — Голос Древних · Q/E — зелья ·
-          F — взаимодействие · Пробел — тактическая пауза и приказы · V — строй · Tab — цель ·
-          C/I/J/M — панели · Esc — меню
+          <p className="mb-1 font-semibold text-[#c9b06b]">{t('Управление')}</p>
+          {t(
+            'WASD / ЛКМ — движение · ЛКМ по врагу — цель · 1–4 знаки · 5 — Голос Древних · Q/E — зелья · F — взаимодействие · Пробел — тактическая пауза и приказы · V — строй · Tab — цель · C/I/J/M — панели · Esc — меню',
+          )}
           {renderMode === '3d' && (
             <>
               <br />
-              <span className="text-[#8fbf6a]">3D: ПКМ (зажать) — поворот камеры · колесо — зум</span>
+              <span className="text-[#8fbf6a]">{t('3D: ПКМ (зажать) — поворот камеры · колесо — зум')}</span>
             </>
           )}
         </div>
@@ -493,7 +494,7 @@ function PausePanel() {
           }}
           danger
         >
-          Выйти в главное меню
+          {t('Выйти в главное меню')}
         </MenuBtn>
       </div>
     </Panel>
@@ -559,14 +560,14 @@ function KeybindRow({
       </span>
       <button
         onClick={() => onStart(action)}
-        aria-label={`Назначить клавишу: ${name}`}
+        aria-label={t('Назначить клавишу: {name}', { name })}
         className={`min-w-[92px] shrink-0 rounded border px-2 py-1 text-[11px] font-semibold transition ${
           listening
             ? 'animate-pulse border-[#d9a441] bg-[#d9a441]/20 text-[#f5c96b]'
             : 'border-[#5a4632] text-[#e8d5a8] hover:border-[#d9a441] hover:text-[#f5c96b]'
         }`}
       >
-        {listening ? 'Нажмите…' : kl}
+        {listening ? t('Нажмите…') : kl}
       </button>
     </div>
   )
@@ -595,7 +596,7 @@ function KeybindsSection() {
         if (owner && owner !== listening) {
           nb[owner] = nb[owner].filter((k) => k !== key)
           const def = ACTION_DEFS.find((d) => d.id === owner)?.name ?? owner
-          useGame.getState().pushToast(`Клавиша «${keyLabel(key)}» освобождена: ${def}`, 'info')
+          useGame.getState().pushToast(t('Клавиша «{k}» освобождена: {d}', { k: keyLabel(key), d: t(def) }), 'info')
         }
         nb[listening] = [key]
       }
@@ -612,17 +613,17 @@ function KeybindsSection() {
     <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
       <div className="mb-2 flex items-center justify-between">
         <p className="game-title-font flex items-center gap-2 text-xs tracking-[0.25em] text-[#9a8f78]">
-          <Keyboard className="h-3.5 w-3.5" /> УПРАВЛЕНИЕ
+          <Keyboard className="h-3.5 w-3.5" /> {t('УПРАВЛЕНИЕ')}
         </p>
         <button
           onClick={() => {
             setBindings(DEFAULT_BINDINGS)
             setBindsState(getBindings())
-            useGame.getState().pushToast('Клавиши сброшены к стандартным', 'info')
+            useGame.getState().pushToast(t('Клавиши сброшены к стандартным'), 'info')
           }}
           className="rounded border border-[#5a4632] px-2 py-1 text-[11px] text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
         >
-          Сбросить
+          {t('Сбросить')}
         </button>
       </div>
       <div className="game-scroll max-h-72 overflow-y-auto pr-1">
@@ -632,8 +633,8 @@ function KeybindsSection() {
               <KeybindRow
                 key={d.id}
                 action={d.id}
-                name={d.name}
-                keyLabel={listening === d.id ? 'Нажмите…' : keyLabel(binds[d.id][0] ?? '')}
+                name={t(d.name)}
+                keyLabel={listening === d.id ? t('Нажмите…') : keyLabel(binds[d.id][0] ?? '')}
                 listening={listening === d.id}
                 onStart={setListening}
               />
@@ -642,10 +643,30 @@ function KeybindsSection() {
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-snug text-[#8a8068]">
-        Клик по действию → новая клавиша (Esc — отмена). WASD/стрелки — движение (фиксировано), Esc — меню.
-        Русская раскладка работает автоматически.
+        {t(
+          'Клик по действию → новая клавиша (Esc — отмена). WASD/стрелки — движение (фиксировано), Esc — меню. Русская раскладка работает автоматически.',
+        )}
       </p>
     </div>
+  )
+}
+
+// v1.6: кнопка выбора языка интерфейса
+function LangBtn({ l }: { l: 'ru' | 'en' }) {
+  const locale = useLocale()
+  return (
+    <button
+      onClick={() => setLocale(l)}
+      aria-pressed={locale === l}
+      aria-label="Переключить язык / Toggle language"
+      className={`rounded border px-3 py-1.5 text-xs font-semibold transition ${
+        locale === l
+          ? 'border-[#d9a441] bg-[#d9a441]/15 text-[#f5c96b]'
+          : 'border-[#5a4632] text-[#cfc0a0] hover:border-[#8a7a5a] hover:text-[#e8d5a8]'
+      }`}
+    >
+      {l === 'ru' ? 'Русский' : 'English'}
+    </button>
   )
 }
 
@@ -659,12 +680,12 @@ function SettingsPanel() {
     getEngine()?.applySettings()
   }
   return (
-    <Panel title="Настройки" subtitle="Эхо Разлома · v1.0">
+    <Panel title={t('Настройки')} subtitle={t('Эхо Разлома · v1.6')}>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">ГРАФИКА</p>
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('ГРАФИКА')}</p>
           <Row>
-            <span className="text-sm text-[#e8d5a8]">Режим рендера</span>
+            <span className="text-sm text-[#e8d5a8]">{t('Режим рендера')}</span>
             <button
               onClick={() => getEngine()?.setRenderMode(renderMode === '3d' ? '2d' : '3d')}
               className="rounded border border-[#d9a441]/60 bg-[#d9a441]/10 px-3 py-1.5 text-xs text-[#f5c96b] transition hover:bg-[#d9a441]/25"
@@ -674,9 +695,9 @@ function SettingsPanel() {
           </Row>
           <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#e8d5a8]">Качество</span>
+              <span className="text-sm text-[#e8d5a8]">{t('Качество')}</span>
               <span className="text-[11px] text-[#8a8068]">
-                действует: <b className="text-[#c9b06b]">{QUALITY_NAME[effQuality as EffQuality]}</b>
+                {t('действует:')} <b className="text-[#c9b06b]">{t(QUALITY_NAME[effQuality as EffQuality])}</b>
               </span>
             </div>
             <div className="mt-2 grid grid-cols-4 gap-1.5">
@@ -691,12 +712,12 @@ function SettingsPanel() {
                       : 'border-[#5a4632] text-[#cfc0a0] hover:border-[#8a7a5a]'
                   }`}
                 >
-                  {q.name}
+                  {t(q.name)}
                 </button>
               ))}
             </div>
             <p className="mt-1.5 text-[11px] leading-snug text-[#8a8068]">
-              «Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.
+              {t('«Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.')}
             </p>
           </div>
           <Row>
@@ -707,29 +728,44 @@ function SettingsPanel() {
           </Row>
         </div>
         <div className="flex flex-col gap-2">
-          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">ЗВУК</p>
-          <VolSlider label="Музыка" value={settings.musicVol} onChange={(v) => apply({ musicVol: v })} />
-          <VolSlider label="Эффекты" value={settings.sfxVol} onChange={(v) => apply({ sfxVol: v })} />
-          <VolSlider label="Эмбиент" value={settings.ambVol} onChange={(v) => apply({ ambVol: v })} />
-          <VolSlider label="Озвучка реплик" value={settings.voiceVol} onChange={(v) => apply({ voiceVol: v })} />
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('ЗВУК')}</p>
+          <VolSlider label={t('Музыка')} value={settings.musicVol} onChange={(v) => apply({ musicVol: v })} />
+          <VolSlider label={t('Эффекты')} value={settings.sfxVol} onChange={(v) => apply({ sfxVol: v })} />
+          <VolSlider label={t('Эмбиент')} value={settings.ambVol} onChange={(v) => apply({ ambVol: v })} />
+          <VolSlider label={t('Озвучка реплик')} value={settings.voiceVol} onChange={(v) => apply({ voiceVol: v })} />
           <Row>
-            <span className="text-sm text-[#e8d5a8]">Голоса реплик (TTS)</span>
+            <span className="text-sm text-[#e8d5a8]">{t('Голоса реплик (TTS)')}</span>
             <button
               onClick={() => apply({ voiceOn: !settings.voiceOn })}
               className="rounded border border-[#5a4632] px-3 py-1.5 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             >
-              {settings.voiceOn ? 'Включены' : 'Выключены'}
+              {settings.voiceOn ? t('Включены') : t('Выключены')}
             </button>
           </Row>
           <Row>
-            <span className="text-sm text-[#e8d5a8]">Общий звук</span>
+            <span className="text-sm text-[#e8d5a8]">{t('Общий звук')}</span>
             <button
               onClick={() => apply({ muted: !settings.muted })}
               className="rounded border border-[#5a4632] px-3 py-1.5 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             >
-              {settings.muted ? 'Выключен' : 'Включён'}
+              {settings.muted ? t('Выключен') : t('Включён')}
             </button>
           </Row>
+        </div>
+        {/* v1.6: язык интерфейса */}
+        <div className="flex flex-col gap-2">
+          <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('ЯЗЫК / LANGUAGE')}</p>
+          <Row>
+            <span className="text-sm text-[#e8d5a8]">{t('ЯЗЫК / LANGUAGE')}</span>
+            <span className="flex gap-1.5">
+              {(['ru', 'en'] as const).map((l) => (
+                <LangBtn key={l} l={l} />
+              ))}
+            </span>
+          </Row>
+          <p className="text-[11px] leading-snug text-[#8a8068]">
+            {t('Интерфейс переключается мгновенно. Диалоги и озвучка остаются русскими (v1.7 — «Локализация II»).')}
+          </p>
         </div>
         <KeybindsSection />
       </div>
@@ -743,53 +779,53 @@ export function CreditsBody() {
   return (
     <div className="flex flex-col gap-4 text-sm">
       <div className="text-center">
-        <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">ЭХО РАЗЛОМА</p>
-        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">ВЕРСИЯ 1.0 · ФАЗЫ 0–8 ЗАКРЫТЫ</p>
+        <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">{t('ЭХО РАЗЛОМА')}</p>
+        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ 1.6 · ФАЗЫ 0–8 ЗАКРЫТЫ')}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
-          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ВДОХНОВЕНИЯ</p>
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">{t('ВДОХНОВЕНИЯ')}</p>
           <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
-            <li>The Witcher 3 — знаки, контракты, бестиарий</li>
-            <li>Dragon Age: Origins — отряд и тактическая пауза</li>
-            <li>Skyrim — мир Севера и крики силы</li>
-            <li>Baldur&apos;s Gate 3 — d20 и броски с кубиком</li>
-            <li>Gothic 2 — наставники и очки обучения</li>
-            <li>Mass Effect 2 — диалоги, таймеры, рейд-финал</li>
+            <li>{t('The Witcher 3 — знаки, контракты, бестиарий')}</li>
+            <li>{t('Dragon Age: Origins — отряд и тактическая пауза')}</li>
+            <li>{t('Skyrim — мир Севера и крики силы')}</li>
+            <li>{t("Baldur's Gate 3 — d20 и броски с кубиком")}</li>
+            <li>{t('Gothic 2 — наставники и очки обучения')}</li>
+            <li>{t('Mass Effect 2 — диалоги, таймеры, рейд-финал')}</li>
           </ul>
         </div>
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
-          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ТЕХНОЛОГИИ</p>
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">{t('ТЕХНОЛОГИИ')}</p>
           <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
-            <li>Next.js 16 · TypeScript 5 · App Router</li>
-            <li>Three.js — 3D-мир и свет</li>
-            <li>Zustand · Tailwind CSS 4 · shadcn/ui</li>
-            <li>WebAudio — синтез звука и адаптивная музыка</li>
-            <li>canvas 2D — легаси-рендер и миникарта</li>
+            <li>{t('Next.js 16 · TypeScript 5 · App Router')}</li>
+            <li>{t('Three.js — 3D-мир и свет')}</li>
+            <li>{t('Zustand · Tailwind CSS 4 · shadcn/ui')}</li>
+            <li>{t('WebAudio — синтез звука и адаптивная музыка')}</li>
+            <li>{t('canvas 2D — легаси-рендер и миникарта')}</li>
           </ul>
         </div>
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
-          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">СИСТЕМЫ</p>
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">{t('СИСТЕМЫ')}</p>
           <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
-            <li>d20-ядро, диалоги с проверками и таймерами</li>
-            <li>Партия: приказы, строи, одобрение, синергии</li>
-            <li>Шесть доменов со своими правилами</li>
-            <li>Финал: рейд, суд Пожирателя, 5 концовок</li>
-            <li>Сейвы с версионированием и автосейв</li>
+            <li>{t('d20-ядро, диалоги с проверками и таймерами')}</li>
+            <li>{t('Партия: приказы, строи, одобрение, синергии')}</li>
+            <li>{t('Шесть доменов со своими правилами')}</li>
+            <li>{t('Финал: рейд, суд Пожирателя, 5 концовок')}</li>
+            <li>{t('Сейвы с версионированием и автосейв')}</li>
           </ul>
         </div>
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
-          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">ДОКУМЕНТАЦИЯ</p>
+          <p className="game-title-font text-[11px] tracking-[0.25em] text-[#9a8f78]">{t('ДОКУМЕНТАЦИЯ')}</p>
           <ul className="mt-1.5 space-y-0.5 text-xs text-[#cfc0a0]">
-            <li>GDD v2.0 — 10 документов (docs/GDD)</li>
-            <li>Видение, лор, мир, системы, роадмап</li>
-            <li>UI/UX, контент, QA-ворота G0–G8, глоссарий</li>
-            <li>PDF-книга GDD в docs/</li>
+            <li>{t('GDD v2.0 — 10 документов (docs/GDD)')}</li>
+            <li>{t('Видение, лор, мир, системы, роадмап')}</li>
+            <li>{t('UI/UX, контент, QA-ворота G0–G8, глоссарий')}</li>
+            <li>{t('PDF-книга GDD в docs/')}</li>
           </ul>
         </div>
       </div>
       <p className="text-center text-[11px] italic text-[#8a8068]">
-        Фанатский некоммерческий прототип. Все права на упомянутые игры принадлежат их правообладателям.
+        {t('Фанатский некоммерческий прототип. Все права на упомянутые игры принадлежат их правообладателям.')}
       </p>
     </div>
   )
@@ -797,7 +833,7 @@ export function CreditsBody() {
 
 function CreditsPanel() {
   return (
-    <Panel title="Титры" wide>
+    <Panel title={t('Титры')} wide>
       <CreditsBody />
     </Panel>
   )
@@ -838,19 +874,19 @@ function EndingPanel() {
   const romance = useGame((s) => s.romance) // v1.5: тёплые мини-портреты в судьбах
   if (!ending) return null
   return (
-    <Panel title={`КОНЦОВКА: ${ending.name.toUpperCase()}`} wide>
+    <Panel title={t('КОНЦОВКА: {name}', { name: ending.name })} wide>
       <div className="flex flex-col gap-3">
         <p className="game-title-font text-center text-sm tracking-[0.3em]" style={{ color: ending.color }}>
-          {ending.name}
+          {t(ending.name)}
         </p>
         {ending.epilogue.map((p, i) => (
           <p key={i} className={`text-sm leading-relaxed ${i === 0 ? 'text-[#f5c96b]' : 'text-[#cfc0a0]'}`}>
-            {p}
+            {t(p)}
           </p>
         ))}
         {ending.fates.length > 0 && (
           <div className="mt-2 flex flex-col gap-2">
-            <p className="game-title-font text-[11px] tracking-[0.25em] text-[#8a8068]">СУДЬБЫ ОТРЯДА</p>
+            <p className="game-title-font text-[11px] tracking-[0.25em] text-[#8a8068]">{t('СУДЬБЫ ОТРЯДА')}</p>
             {ending.fates.map((f) => (
               <div key={f.name} className="flex items-start gap-3 rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
                 {(() => {
@@ -864,8 +900,8 @@ function EndingPanel() {
                   ) : null
                 })()}
                 <span className="min-w-0">
-                  <p className="text-xs font-bold text-[#e8d5a8]">{f.name}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-[#9a8f78]">{f.text}</p>
+                  <p className="text-xs font-bold text-[#e8d5a8]">{t(f.name)}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-[#9a8f78]">{t(f.text)}</p>
                 </span>
               </div>
             ))}
@@ -874,22 +910,22 @@ function EndingPanel() {
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {ending.stats.map(([k, v]) => (
             <div key={k} className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
-              <p className="text-[11px] text-[#8a8068]">{k}</p>
-              <p className="text-sm font-bold text-[#e8d5a8]">{v}</p>
+              <p className="text-[11px] text-[#8a8068]">{t(k)}</p>
+              <p className="text-sm font-bold text-[#e8d5a8]">{t(v)}</p>
             </div>
           ))}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <MenuBtn primary onClick={() => getEngine()?.closePanel()}>
-            Свободная игра
+            {t('Свободная игра')}
           </MenuBtn>
-          <MenuBtn onClick={() => getEngine()?.openPanel('credits')}>Титры</MenuBtn>
+          <MenuBtn onClick={() => getEngine()?.openPanel('credits')}>{t('Титры')}</MenuBtn>
           <MenuBtn
             onClick={() => {
               getEngine()?.toTitle()
             }}
           >
-            Главное меню
+            {t('Главное меню')}
           </MenuBtn>
         </div>
       </div>
@@ -898,6 +934,7 @@ function EndingPanel() {
 }
 
 export default function Panels() {
+  useLocale() // v1.6: перерисовка панелей при переключении языка
   const panel = useGame((s) => s.panel)
   if (!panel) return null
   switch (panel) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useGame, type DiceRollHudState } from '@/lib/game/store'
 import { getEngine } from '@/lib/game/engine'
+import { t, useLocale } from '@/lib/game/i18n'
 import { PORTRAIT_IMG, PORTRAIT_ROMANCE } from '@/lib/game/data/portraits'
 
 /** v1.5: спикер → ключ романса в сторе. */
@@ -39,7 +40,7 @@ function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
       <img
         key={imgSrc}
         src={imgSrc}
-        alt={`Портрет: ${speaker}`}
+        alt={t('Портрет: {x}', { x: speaker })}
         onError={() => setFailedSpeakers((m) => ({ ...m, [speaker]: true }))}
         className="h-full w-full select-none object-cover object-top"
         draggable={false}
@@ -221,7 +222,7 @@ function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
 /** Общий каркас портрета: градиентный фон, рамка-виньетка, плечи. */
 function Portrait({ children, color, uid }: { children: React.ReactNode; color: string; uid: string }) {
   return (
-    <svg viewBox="0 0 64 64" className="h-full w-full" role="img" aria-label="Портрет собеседника">
+    <svg viewBox="0 0 64 64" className="h-full w-full" role="img" aria-label={t('Портрет собеседника')}>
       <defs>
         <radialGradient id={uid} cx="50%" cy="32%" r="75%">
           <stop offset="0%" stopColor={color} stopOpacity="0.34" />
@@ -263,10 +264,10 @@ function TimerBar({ seconds, onTimeout }: { seconds: number; onTimeout: () => vo
     <div className="mb-2">
       <div className="flex items-center justify-between">
         <span className={`text-[10px] tracking-[0.25em] ${urgent ? 'text-[#e08a6b]' : 'text-[#c9a3e8]'}`}>
-          {urgent ? 'ТИШИНА — РЕШЕЙСЯ!' : 'ВРЕМЯ ИСТЕКАЕТ...'}
+          {urgent ? t('ТИШИНА — РЕШЕЙСЯ!') : t('ВРЕМЯ ИСТЕКАЕТ...')}
         </span>
         <span className={`text-[11px] font-bold tabular-nums ${urgent ? 'text-[#e08a6b]' : 'text-[#c9a3e8]'}`}>
-          {left.toFixed(1)}с
+          {t('{s}с', { s: left.toFixed(1) })}
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-sm border border-[#3a2e20] bg-[#241c14]">
@@ -284,7 +285,7 @@ function TimerBar({ seconds, onTimeout }: { seconds: number; onTimeout: () => vo
 function D20({ value, success }: { value: number; success: boolean }) {
   const stroke = success ? '#d9a441' : '#c94f3d'
   return (
-    <svg viewBox="0 0 64 64" className="h-16 w-16" role="img" aria-label={`Бросок d20: ${value}`}>
+    <svg viewBox="0 0 64 64" className="h-16 w-16" role="img" aria-label={t('Бросок d20: {n}', { n: value })}>
       <polygon points="32,3 58,17 58,47 32,61 6,47 6,17" fill="#241c14" stroke={stroke} strokeWidth="2.5" />
       <polygon points="32,12 50,22 32,50 14,22" fill="none" stroke={stroke} strokeWidth="1.2" opacity="0.6" />
       <polygon points="32,12 50,22 32,26 14,22" fill="none" stroke={stroke} strokeWidth="1" opacity="0.4" />
@@ -325,7 +326,7 @@ function DiceRollOverlay({ roll }: { roll: DiceRollHudState }) {
           settled ? (roll.success ? 'border-[#d9a441]' : 'border-[#c94f3d]') : 'border-[#5a4632]'
         }`}
       >
-        <p className="game-title-font text-xs tracking-[0.3em] text-[#c9b06b]">БРОСОК D20</p>
+        <p className="game-title-font text-xs tracking-[0.3em] text-[#c9b06b]">{t('БРОСОК D20')}</p>
         <p className="mt-1 truncate text-[11px] text-[#cfc0a0]">{roll.label}</p>
         <div className="mt-2 flex justify-center">
           <D20 value={settled ? roll.roll : shown} success={settled ? roll.success : true} />
@@ -338,15 +339,15 @@ function DiceRollOverlay({ roll }: { roll: DiceRollHudState }) {
               <span className="text-[#cfc0a0]">{roll.bonus}</span>
               {' = '}
               <span className="font-bold text-[#f5e6c4]">{roll.total}</span>
-              {' против '}
-              <span className="text-[#c9b06b]">СЛ {roll.dc}</span>
+              {' '}
+              <span className="text-[#c9b06b]">{t('СЛ {n}', { n: roll.dc })}</span>
             </p>
             <p className={`game-title-font mt-1 text-lg tracking-[0.35em] ${roll.success ? 'text-[#d9a441]' : 'text-[#c94f3d]'}`}>
-              {roll.success ? 'УСПЕХ' : 'ПРОВАЛ'}
+              {roll.success ? t('УСПЕХ') : t('ПРОВАЛ')}
             </p>
           </>
         ) : (
-          <p className="mt-2 animate-pulse text-xs text-[#8a8068]">кубик катится...</p>
+          <p className="mt-2 animate-pulse text-xs text-[#8a8068]">{t('кубик катится...')}</p>
         )}
       </div>
     </div>
@@ -356,6 +357,7 @@ function DiceRollOverlay({ roll }: { roll: DiceRollHudState }) {
 // ---------------- Оверлей диалога ----------------
 
 export default function DialogueOverlay() {
+  useLocale() // v1.6: перерисовка при переключении языка
   const dialogue = useGame((s) => s.dialogue)
   const diceRoll = useGame((s) => s.diceRoll)
 
@@ -427,8 +429,8 @@ export default function DialogueOverlay() {
                   </span>
                   <span className="min-w-0 flex-1">{c.text}</span>
                   {c.origin && (
-                    <span className="shrink-0 rounded bg-[#2a1f2e] px-1.5 py-0.5 text-[10px] tracking-wider text-[#c9a3e8]" title="Реплика происхождения">
-                      ✦ ПРОИСХОЖДЕНИЕ
+                    <span className="shrink-0 rounded bg-[#2a1f2e] px-1.5 py-0.5 text-[10px] tracking-wider text-[#c9a3e8]" title={t('Реплика происхождения')}>
+                      {t('✦ ПРОИСХОЖДЕНИЕ')}
                     </span>
                   )}
                   {c.tag && !c.origin && (

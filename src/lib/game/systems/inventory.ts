@@ -6,6 +6,7 @@
 
 import { ITEMS, SELL_RATE } from '../data/items'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { EngineCtx } from '../core/ctx'
 import { recalcStats } from './progression'
 import { floater } from './combat'
@@ -17,7 +18,7 @@ export function addItem(ctx: EngineCtx, id: string, qty: number) {
   const ex = ctx.inventory.find((i) => i.item === id)
   if (ex) ex.qty += qty
   else ctx.inventory.push({ item: id, qty })
-  ctx.toast('Получено: ' + def.name + (qty > 1 ? ` ×${qty}` : ''), 'loot')
+  ctx.toast(t('Получено: {name}', { name: t(def.name) + (qty > 1 ? ` ×${qty}` : '') }), 'loot')
   ctx.syncUi()
 }
 
@@ -52,7 +53,7 @@ export function sellItem(ctx: EngineCtx, id: string) {
   const val = Math.floor(def.price * SELL_RATE)
   removeItem(ctx, id, 1)
   ctx.gold += val
-  ctx.toast(`Продано: ${def.name} (+${val} зол.)`, 'info')
+  ctx.toast(t('Продано: {name} (+{val} зол.)', { name: t(def.name), val }), 'info')
   sfx('coin')
 }
 
@@ -94,7 +95,7 @@ export function useItem(ctx: EngineCtx, id: string) {
     ctx.oilKind = id
     ctx.oilT = dur
     floater(ctx, ctx.player.pos, def.name, '#d9a441', 13)
-    ctx.toast(`${def.name} нанесено на клинок (${Math.round(dur / 60)} мин).`, 'loot')
+    ctx.toast(t('{name} нанесено на клинок ({min} мин).', { name: t(def.name), min: Math.round(dur / 60) }), 'loot')
     sfx('potion')
     ctx.syncUi()
   }

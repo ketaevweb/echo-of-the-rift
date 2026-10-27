@@ -22,6 +22,7 @@ import {
 } from '../data/finale'
 import { Entity } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { RaidState, EngineCtx } from '../core/ctx'
 import { makeEntity } from '../core/entity'
@@ -94,7 +95,7 @@ function killCompanion(ctx: EngineCtx, id: CompanionId) {
   c.alive = false
   ctx.flags[`${id}Dead`] = true
   ring(ctx, c.pos, '#c94f3d', 70, 1.1)
-  floater(ctx, c.pos, `${RAID_ROLES[id].role} ПАЛ`, '#c94f3d', 16)
+  floater(ctx, c.pos, t('{role} ПАЛ', { role: t(RAID_ROLES[id].role) }), '#c94f3d', 16)
   ctx.toast(
     id === 'torvald'
       ? 'Торвальд пал на волне авангарда — лояльность не была заслужена (Бастион Ветвей не удержан).'
@@ -123,7 +124,14 @@ function survivalCheck(ctx: EngineCtx, waveNo: number) {
     const roll = d(20) + bonus
     const ok = roll >= 15
     ctx.toast(
-      `${id === 'kaya' ? 'Кайя' : 'Торвальд'}: выживание волны ${waveNo} — d20+${bonus}${droneCover ? ' (дроны Ашера)' : ''} = ${roll} против СЛ 15 — ${ok ? 'держится' : 'едва уходит'}`,
+      t('{name}: выживание волны {wave} — d20+{bonus}{drones} = {roll} против СЛ 15 — {verdict}', {
+        name: id === 'kaya' ? t('Кайя') : t('Торвальд'),
+        wave: waveNo,
+        bonus,
+        drones: droneCover ? t(' (дроны Ашера)') : '',
+        roll,
+        verdict: ok ? t('держится') : t('едва уходит'),
+      }),
       ok ? 'quest' : 'warn',
     )
   }
@@ -229,8 +237,8 @@ export function updateFinale(ctx: EngineCtx, dt: number) {
     if (R.breakT <= 0) {
       R.pending = [...RAID_WAVES[R.wave]]
       R.spawnT = 0
-      floater(ctx, RAID_HEART, `ВОЛНА ${R.wave + 1}!`, '#a06bd9', 18)
-      ctx.toast(`Рейд: волна ${R.wave + 1} из ${RAID_WAVES.length}!`, 'warn')
+      floater(ctx, RAID_HEART, t('ВОЛНА {n}!', { n: R.wave + 1 }), '#a06bd9', 18)
+      ctx.toast(t('Рейд: волна {n} из {total}!', { n: R.wave + 1, total: RAID_WAVES.length }), 'warn')
       sfx('boss')
     }
     return
@@ -259,7 +267,7 @@ export function updateFinale(ctx: EngineCtx, dt: number) {
     }
     survivalCheck(ctx, done) // смерть за нелояльность — на волне роли (с 1-й), броски approval — с 2-й
     R.breakT = RAID_BREAK
-    ctx.toast(`Волна отбита! Эхо перестраивается — следующая через ${RAID_BREAK} с.`, 'quest')
+    ctx.toast(t('Волна отбита! Эхо перестраивается — следующая через {sec} с.', { sec: RAID_BREAK }), 'quest')
     sfx('level')
     ctx.syncUi()
   }

@@ -8,6 +8,7 @@
 
 import { Entity, FormationId, Vec } from '../types'
 import { sfx } from '../sfx'
+import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { beam, damage, floater, ring } from './combat'
@@ -28,7 +29,7 @@ export function addApproval(ctx: EngineCtx, id: 'kaya' | 'torvald', delta: numbe
   const crossed = before < APPROVAL_SYNERGY && after >= APPROVAL_SYNERGY
   if (crossed) {
     const name = id === 'kaya' ? 'Кайя' : 'Торвальд'
-    ctx.toast(`${name} доверяет тебе (${after}/100) — открыты парные приёмы!`, 'quest')
+    ctx.toast(t('{name} доверяет тебе ({n}/100) — открыты парные приёмы!', { name: t(name), n: after }), 'quest')
     sfx('level')
   }
   ctx.syncUi()

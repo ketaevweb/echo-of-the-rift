@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { CareerId, Faction, FormationId, InventoryEntry, OriginId, SaveData, SignId, Stance } from './types'
 import { EffQuality, GameSettings, DEFAULT_SETTINGS, readSettings } from './settings'
+import { t } from './i18n'
 
 export type Screen = 'title' | 'game'
 export type PanelId = null | 'char' | 'inv' | 'journal' | 'pause' | 'shop' | 'trainer' | 'map' | 'settings' | 'credits' | 'ending'
@@ -312,8 +313,10 @@ export const useGame = create<GameStore>((set) => ({
   updateSettings: (partial) =>
     set((st) => ({ settings: { ...st.settings, ...partial } })),
   pushToast: (text, kind = 'info') =>
+    // v1.6: единая точка перевода тостов — статические строки бьются по словарю,
+    // составные приходят уже шаблонами t() из систем
     set((st) => ({
-      toasts: [...st.toasts.slice(-4), { id: toastSeq++, text, kind }],
+      toasts: [...st.toasts.slice(-4), { id: toastSeq++, text: t(text), kind }],
     })),
   clearToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
   setHasSave: (v) => set({ hasSave: v }),
