@@ -5,7 +5,7 @@
 // (WASD/клик-движение, автопатака по цели, стамина).
 // ============================================================
 
-import { WORLD, RIDGE, GRIDGE, FRIDGE } from '../data/world'
+import { WORLD, RIDGE, GRIDGE, FRIDGE, MARA_RIDGE } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
@@ -42,6 +42,13 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   const fhi = FRIDGE.x + FRIDGE.band
   if (nx > flo2 - er && nx < fhi + er) {
     nx = e.pos.x >= FRIDGE.x ? Math.max(nx, fhi + er) : Math.min(nx, flo2 - er)
+  }
+  // Багровый хребет к Маре непроходим (Фаза 6.3): только в секторе Гранита,
+  // переход — через Врата Мары. Вельд западнее не трогаем.
+  const mlo = MARA_RIDGE.y - MARA_RIDGE.band
+  const mhi = MARA_RIDGE.y + MARA_RIDGE.band
+  if (nx > GRIDGE.x && ny > mlo - er && ny < mhi + er) {
+    ny = e.pos.y >= MARA_RIDGE.y ? Math.max(ny, mhi + er) : Math.min(ny, mlo - er)
   }
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue

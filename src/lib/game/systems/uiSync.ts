@@ -16,6 +16,7 @@ import { countItem } from './inventory'
 import { xpNext } from './progression'
 import { nearestInteraction, stageText } from './quest'
 import { CAREER_NAME, CAREER_PERKS, heroRank, RANK_NAME } from './career'
+import { siegeHud } from './mara'
 
 export function syncUi(ctx: EngineCtx): void {
   const st = useGame.getState()
@@ -97,9 +98,22 @@ export function syncUi(ctx: EngineCtx): void {
   // Фаза 6.2: предельные квесты тоже попадают в трекер побочек
   const frostWQ = quests.find((q) => q.id === 'frost_words')!
   const frostDQ = quests.find((q) => q.id === 'frost_dragon')!
-  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ, frostWQ, frostDQ].find((q) => q.stage > 0 && !q.done) ?? null
+  // Фаза 6.3: маровские квесты тоже попадают в трекер побочек
+  const maraQ = quests.find((q) => q.id === 'mara')!
+  const maraWQ = quests.find((q) => q.id === 'mara_wells')!
+  const maraGQ = quests.find((q) => q.id === 'mara_glands')!
+  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ, frostWQ, frostDQ, maraQ, maraWQ, maraGQ].find(
+    (q) => q.stage > 0 && !q.done,
+  ) ?? null
   const boss = ctx.entities.find(
-    (e) => (e.enemyType === 'boss' || e.enemyType === 'ash_mother' || e.enemyType === 'pit_master' || e.enemyType === 'dragon') && e.alive && e.aiState !== 'idle',
+    (e) =>
+      (e.enemyType === 'boss' ||
+        e.enemyType === 'ash_mother' ||
+        e.enemyType === 'pit_master' ||
+        e.enemyType === 'dragon' ||
+        e.enemyType === 'blight_mother') &&
+      e.alive &&
+      e.aiState !== 'idle',
   )
   // Фаза 6.2: крики Ту'ум — зеркало HUD
   const shouts: ShoutHud[] = [
@@ -167,9 +181,20 @@ export function syncUi(ctx: EngineCtx): void {
     // Фаза 3: масло, сутки, зона
     oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,
     daytime: ctx.dayClock,
-    zoneLabel: ctx.zone === 'veld' ? 'ВЕЛЬД' : ctx.zone === 'granite' ? 'ГРАНИТНАЯ ДОЛИНА' : ctx.zone === 'frost' ? 'СТЫЛОЕ ПРЕДЕЛЬЕ' : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+    zoneLabel:
+      ctx.zone === 'veld'
+        ? 'ВЕЛЬД'
+        : ctx.zone === 'granite'
+          ? 'ГРАНИТНАЯ ДОЛИНА'
+          : ctx.zone === 'frost'
+            ? 'СТЫЛОЕ ПРЕДЕЛЬЕ'
+            : ctx.zone === 'mara'
+              ? 'БАГРОВАЯ МАРА'
+              : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
     formation: ctx.formation,
     career,
     shouts,
+    // Фаза 6.3: оборона Бастиона — зеркало HUD
+    siege: siegeHud(ctx),
   })
 }

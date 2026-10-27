@@ -8,6 +8,7 @@
 // ============================================================
 
 import { InteractableDef, PropDef, SpawnZoneDef, Vec } from '../types'
+import { MARA_RIDGE } from './mara'
 
 // ---------------- Границы и переходы ----------------
 
@@ -104,15 +105,17 @@ function graniteBlocked(x: number, y: number): boolean {
   return false
 }
 
-/** Скалы Гранита: обломки осколка Ядра, торчащие всюду (Gothic-вайб). */
+/** Скалы Гранита: обломки осколка Ядра, торчащие всюду (Gothic-вайб).
+ *  Южнее Багрового хребта — уже Мара (Фаза 6.3), туда не сеем. */
 function buildBoulders(): PropDef[] {
   const rnd = lcg(60613)
   const rocks: PropDef[] = []
   let guard = 0
+  const yMax = MARA_RIDGE.y - 280
   while (rocks.length < 64 && guard < 5000) {
     guard++
     const x = GRIDGE.x + 260 + rnd() * (5000 - GRIDGE.x - 340)
-    const y = 120 + rnd() * 3960
+    const y = 120 + rnd() * (yMax - 120)
     if (graniteBlocked(x, y)) continue
     if (rocks.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 120)) continue
     rocks.push({ kind: 'rock', pos: { x: Math.round(x), y: Math.round(y) }, r: 10 + Math.floor(rnd() * 10), solid: true, seed: Math.floor(rnd() * 9999) })
@@ -125,10 +128,11 @@ function buildAshShrubs(): PropDef[] {
   const rnd = lcg(90210)
   const out: PropDef[] = []
   let guard = 0
+  const yMax = MARA_RIDGE.y - 280
   while (out.length < 90 && guard < 6000) {
     guard++
     const x = GRIDGE.x + 240 + rnd() * (5000 - GRIDGE.x - 320)
-    const y = 120 + rnd() * 3960
+    const y = 120 + rnd() * (yMax - 120)
     if (graniteBlocked(x, y)) continue
     if (out.some((t) => Math.hypot(t.pos.x - x, t.pos.y - y) < 75)) continue
     out.push({ kind: rnd() > 0.4 ? 'shrub' : 'flower', pos: { x: Math.round(x), y: Math.round(y) }, r: 6, seed: Math.floor(rnd() * 9999) })

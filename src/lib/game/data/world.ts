@@ -33,10 +33,25 @@ import {
   FRIDGE,
   FR_GATES,
 } from './frost'
+import {
+  BASTION,
+  BASTION_GATE,
+  BLIGHT_WELLS,
+  MA_GATES,
+  MARA_AREAS,
+  MARA_INTERACTABLES,
+  MARA_MARKERS,
+  MARA_NPCS,
+  MARA_PROPS,
+  MARA_RIDGE,
+  MARA_ROADS,
+  MARA_SPAWN_ZONES,
+} from './mara'
 
 /** Мир: долина Хеймхолл на северо-западе, Вельд на юге за Хребтом (Фаза 3),
  *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6),
- *  Стылое Пределье за Стылым Хребтом (Фаза 6.2). */
+ *  Стылое Пределье за Стылым Хребтом (Фаза 6.2),
+ *  Багровая Мара на юге Гранита за Багровым хребтом (Фаза 6.3). */
 export const WORLD = { w: 6360, h: 4200 }
 
 /** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
@@ -57,6 +72,7 @@ export const AREAS: AreaDef[] = [
   ...VELD_AREAS,
   ...GRANITE_AREAS,
   ...FROST_AREAS,
+  ...MARA_AREAS,
   { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
@@ -91,6 +107,8 @@ export const ROADS: Vec[][] = [
   ...GRANITE_ROADS,
   // Тропы Стылого Пределья (Фаза 6.2)
   ...FROST_ROADS,
+  // Тропы Багровой Мары (Фаза 6.3)
+  ...MARA_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -238,6 +256,7 @@ export const PROPS: PropDef[] = [
   ...VELD_PROPS,
   ...GRANITE_PROPS,
   ...FROST_PROPS,
+  ...MARA_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -256,6 +275,8 @@ export const NPCS: NpcDef[] = [
   ...GRANITE_NPCS,
   // Стылое Пределье (Фаза 6.2)
   ...FROST_NPCS,
+  // Багровая Мара (Фаза 6.3)
+  ...MARA_NPCS,
 ]
 
 export const SPAWN_ZONES: SpawnZoneDef[] = [
@@ -267,6 +288,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   ...VELD_SPAWN_ZONES,
   ...GRANITE_SPAWN_ZONES,
   ...FROST_SPAWN_ZONES,
+  ...MARA_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -285,6 +307,7 @@ export const INTERACTABLES: InteractableDef[] = [
   ...VELD_INTERACTABLES,
   ...GRANITE_INTERACTABLES,
   ...FROST_INTERACTABLES,
+  ...MARA_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -297,9 +320,10 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   ...VELD_MARKERS,
   ...GRANITE_MARKERS,
   ...FROST_MARKERS,
+  ...MARA_MARKERS,
 ]
 
-// Реэкспорты Вельда/Гранита/Пределья для движка/рендеров (единая точка импорта мира)
+// Реэкспорты Вельда/Гранита/Пределья/Марый для движка/рендеров (единая точка импорта мира)
 export { ASH_MOTHER, GATES, POOLS, RIDGE, VELD_CLUES } from './veld'
 export { COLONY, GRIDGE, GR_GATES, MINE, ORE_VEINS, PIT, PIT_MASTER, SHARD } from './granite'
 export {
@@ -318,12 +342,24 @@ export {
   WORD_WALL_FORCE,
   WORD_WALL_FROST,
 } from './frost'
+export {
+  BASTION,
+  BASTION_GATE,
+  BLIGHT_WELLS,
+  BREACH_CAMPS,
+  MA_GATES,
+  MARA_RIDGE,
+  MORASS,
+  SIEGE_BREAK,
+  SIEGE_GATE_HP,
+  SIEGE_WAVES,
+} from './mara'
 
 /** Зона по мировой точке: Пределье (восток за Стылым Хребтом) приоритетнее,
- *  затем Гранит (восток за Каменным Хребтом), затем Вельд (юг за Хребтом),
- *  остальное — долина. */
-export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' {
+ *  затем Гранит (восток за Каменным Хребтом), в юге которого — Мара (Фаза 6.3),
+ *  затем Вельд (юг за Хребтом), остальное — долина. */
+export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' | 'mara' {
   if (x > FRIDGE.x) return 'frost'
-  if (x > GRIDGE.x) return 'granite'
+  if (x > GRIDGE.x) return y > MARA_RIDGE.y ? 'mara' : 'granite'
   return y > RIDGE.y ? 'veld' : 'valley'
 }

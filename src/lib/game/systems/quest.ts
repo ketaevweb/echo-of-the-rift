@@ -20,11 +20,12 @@ import { EngineCtx } from '../core/ctx'
 import { addItem, countItem, removeItem } from './inventory'
 import { gainXp, openShop, openTrainer } from './progression'
 import { saveGame } from './save'
-import { floater } from './combat'
+import { floater, ring } from './combat'
 import { spawnAshMother } from './ai'
 import { approvalOnQuestDone } from './party'
 import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, startPitFight } from './career'
 import { cycleRune, learnWord } from './frost'
+import { startSiege } from './mara'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -319,6 +320,13 @@ export function runAction(ctx: EngineCtx, action: string) {
           ctx.player.hp = ctx.hp
         }
         break
+      // Фаза 6.3: оборона Бастиона — бить рог
+      case 'siege':
+        if (arg1 === 'start') {
+          closeDialogue(ctx)
+          startSiege(ctx)
+        }
+        break
     }
   }
   ctx.syncUi()
@@ -330,9 +338,30 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
   if (it.action.startsWith('dialogue:')) {
     openDialogue(ctx, it.action.slice(9))
   } else if (it.action.startsWith('portal:')) {
-    // Врата Тумана / Врата Гранита / Врата Пределья (Фаза 3/6/6.2): затемнение + телепорт
+    // Врата Тумана / Врата Гранита / Врата Пределья / Врата Мары (Фаза 3/6/6.2/6.3)
     const zone = it.action.slice(7)
-    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost') ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost')
+    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost' || zone === 'mara') {
+      ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost' | 'mara')
+    }
+  } else if (it.action.startsWith('purge:')) {
+    // Мор-сгустки Мары (Фаза 6.3): выжечь скверну в жилах — квест Хольта
+    const questId = it.action.slice(6)
+    ctx.removedProps.add(it.id)
+    ctx.flags['well_' + it.id] = true
+    ring(ctx, it.pos, '#f5c96b', 70, 0.9)
+    floater(ctx, it.pos, 'СКВЕРНА ВЫЖЕЧЕНА', '#f5c96b', 15)
+    sfx('fire')
+    const q = ctx.quests[questId]
+    if (q && !q.done) {
+      q.counter++
+      if (q.stage === 1 && q.counter >= 3) {
+        advanceQuest(ctx, questId, 2)
+      } else {
+        ctx.toast(`Мор-сгусток: ${q.counter}/3`, 'quest')
+        saveGame(ctx, false)
+        ctx.syncUi()
+      }
+    }
   } else if (it.action.startsWith('rune:')) {
     // Пещера Рун (Фаза 6.2): поворот рунного камня-кольца
     cycleRune(ctx, it.action.slice(5))

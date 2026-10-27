@@ -7,7 +7,7 @@
 
 import { ABILITY_MAP, ENEMY_STATS } from '../data/abilities'
 import { ENEMY_NAME } from '../data/tables'
-import { ASH_MOTHER, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
+import { ASH_MOTHER, BLIGHT_WELLS, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
 import { Entity, Stance, Vec } from '../types'
 import { sfx } from '../sfx'
 import { d, rndRange } from '../core/util'
@@ -18,6 +18,7 @@ import { beam, damage, floater, meleeAttack, rangedAttack, ring, spawnTelegraph 
 import { openDialogue } from './quest'
 import { companionIndex, formationSlot } from './party'
 import { pitMasterLogic, spawnPitMaster } from './career'
+import { blightMotherLogic } from './mara'
 import { spawnDragon } from './frost'
 
 export { spawnPitMaster }
@@ -97,6 +98,10 @@ export function spawnWorld(ctx: EngineCtx) {
   }
   for (const c of VELD_CLUES) {
     if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
+  }
+  // Фаза 6.3: выжженные мор-сгустки остаются выжженными после загрузки
+  for (const w of BLIGHT_WELLS) {
+    if (ctx.flags['well_' + w.id]) ctx.removedProps.add(w.id)
   }
   // Фаза 4: спавним по наличию в мире (а не по флагу — сейв ставит
   // companionIds=true до spawnWorld, и старый гвард молча терял партию при загрузке)
@@ -454,8 +459,8 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
     }
     return
   }
-  // Интро босса (дракон Стылого Пределья интроится через событие Дола)
-  if (e.boss && e.enemyType !== 'dragon' && !ctx.flags.bossIntroDone) {
+  // Интро босса долины (у Мор-Матери/Мастера Ямы свои события — только свой enemyType)
+  if (e.enemyType === 'boss' && !ctx.flags.bossIntroDone) {
     if (Math.hypot(ctx.player.pos.x - e.pos.x, ctx.player.pos.y - e.pos.y) < 340) {
       ctx.flags.bossIntroDone = true
       e.aggroR = 400
@@ -541,6 +546,8 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
   if (e.boss && e.enemyType !== 'dragon') bossLogic(ctx, e, dist, dt)
   if (e.enemyType === 'ash_mother') ashMotherLogic(ctx, e, dist, dt)
   if (e.enemyType === 'pit_master') pitMasterLogic(ctx, e, dist, dt)
+  // Фаза 6.3: Мор-Мать управляет собой полностью (взрыв/плевок/призыв)
+  if (e.enemyType === 'blight_mother') blightMotherLogic(ctx, e, dist, dt)
   // Фаза 6.2: дракон управляет собой полностью (полёт/стрейф/посадка)
   if (e.enemyType === 'dragon') return
 

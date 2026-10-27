@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, MA_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW, BASTION, BLIGHT_WELLS, MARA_RIDGE } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -91,6 +91,8 @@ const WALLF_FLAT = { x: WORD_WALL_FORCE.pos.x, y: WORD_WALL_FORCE.pos.y, r: 120 
 const WALL2_FLAT = { x: WORD_WALL_FROST.pos.x, y: WORD_WALL_FROST.pos.y, r: 120 }
 const ROOST_FLAT = { x: ROOST.pos.x, y: ROOST.pos.y, r: 250 }
 const BARROW_FLAT = { x: BARROW.pos.x, y: BARROW.pos.y, r: 110 }
+// Фаза 6.3: ключевые точки Багровой Мары
+const BASTION_FLAT = { x: BASTION.pos.x, y: BASTION.pos.y, rx: 210, ry: 150 }
 
 export const WATER_LEVEL = -1.6
 
@@ -175,6 +177,29 @@ export function heightAt(x: number, y: number): number {
     const t = falloff(df, 70, 260)
     h += t * t * (62 + jag)
   }
+  // --- Фаза 6.3: Багровый хребет к Маре (горизонтальная стена по y, только сектор Гранита) ---
+  if (x > GRIDGE.x) {
+    const dm = Math.abs(y - MARA_RIDGE.y)
+    if (dm < 330) {
+      const jag = (fbm(x / 110 + 103, y / 110 + 53, 2) - 0.5) * 11
+      const t = falloff(dm, 70, 260)
+      h += t * t * (60 + jag)
+    }
+    // Мара: клыкастая багровая пустошь с мор-омутами
+    if (y > MARA_RIDGE.y + 40) {
+      const mz = falloff(y - (MARA_RIDGE.y + 40), 0, 260)
+      const wastes = (fbm(x / 300 + 91, y / 300 + 17, 3) - 0.5) * 7 + 1.4
+      h = h * (1 - mz) + wastes * mz
+      for (const w of BLIGHT_WELLS) {
+        const dw = Math.hypot(x - w.pos.x, y - w.pos.y)
+        const fw = falloff(dw, 60, 60)
+        if (fw > 0) {
+          const bowl = -2.2 - 1.1 * (1 - Math.min(1, dw / 110))
+          h = h * (1 - fw) + bowl * fw
+        }
+      }
+    }
+  }
   // Вельд: болотистая низина с омутами
   if (y > RIDGE.y + 40) {
     const sw = falloff(y - (RIDGE.y + 40), 0, 240)
@@ -253,6 +278,15 @@ export function heightAt(x: number, y: number): number {
     const fg = falloff(tg, 90, 80)
     h = h * (1 - fg) + 1.8 * fg
   }
+  // Плоские пятачки Мары (Фаза 6.3): бастион + врата
+  const tbast = inEllipse(x, y, BASTION_FLAT.x, BASTION_FLAT.y, BASTION_FLAT.rx, BASTION_FLAT.ry)
+  const fbast = falloff(tbast, 0.75, 0.55)
+  h = h * (1 - fbast) + 3.2 * fbast
+  for (const g of [MA_GATES.graniteSide, MA_GATES.mara]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    h = h * (1 - fg) + 1.8 * fg
+  }
 
   return h
 }
@@ -286,6 +320,11 @@ const C_SNOW2: [number, number, number] = [0.82, 0.85, 0.84]
 const C_SNOWDIRT: [number, number, number] = [0.62, 0.63, 0.56]
 const C_ICE: [number, number, number] = [0.63, 0.74, 0.74]
 const C_SCORCH: [number, number, number] = [0.16, 0.14, 0.13]
+// Палитра Багровой Мары (Фаза 6.3): гниль, багровые жилы, мор-омуты
+const C_BLIGHT: [number, number, number] = [0.29, 0.15, 0.12]
+const C_BLIGHT2: [number, number, number] = [0.21, 0.11, 0.10]
+const C_VEIN: [number, number, number] = [0.46, 0.16, 0.13]
+const C_ROTTED: [number, number, number] = [0.17, 0.13, 0.11]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -398,6 +437,36 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
       // Площадь Приюта — вытоптанный снег
       const thav = inEllipse(x, y, HAVEN_FLAT.x, HAVEN_FLAT.y, 150, 110)
       lerp3(tmpA, C_SNOWDIRT, falloff(thav, 0.72, 0.45), tmpA)
+    }
+  }
+
+  // --- Фаза 6.3: Багровая Мара — гниль и багровые жилы (после гранита, перекрывает его) ---
+  if (x > GRIDGE.x && y > MARA_RIDGE.y - 200) {
+    const mz = falloff(y - (MARA_RIDGE.y - 200), 0, 240)
+    if (mz > 0.01) {
+      const bl = fbm(x / 210 + 77, y / 210 + 33, 3)
+      const base = bl > 0.52 ? C_BLIGHT : C_BLIGHT2
+      lerp3(tmpA, base, mz, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      // багровые жилы скверны
+      lerp3(tmpA, C_VEIN, Math.max(0, bl - 0.62) * 1.5 * mz, tmpA)
+      // гнилые низины у мор-омутов
+      for (const w of BLIGHT_WELLS) {
+        const dw = Math.hypot(x - w.pos.x, y - w.pos.y)
+        if (dw < 130) {
+          lerp3(tmpA, C_ROTTED, falloff(dw, 66, 64) * 0.95, tmpA)
+        }
+      }
+      // площадь Бастиона — вытоптанная земля под частоколом
+      const tbast2 = inEllipse(x, y, BASTION.pos.x, BASTION.pos.y, 150, 105)
+      lerp3(tmpA, C_DIRT, falloff(tbast2, 0.72, 0.45) * mz, tmpA)
+    }
+    // Багровый хребет — голый камень
+    const dmr = Math.abs(y - MARA_RIDGE.y)
+    if (dmr < 320) {
+      lerp3(tmpA, C_ROCK, falloff(dmr, 70, 250) * 0.9, tmpA)
     }
   }
 

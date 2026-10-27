@@ -209,6 +209,41 @@ export const ITEMS: Record<string, ItemDef> = {
     price: 140,
     icon: 'Bone',
   },
+  // ---------------- Фаза 6.3: Багровая Мара ----------------
+  ghoul_gland: {
+    id: 'ghoul_gland',
+    name: 'Мор-железа',
+    desc: 'Пульсирующий узел под кожей упыря. Досент Хольт платит за них и ведёт счёт.',
+    type: 'misc',
+    price: 24,
+    icon: 'FlaskRound',
+  },
+  bastion_blade: {
+    id: 'bastion_blade',
+    name: 'Клинок Бастиона',
+    desc: 'Сталь Ветвей, перекованная в дни штурма. Пахнет гарью и мор-кровью — и не ржавеет.',
+    type: 'weapon',
+    price: 360,
+    damage: 11,
+    icon: 'Sword',
+  },
+  blight_heart: {
+    id: 'blight_heart',
+    name: 'Сердце Мор-Матери',
+    desc: 'До сих пор бьётся. Доказательство для Мейры — и предупреждение для всех остальных.',
+    type: 'quest',
+    price: 150,
+    icon: 'Heart',
+  },
+  watch_gorget: {
+    id: 'watch_gorget',
+    name: 'Горжета Дозора Мары',
+    desc: 'Пластина на шею с клеймом Ветвей: мор-плевки скользят по отполированной стали.',
+    type: 'armor',
+    price: 320,
+    ac: 4,
+    icon: 'Shield',
+  },
 }
 
 export const SELL_RATE = 0.4

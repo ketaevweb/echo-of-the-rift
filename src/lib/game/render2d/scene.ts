@@ -31,7 +31,7 @@ export interface SceneView {
   telegraphs: Telegraph[]
   playerAlive: boolean
   // Фаза 3: атмосфера
-  zone: 'valley' | 'veld' | 'granite' | 'frost'
+  zone: 'valley' | 'veld' | 'granite' | 'frost' | 'mara'
   dayT: number
   // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
   tactical?: boolean

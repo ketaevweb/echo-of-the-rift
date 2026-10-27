@@ -93,6 +93,21 @@ export const BESTIARY_INFO: Record<string, { name: string; text: string; weaknes
     text: 'Крылатая тень Стылого Пределья. Говорит на древнем языке, и от его слов вспыхивает снег. Душа его — лоно слов силы.',
     weakness: 'На земле уязвим как зверь; в воздухе достают только знаки, лук Кайи и крики. Читай огненные бомбы по кругам на снегу.',
   },
+  ghoul: {
+    name: 'Мор-упырь',
+    text: 'Бывший путник: мор добрался до нутра и переделал под себя. Бежит быстрее человека и не чувствует боли. Кожа — багровая корка.',
+    weakness: 'Плоть скверны горит — Игни бьёт вдвое. Масло против спектров берёт.',
+  },
+  abomination: {
+    name: 'Мор-абом',
+    text: 'Сплетение тел, которого не должно было быть. Мор сросся в гору мяса, что идёт на бастион, как осадный таран.',
+    weakness: 'Медлителен. Огонь (Игни) выжигает сросшуюся плоть, Аард роняет его с ног.',
+  },
+  blight_mother: {
+    name: 'Мор-Мать',
+    text: 'Матка Мары: из её брющного мешка выходят упыри, её плевки роятся скверной. Штурмует бастион последней волной, когда частокол уже дрожит.',
+    weakness: 'Читай круги мор-взрыва и конусы плевка. Аксий и Аард держат её надолго — прибереги к финалу волны.',
+  },
 }
 
 export const ENEMY_NAME: Record<string, string> = {
@@ -111,14 +126,17 @@ export const ENEMY_NAME: Record<string, string> = {
   draugr: 'Драугр',
   frost_troll: 'Стылый тролль',
   dragon: 'Иммолтакс',
+  ghoul: 'Мор-упырь',
+  abomination: 'Мор-абом',
+  blight_mother: 'Мор-Мать',
 }
 
 // ---------------- Масла (Фаза 3) ----------------
 
-/** Классы врагов для масел: «звери» и «спектры». */
+/** Классы врагов для масел: «звери» и «спектры». Мор-скверна Мары — к спектрам. */
 export const OIL_TARGETS: Record<'beast' | 'specter', Set<string>> = {
   beast: new Set(['wolf', 'alpha', 'bogling', 'scorpion', 'frost_troll', 'dragon']),
-  specter: new Set(['horror', 'ash_shade', 'ash_mother', 'draugr']),
+  specter: new Set(['horror', 'ash_shade', 'ash_mother', 'draugr', 'ghoul', 'abomination', 'blight_mother']),
 }
 
 export const ATTR_NAMES: Record<string, string> = {

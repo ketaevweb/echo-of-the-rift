@@ -471,6 +471,105 @@ function buildFrostTroll(): { group: THREE.Group; refs: HumanoidRefs } {
   return built
 }
 
+// ---------------- Мара: упырь / абом / Мор-Мать (Фаза 6.3) ----------------
+
+/** Мор-упырь: сгорбленный бегун в багровой корке, глаза — угли скверны. */
+function buildGhoul(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#8a5a4a', 0x9a6a56, { scale: 0.95 })
+  // горб скверны на спине
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(5.2, 8, 6), mat(0x5a2a22, { roughness: 0.55 }))
+  hump.position.set(0, 21, -3.4)
+  hump.scale.set(1.2, 0.8, 1)
+  built.group.add(hump)
+  // багровые прожилки на торсе
+  const veins = new THREE.Mesh(
+    new THREE.SphereGeometry(5.4, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x6a1a12, emissive: 0xc93a24, emissiveIntensity: 0.5, roughness: 0.4 }),
+  )
+  veins.position.set(0, 19.5, 2.2)
+  veins.scale.set(0.72, 0.5, 0.42)
+  built.group.add(veins)
+  // глаза-угли
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff7a3a })
+  for (const sz of [-1.7, 1.7]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 4), eyeMat)
+    eye.position.set(0, 27.8, sz)
+    built.group.add(eye)
+  }
+  return built
+}
+
+/** Мор-абом: сросшаяся громила — осадный таран Мары. */
+function buildAbomination(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#6a4238', 0x8a5a48, { scale: 1.75, horns: true })
+  // сросшиеся наросты-коконы на плечах
+  const flesh = new THREE.MeshStandardMaterial({ color: 0x5a1a14, emissive: 0xb03a20, emissiveIntensity: 0.42, roughness: 0.45 })
+  for (const sz of [-1, 1]) {
+    const cocoon = new THREE.Mesh(new THREE.SphereGeometry(5.6, 9, 7), flesh)
+    cocoon.position.set(sz * 10.4, 27, -1.2)
+    cocoon.scale.set(1.15, 0.85, 0.95)
+    built.group.add(cocoon)
+  }
+  // брюшной мешок скверны
+  const sack = new THREE.Mesh(new THREE.SphereGeometry(7.4, 9, 7), flesh)
+  sack.position.set(0, 13.5, 3.4)
+  sack.scale.set(1.1, 1.15, 0.75)
+  built.group.add(sack)
+  return built
+}
+
+/** Мор-Мать: брющной мешок Мары. Морда по +X, тело — refs.body. */
+function buildBlightMother(): { group: THREE.Group; refs: { body: THREE.Object3D } } {
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  const fleshMat = new THREE.MeshStandardMaterial({ color: 0x4a1610, emissive: 0xb03a20, emissiveIntensity: 0.4, roughness: 0.5 })
+  const crustMat = mat(0x3a1210, { roughness: 0.7 })
+
+  // Брющной мешок — главный объём
+  const bulk = new THREE.Mesh(new THREE.SphereGeometry(11, 12, 10), fleshMat)
+  bulk.scale.set(1.35, 1.05, 1.1)
+  bulk.position.y = 11
+  bulk.castShadow = true
+  // корка-панцирь сверху
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(11.4, 12, 8), crustMat)
+  shell.scale.set(1.3, 0.62, 1.06)
+  shell.position.y = 14.5
+  // «голова»-отросток вперёд
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(4.4, 12, 7), crustMat)
+  snout.rotation.z = -Math.PI / 2
+  snout.position.set(14.5, 12.5, 0)
+  // глаза-угли
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff6a2a })
+  for (const sz of [-3.4, 3.4]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(1.1, 6, 4), eyeMat)
+    eye.position.set(17.5, 13.5, sz)
+    body.add(eye)
+  }
+  // щупальца по бокам и сзади
+  const tendrils: Array<[number, number, number]> = [
+    [-8, 8, -8], [-8, 8, 8], [-13, 7, 0], [0, 8, -11], [0, 8, 11], [6, 9, -9.5],
+  ]
+  for (const [tx, ty, tz] of tendrils) {
+    const t = new THREE.Mesh(new THREE.ConeGeometry(1.9, 11, 5), fleshMat)
+    t.position.set(tx, ty - 2, tz)
+    t.rotation.z = Math.PI - 0.5 + Math.random() * 0.4
+    t.rotation.x = Math.atan2(tz, tx)
+    body.add(t)
+  }
+  // светящееся ядро скверны в брюхе
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(4.4, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xd94a30, transparent: true, opacity: 0.85 }),
+  )
+  core.position.set(0, 9.5, 6.5)
+  const glow = new THREE.PointLight(0xc93820, 160, 190, 2)
+  glow.position.y = 12
+  body.add(bulk, shell, snout, core, glow)
+  group.add(body)
+  group.scale.setScalar(1.5)
+  return { group, refs: { body } }
+}
+
 /** Иммолтакс: крылатая тень Стылого Пределья. Морда по +X, тело — refs.body (высота полёта правит движок). */
 function buildDragon(): { group: THREE.Group; refs: { body: THREE.Object3D; wingL: THREE.Object3D; wingR: THREE.Object3D; tail: THREE.Object3D } } {
   const group = new THREE.Group()
@@ -652,6 +751,15 @@ export class Avatar {
       case 'frost_troll':
         built = buildFrostTroll()
         break
+      case 'ghoul':
+        built = buildGhoul()
+        break
+      case 'abomination':
+        built = buildAbomination()
+        break
+      case 'blight_mother':
+        built = buildBlightMother()
+        break
       case 'dragon':
         built = buildDragon()
         break
@@ -672,7 +780,7 @@ export class Avatar {
     this.forwardX =
       arch === 'wolf' || arch === 'alpha' || arch === 'horror' ||
       arch === 'bogling' || arch === 'ash_shade' || arch === 'ash_mother' ||
-      arch === 'scorpion' || arch === 'dragon'
+      arch === 'scorpion' || arch === 'dragon' || arch === 'blight_mother'
     this.mats = collectMats(this.group)
     this.hpBar = new HpBar()
     this.group.add(this.hpBar.obj)
@@ -696,6 +804,9 @@ export class Avatar {
     | 'pit_master'
     | 'draugr'
     | 'frost_troll'
+    | 'ghoul'
+    | 'abomination'
+    | 'blight_mother'
     | 'dragon'
     | 'boss'
     | 'humanoid' {
@@ -716,6 +827,9 @@ export class Avatar {
       case 'pit_master': return 'pit_master'
       case 'draugr': return 'draugr'
       case 'frost_troll': return 'frost_troll'
+      case 'ghoul': return 'ghoul'
+      case 'abomination': return 'abomination'
+      case 'blight_mother': return 'blight_mother'
       case 'dragon': return 'dragon'
       case 'boss': return 'boss'
       default: return 'humanoid'

@@ -268,3 +268,27 @@ Stage Summary:
 - Мир 6360×4200, 4-я зона проходима в свободном порядке; сейвы v1 обратно совместимы (shoutLv/runes с дефолтами).
 - Скриншоты: .ref/f62-frost-entry.png, f62-haven3.png, f62-snowview.png, f62-runes-solved.png, f62-wordwall.png, f62-shout-force.png, f62-dragon-air.png, f62-dragon-fight.png, f62-shout-frost.png, f62-reload.png.
 - Следующий шаг по роадмапу — Фаза 6.3: домен 4 «Багровая Мара» (DAO): оборона бастиона (волны + приказы), мор-погода.
+
+---
+Task ID: 6.3
+Agent: Z.ai Code (main)
+Task: Фаза 6.3 — Багровая Мара (домен DAO): оборона бастиона (волны + приказы партии), мор-погода, босс Мор-Мать, 2 побочных квеста.
+
+Work Log:
+- Данные: data/mara.ts — Багровый хребет (y 3350, сектор Гранита), Врата Мары (обе стороны), Бастион Ветвей (4380,3800) + ворота штурма, 2 лагеря прорыва, 3 мор-сгустка, Логово Моры; дороги, пропсы (bastion/blight/deadtree/rock), NPC (Командор Мейра, Досент Хольт), спавн-зоны (ghoul ×2, abomination), интеракты (рог, сгустки), арea/маркеры; SIEGE_WAVES 5 волн (финал — Мор-Мать).
+- Мир: world.ts — zoneOf 'mara' (x>GRIDGE && y>MARA_RIDGE), интеграция PROPS/NPCS/SPAWN_ZONES/INTERACTABLES/AREAS/MARKERS/ROADS + реэкспорты; granite.ts — генерация валунов/кустов клампится к y < MARA_RIDGE−280; types.ts — EnemyType ghoul/abomination/blight_mother, PropDef blight/bastion.
+- Бой: abilities.ts — статы ghoul (70hp, быстрый), abomination (150hp, таран), blight_mother (640hp босс); FIRE_WEAK +ghoul/abom, STUN_WEAK +Мать; tables.ts — бестиарий/имена, OIL_TARGETS specter + мор-твари; items.ts — ghoul_gland, bastion_blade (dmg 11), blight_heart, watch_gorget (ac 4).
+- Система осады systems/mara.ts: startSiege (рог; компаньоны получают приказ hold у ворот — связка с Фазой 4), updateMara (брейк 8с → волна → грызня частокола alive*0.55/с → победа/провал), blightMotherLogic (мор-взрыв круг, мор-плевок конус с burn+slow, призыв упырей 66/33%), siegeHud зеркало. Провал: твари рассеиваются, ретрай через рог.
+- Квесты/диалоги: 'mara' «Оборона Бастиона» (5 стадий), 'mara_wells' «Скверна в жилах» (3 сгустка → горжета), 'mara_glands' «Желёзы скверны» (5 желёз с упырей/абомов); диалоги mara_meira/mara_holt/mara_horn + портреты; quest.ts — action 'siege:start', интеракт 'purge:', портал 'mara'.
+- Хуки: ai.ts — blightMotherLogic в updateEnemy; combat.ts — лут/счётчики ghoul/abom/blight_mother; Game.ts — updateMara в stepWorld; engine.ts — siege поле (транзитное), travelTo mara (MA_GATES обе стороны), ambient 'mara' (sfx — гул 95Гц); movement.ts — Багровый хребет непроходим (сектор Гранита).
+- Рендер 3D: heightmap — хребет, пустошь с омутами, Бастион FLAT, палитра C_BLIGHT/C_VEIN/C_ROTTED + багровые жилы; Renderer3d — багровое небо/туман/солнце/полусферика, мор-искры (снегопад перекрашен, медленный дрейф); Props — bastion (частокол с башнями/знамёнами/факелами) + blight (лужа с пульсирующим ядром, removable); Avatars — buildGhoul (горб, угли-глаза), buildAbomination (коконы, брюшной мешок), buildBlightMother (bulk+корка+щупальца+ядро, forwardX); render2d — кейсы bastion/blight/упыри/Мать.
+- UI: store/uiSync — siege-зеркало (волна N/5 + % частокола), boss-детект blight_mother, zoneLabel «БАГРОВАЯ МАРА», маровские квесты в трекере побочек; Hud — панель «ОБОРОНА БАСТИОНА» с полосой частокола, CONTRACT_TOTALS (N/M для всех побочек в трекере).
+- Багфиксы по ходу E2E: ① ctx.time не тикал со времён рефакторинга 0.9 (ломало respawnAt/endingAt) — восстановлен тик в stepWorld; ② интро Пожирателя Бурь срабатывало на ЛЮБОМ boss:true (в т.ч. Мор-Мать) — условие ужато до enemyType==='boss'; ③ порядок действий диалога Мейры (siege:start до quest:mara:2 гвардился stage<2) — переставлен; ④ сгустки можно было жечь до взятия квеста (квест зависал) — cond quest.mara_wells==1; ⑤ well_* removedProps не восстанавливались из сейва — рестор в spawnWorld; ⑥ тинт Мары слишком узко переходил — falloff расширен.
+- E2E agent-browser: Гранит → врата → «БАГРОВАЯ МАРА» (багровая дымка, мор-искры, гул); Мейра: квест → рог → осада; волна 1: 4 упыря из лагерей, частокол 100→98.8, «ВОЛНА 1!», UI-трекер; прыжок на волну 5: 2 упыря+2 абома+Мать, босс-бар, ИИ тикает (слэм/плевок/призыв), урон игроку; победа → stage 4 + bastionHeld; Мейра: награда 350з+Клинок Бастиона+stage 5; Хольт: сгустки 3/3 → горжета+140з; желёзы: реальное убийство упыря (kills=1, counter 1/5, железа в луте); провал осады (gateHp→0 → siege null, ретрай); сейв/reload/Продолжить ×4 — квесты/флаги/сгустки восстановлены; переходы mara⇄granite в обе стороны; tsc+lint чистые, консоль без ошибок.
+- Скриншоты: .ref/f63-granite-side.png, f63-bastion.png, f63-siege-start.png, f63-wave1-fight.png, f63-mother.png, f63-mother-fight.png, f63-bastion-gate.png, f63-blight-well.png, f63-tint3.png, f63-fromabove.png.
+
+Stage Summary:
+- Фаза 6.3 закрыта по правилу «домен = 1 механика + 1 босс + 2 побочных»: DAO-механика — оборона Бастиона волнами с прочностью частокола и приказами партии (hold у ворот при роге + тактическая пауза Фазы 4), мор-погода (багровое небо/искры/гул) как атмосферный слой, босс Мор-Мать в финале 5-й волны, побочки Хольта (сгустки/желёзы) с наградами.
+- 5-я зона мира проходима; осада транзитна (не сейвится) — после загрузки ретрай через рог; сейвы v1 обратно совместимы.
+- Попутно исправлен старый баг: ctx.time (потерян при рефакторинге) — респавн врагов и финал снова работают.
+- Следующий шаг по роадмапу — Фаза 6.4: домен «Спорные Земли» (BG3): диалоговые квесты, выборы, меняющие ландшафт.

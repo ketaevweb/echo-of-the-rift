@@ -868,6 +868,68 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
       ctx.fill()
       break
     }
+    case 'bastion': {
+      // Фаза 6.3: ворота Бастиона — частокол с башнями и проёмом
+      const w = p.w ?? 150
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 4, w * 0.55, 9, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // частокол (заострённые брёвна)
+      for (let i = -7; i <= 7; i++) {
+        if (Math.abs(i) < 2) continue
+        const bx = pos.x + i * 11 + (i > 0 ? 10 : -10)
+        ctx.fillStyle = i % 2 === 0 ? '#5a4630' : '#463524'
+        ctx.fillRect(bx - 3, pos.y - 22, 6, 24)
+        ctx.beginPath()
+        ctx.moveTo(bx - 3, pos.y - 22)
+        ctx.lineTo(bx, pos.y - 27)
+        ctx.lineTo(bx + 3, pos.y - 22)
+        ctx.closePath()
+        ctx.fill()
+      }
+      // башни
+      const half = w / 2
+      for (const tx of [pos.x - half + 8, pos.x + half - 8]) {
+        ctx.fillStyle = '#5a4630'
+        ctx.fillRect(tx - 9, pos.y - 34, 18, 36)
+        ctx.fillStyle = '#7a3b2e'
+        ctx.beginPath()
+        ctx.moveTo(tx - 12, pos.y - 34)
+        ctx.lineTo(tx, pos.y - 44)
+        ctx.lineTo(tx + 12, pos.y - 34)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = '#d9a441'
+        ctx.fillRect(tx - 3, pos.y - 28, 6, 12)
+      }
+      // ворота (приоткрыты)
+      ctx.fillStyle = '#0d0a08'
+      ctx.fillRect(pos.x - 20, pos.y - 21, 40, 22)
+      ctx.fillStyle = '#6a5238'
+      ctx.fillRect(pos.x - 20, pos.y - 21, 17, 22)
+      ctx.fillRect(pos.x + 3, pos.y - 21, 17, 22)
+      break
+    }
+    case 'blight': {
+      // Фаза 6.3: мор-сгусток — багровая лужа с пульсирующим ядром
+      const r = p.r ?? 22
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3 + pos.x)
+      ctx.fillStyle = 'rgba(58,18,16,0.85)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y, r * 1.35, r * 0.62, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = `rgba(201,58,42,${0.4 + pulse * 0.35})`
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y, r * 1.1, r * 0.5, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.fillStyle = `rgba(217,74,48,${0.55 + pulse * 0.35})`
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y - 5 - pulse * 2, r * 0.34, r * 0.26, 0, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
   }
 }
 
@@ -1120,6 +1182,50 @@ export function drawEntity(
       // Пределье 2D: мёртвый воин в истлевшей броне
       drawHumanoid(ctx, e, t, '#6a7a6a', 'sword')
       break
+    case 'ghoul':
+      // Мара 2D: сгорбленный упырь в багровой корке
+      drawHumanoid(ctx, e, t, '#8a5a4a', 'sword')
+      break
+    case 'abomination':
+      // Мара 2D: сросшаяся громила
+      drawHumanoid(ctx, e, t, '#6a4238', 'sword')
+      break
+    case 'blight_mother': {
+      // Мора-Мать 2D: брющной мешок с щупальцами и ядром
+      const bob = Math.sin(t * 2.1 + e.eid) * 2
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * 1.2)
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a1610'
+      ctx.beginPath()
+      ctx.ellipse(e.pos.x, e.pos.y - e.radius * 0.7 - bob, e.radius * 1.25, e.radius * 0.95, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // щупальца
+      ctx.strokeStyle = e.hitT > 0 ? '#ffffff' : '#3a1210'
+      ctx.lineWidth = 4
+      for (let i = 0; i < 5; i++) {
+        const a = t * 1.2 + (i / 5) * Math.PI * 2 + e.eid
+        ctx.beginPath()
+        ctx.moveTo(e.pos.x + Math.cos(a) * e.radius * 0.8, e.pos.y - 6 - bob)
+        ctx.quadraticCurveTo(
+          e.pos.x + Math.cos(a) * e.radius * 1.5,
+          e.pos.y + 2,
+          e.pos.x + Math.cos(a) * e.radius * 1.7,
+          e.pos.y + 8,
+        )
+        ctx.stroke()
+      }
+      // ядро скверны
+      const pulse = 0.5 + 0.5 * Math.sin(t * 4 + e.eid)
+      ctx.fillStyle = `rgba(217,74,48,${0.6 + pulse * 0.35})`
+      ctx.beginPath()
+      ctx.arc(e.pos.x + e.radius * 0.4, e.pos.y - e.radius * 0.6 - bob, 5 + pulse * 1.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#ffb04a'
+      ctx.beginPath()
+      ctx.arc(e.pos.x + e.radius * 1.05, e.pos.y - e.radius * 1.1 - bob, 2, 0, Math.PI * 2)
+      ctx.arc(e.pos.x + e.radius * 1.05, e.pos.y - e.radius * 0.6 - bob, 2, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
     case 'frost_troll':
       // Стылый тролль: белошёрстная громила
       drawHumanoid(ctx, e, t, '#d8dcd4', 'sword')

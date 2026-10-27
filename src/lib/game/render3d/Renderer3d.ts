@@ -319,6 +319,7 @@ export class Renderer3d {
 
   private tmpColor = new THREE.Color()
   private tmpColor2 = new THREE.Color()
+  private sunMara = new THREE.Color(0.85, 0.35, 0.28)
 
   /** Лерпит туман/небо/свет к целям зоны и времени суток; Тишь выцветает картинку. */
   private updateAtmosphere(zone: ZoneId, dayT: number, silenceGoal: number) {
@@ -326,12 +327,17 @@ export class Renderer3d {
     const veld = zone === 'veld'
     const granite = zone === 'granite'
     const frost = zone === 'frost'
+    const mara = zone === 'mara'
     const dl = this.daylight
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
     this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
 
     // Туман
-    if (frost) {
+    if (mara) {
+      // Мара: багровая мор-дымка, гуще к ночи (DAO-вайб: мор-погода)
+      this.tmpColor.setRGB(0.20 + dl * 0.30, 0.08 + dl * 0.10, 0.07 + dl * 0.08)
+      this.fog.density += (0.0026 - dl * 0.0008 - this.fog.density) * k
+    } else if (frost) {
       // Пределье: белёсая метель — светло-серый туман, гуще к ночи
       this.tmpColor.setRGB(0.42 + dl * 0.38, 0.47 + dl * 0.36, 0.46 + dl * 0.34)
       this.fog.density += (0.0026 - dl * 0.0009 - this.fog.density) * k
@@ -351,7 +357,11 @@ export class Renderer3d {
     // Небо
     const top = this.skyMat.uniforms.top.value as THREE.Color
     const hor = this.skyMat.uniforms.horizon.value as THREE.Color
-    if (frost) {
+    if (mara) {
+      // Небо Мары: кроваво-багровый купол, гнилой горизонт
+      this.tmpColor.setRGB(0.18 + dl * 0.30, 0.07 + dl * 0.09, 0.06 + dl * 0.07)
+      this.tmpColor2.setRGB(0.34 + dl * 0.40, 0.12 + dl * 0.14, 0.10 + dl * 0.10)
+    } else if (frost) {
       // Небо Пределья: серо-белый купол, бледный горизонт (без синевы)
       this.tmpColor.setRGB(0.44 + dl * 0.34, 0.48 + dl * 0.33, 0.47 + dl * 0.31)
       this.tmpColor2.setRGB(0.58 + dl * 0.36, 0.61 + dl * 0.33, 0.58 + dl * 0.30)
@@ -370,14 +380,18 @@ export class Renderer3d {
     hor.lerp(this.tmpColor2, k)
 
     // Свет
-    const zoneDim = frost ? 0.94 : granite ? 0.82 : veld ? 0.78 : 1
+    const zoneDim = frost ? 0.94 : granite ? 0.82 : veld ? 0.78 : mara ? 0.72 : 1
     this.sun.intensity += ((0.04 + dl * 1.55 * zoneDim) - this.sun.intensity) * k
     // цвет солнца: на низком солнце — тёплый закатный
     const dusk = Math.max(0, 1 - Math.abs(Math.sin((dayT - 0.25) * Math.PI * 2)) * 2.6)
     this.tmpColor.copy(this.sunDay).lerp(this.sunDusk, dusk * 0.8)
+    // В Маре солнце — багровый диск сквозь скверну
+    if (mara) this.tmpColor.lerp(this.sunMara, 0.55)
     this.sun.color.lerp(this.tmpColor, k)
     this.hemi.intensity += ((0.16 + dl * 0.58) - this.hemi.intensity) * k
-    if (frost) {
+    if (mara) {
+      this.hemi.color.lerp(this.tmpColor.setRGB(0.34 + dl * 0.30, 0.14 + dl * 0.12, 0.12 + dl * 0.10), k)
+    } else if (frost) {
       this.hemi.color.lerp(this.tmpColor.setRGB(0.62 + dl * 0.32, 0.66 + dl * 0.30, 0.64 + dl * 0.28), k)
     } else {
       this.hemi.color.lerp(this.tmpColor.setRGB(0.28 + dl * 0.57, 0.32 + dl * 0.54, 0.30 + dl * 0.47), k)
@@ -539,17 +553,26 @@ export class Renderer3d {
 
     this.updateCamera(view)
 
-    // Фаза 6.2: снегопад Пределья — облако следует за целью кадра, падает, opacity по зоне
-    const snowGoal = view.zone === 'frost' ? 0.85 : 0
+    // Фаза 6.2/6.3: осадки — снег Пределья или мор-искры Мары (те же точки, другой цвет)
+    const snowGoal = view.zone === 'frost' ? 0.85 : view.zone === 'mara' ? 0.55 : 0
     this.snowMat.opacity += (snowGoal - this.snowMat.opacity) * 0.05
+    // цвет: снег — белый, мор — багровые хлопья скверны
+    const snowWhite = view.zone !== 'mara' ? 1 : 0
+    this.snowMat.color.setRGB(
+      this.snowMat.color.r + (snowWhite - this.snowMat.color.r) * 0.05,
+      this.snowMat.color.g + ((view.zone === 'mara' ? 0.28 : 1) - this.snowMat.color.g) * 0.05,
+      this.snowMat.color.b + ((view.zone === 'mara' ? 0.24 : 1) - this.snowMat.color.b) * 0.05,
+    )
     this.snow.visible = this.snowMat.opacity > 0.02
     if (this.snow.visible) {
+      // в Маре мор-испарения падают медленно и плывут вбок
+      const fall = view.zone === 'mara' ? 5.5 : 13
       this.snow.position.set(
         Math.round(this.camTarget.x / 100) * 100,
-        30 - ((view.time * 13) % 50),
+        30 - ((view.time * fall) % 50),
         Math.round(this.camTarget.z / 100) * 100,
       )
-      this.snow.position.x += Math.sin(view.time * 0.6) * 6
+      this.snow.position.x += Math.sin(view.time * 0.6) * (view.zone === 'mara' ? 14 : 6)
     }
 
     this.renderer.render(this.scene, this.camera)

@@ -715,6 +715,111 @@ export class Props3d {
         if (p.id) this.removable.set(p.id, [g])
         break
       }
+
+      case 'bastion': {
+        // Фаза 6.3: ворота Бастиона Ветвей — частокол с башнями и проёмом
+        const g = new THREE.Group()
+        const wood = groundMat(0x5a4630)
+        const woodDark = groundMat(0x463524)
+        // частокол: ряд заострённых брёвен по обе стороны ворот
+        const half = (p.w ?? 150) / 2
+        for (let i = -7; i <= 7; i++) {
+          if (Math.abs(i) < 2) continue // проём
+          const bx = i * 11 + (i > 0 ? 10 : -10)
+          const log = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.8, 26, 6), i % 2 === 0 ? wood : woodDark)
+          log.position.set(bx, 13, 0)
+          log.castShadow = true
+          g.add(log)
+          const tip = new THREE.Mesh(new THREE.ConeGeometry(3.3, 4.5, 6), woodDark)
+          tip.position.set(bx, 28.2, 0)
+          g.add(tip)
+        }
+        // башни по краям ворот
+        for (const tx of [-half + 8, half - 8]) {
+          const tower = new THREE.Mesh(new THREE.BoxGeometry(18, 34, 15), wood)
+          tower.position.set(tx, 17, 0)
+          tower.castShadow = true
+          g.add(tower)
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(13, 9, 4), groundMat(0x7a3b2e))
+          roof.position.set(tx, 38.5, 0)
+          roof.rotation.y = Math.PI / 4
+          g.add(roof)
+          // знамя Ветвей
+          const banner = new THREE.Mesh(
+            new THREE.PlaneGeometry(7, 13),
+            new THREE.MeshStandardMaterial({ color: 0xd9a441, emissive: 0x8a6a2a, emissiveIntensity: 0.25, side: THREE.DoubleSide, roughness: 0.8 }),
+          )
+          banner.position.set(tx, 24, 8.2)
+          g.add(banner)
+          this.herbPulse.push(banner)
+        }
+        // створки ворот (приоткрыты) + тёмный проём
+        const hole = new THREE.Mesh(new THREE.PlaneGeometry(40, 22), new THREE.MeshBasicMaterial({ color: 0x0d0a08 }))
+        hole.position.set(0, 11, -1)
+        g.add(hole)
+        for (const dx of [-10.5, 10.5]) {
+          const door = new THREE.Mesh(new THREE.BoxGeometry(20, 21, 2.4), groundMat(0x6a5238))
+          door.position.set(dx, 10.5, 0.6)
+          door.rotation.y = dx < 0 ? 0.35 : -0.35
+          door.castShadow = true
+          g.add(door)
+        }
+        // факелы у ворот
+        for (const fx of [-24, 24]) {
+          const torch = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 7, 5), woodDark)
+          torch.position.set(fx, 3.5, 8)
+          g.add(torch)
+          const flame = new THREE.Mesh(
+            new THREE.SphereGeometry(1.6, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.9 }),
+          )
+          flame.position.set(fx, 7.6, 8)
+          g.add(flame)
+          const fl = new THREE.PointLight(0xd9823a, 120, 110, 2)
+          fl.position.set(fx, 9, 10)
+          g.add(fl)
+          this.fires.push({ light: fl, flame, base: 7.6 })
+        }
+        place(this.group, g, x, y, 0, Math.PI) // смотрит на юг — к мору
+        break
+      }
+
+      case 'blight': {
+        // Фаза 6.3: мор-сгусток — багровая лужа скверны с пульсирующим ядром
+        const g = new THREE.Group()
+        const pool = new THREE.Mesh(
+          new THREE.CircleGeometry((p.r ?? 22) * 1.35, 18),
+          new THREE.MeshStandardMaterial({ color: 0x3a1210, emissive: 0xc93a2a, emissiveIntensity: 0.32, roughness: 0.35, transparent: true, opacity: 0.92 }),
+        )
+        pool.rotation.x = -Math.PI / 2
+        pool.position.y = 0.3
+        g.add(pool)
+        // ядро — пульсирующий ком скверны
+        const core = new THREE.Mesh(
+          new THREE.SphereGeometry(6.5, 10, 8),
+          new THREE.MeshStandardMaterial({ color: 0x5a1a14, emissive: 0xd94a30, emissiveIntensity: 0.85, roughness: 0.3 }),
+        )
+        core.position.y = 4.2
+        core.scale.set(1.25, 0.8, 1.25)
+        g.add(core)
+        this.herbPulse.push(core)
+        // щупальца-жилы
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + seedRot((p.seed ?? 1) + i) * 0.5
+          const rr = (p.r ?? 22) * 0.9
+          const tendril = new THREE.Mesh(new THREE.ConeGeometry(1.8, 7 + (i % 3) * 2.5, 5), groundMat(0x4a1410, 0.6))
+          tendril.position.set(Math.cos(a) * rr, 2.2, Math.sin(a) * rr)
+          tendril.rotation.set((Math.random() - 0.5) * 0.7, 0, (Math.random() - 0.5) * 0.7)
+          tendril.rotation.z = -a + Math.PI / 2
+          g.add(tendril)
+        }
+        const glow = new THREE.PointLight(0xd94a30, 130, 130, 2)
+        glow.position.y = 5
+        g.add(glow)
+        place(this.group, g, x, y, 0, 0)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
     }
   }
 

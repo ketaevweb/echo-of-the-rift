@@ -188,6 +188,21 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     if (ctx.quests.frost_dragon.stage === 3) advanceQuest(ctx, 'frost_dragon', 4)
     dragonSoulAbsorb(ctx)
     useGame.getState().patch({ bossBar: null })
+  } else if (type === 'ghoul') {
+    // Фаза 6.3: мор-упырь — железа для Хольта, счётчик квеста
+    goldLoot = 10 + Math.floor(Math.random() * 10)
+    if (Math.random() < 0.55) addItem(ctx, 'ghoul_gland', 1)
+    bumpGlands(ctx)
+  } else if (type === 'abomination') {
+    goldLoot = 40 + Math.floor(Math.random() * 16)
+    if (Math.random() < 0.85) addItem(ctx, 'ghoul_gland', 1)
+    bumpGlands(ctx)
+  } else if (type === 'blight_mother') {
+    // Фаза 6.3: Мор-Мать пала
+    ctx.flags.blightMotherDead = true
+    goldLoot = 220
+    addItem(ctx, 'blight_heart', 1)
+    useGame.getState().patch({ bossBar: null })
   } else if (type === 'boss') {
     goldLoot = 150
     addItem(ctx, 'rift_shard', 3)
@@ -222,6 +237,17 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     ctx.endingAt = ctx.time + 1.8
   }
   if (ctx.targetEid === e.eid) ctx.targetEid = null
+}
+
+/** Фаза 6.3: счётчик мор-желёз для квеста Хольта (добыто с туш). */
+function bumpGlands(ctx: EngineCtx) {
+  const q = ctx.quests.mara_glands
+  if (q.stage === 1 && !q.done) {
+    q.counter++
+    const c = q.counter
+    if (c >= 5) ctx.toast('Пять мор-желёз собраны — к досенту Хольту в Бастион!', 'quest')
+    else ctx.toast(`Желёзы скверны: ${c}/5`, 'info')
+  }
 }
 
 export function onPlayerDeath(ctx: EngineCtx) {

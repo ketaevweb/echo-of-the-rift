@@ -7,6 +7,16 @@ import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
 import { GameIcon } from './GameIcon'
 
+/** Цели счётчиков побочных квестов для трекера (N из M). */
+const CONTRACT_TOTALS: Record<string, number> = {
+  veld: 3,
+  granite_ore: 4,
+  granite_scorpions: 5,
+  frost_dragon: 3,
+  mara_wells: 3,
+  mara_glands: 5,
+}
+
 const STANCE_LABEL: Record<string, string> = {
   follow: 'Следовать',
   hold: 'Держать позицию',
@@ -113,6 +123,7 @@ export default function Hud() {
   const zoneLabel = useGame((s) => s.zoneLabel)
   const formation = useGame((s) => s.formation)
   const shouts = useGame((s) => s.shouts)
+  const siege = useGame((s) => s.siege)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -180,8 +191,8 @@ export default function Hud() {
               <div className={trackerQuest ? 'mt-2 border-t border-[#3a2e20] pt-2' : ''}>
                 <p className="text-[11px] font-semibold text-[#c9b06b]">{contractQuest.name}</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-[#a89a7d]">
-                  {contractQuest.id === 'veld' && contractQuest.stage === 1
-                    ? `${contractQuest.stageText} (${contractQuest.counter}/3)`
+                  {contractQuest.counter > 0
+                    ? `${contractQuest.stageText} (${contractQuest.counter}/${CONTRACT_TOTALS[contractQuest.id] ?? contractQuest.counter})`
                     : contractQuest.stageText}
                 </p>
               </div>
@@ -197,6 +208,21 @@ export default function Hud() {
           <div className="mt-1">
             <Bar value={bossBar.hp} max={bossBar.maxHp} color="bg-[#a06bd9]" bg="bg-[#1a1220]" />
           </div>
+        </div>
+      )}
+
+      {/* Оборона Бастиона (Фаза 6.3): волна + прочность частокола */}
+      {siege && (
+        <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#c94f3d]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
+          <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#e08a6b]">
+            ОБОРОНА БАСТИОНА · ВОЛНА {Math.min(siege.wave + 1, siege.waves)}/{siege.waves}
+          </p>
+          <div className="mt-1.5">
+            <Bar value={siege.gateHp} max={100} color="bg-[#d9a441]" bg="bg-[#241a10]" />
+          </div>
+          <p className="mt-1 text-center text-[10px] text-[#9a8f78]">
+            Частокол: {Math.max(0, Math.ceil(siege.gateHp))}% — не дай мору его прогрызть
+          </p>
         </div>
       )}
 

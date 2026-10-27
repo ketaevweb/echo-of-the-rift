@@ -255,10 +255,23 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 560, ac: 14, atk: 8, dmgDice: 2, dmgSides: 8, dmgMod: 4,
     speed: 118, aggroR: 0, leashR: 9999, attackRange: 60, attackCd: 1.7, xp: 900, radius: 30,
   },
+  // ---------------- Фаза 6.3: Багровая Мара ----------------
+  ghoul: {
+    hp: 70, ac: 12, atk: 5, dmgDice: 1, dmgSides: 6, dmgMod: 2,
+    speed: 128, aggroR: 260, leashR: 9999, attackRange: 44, attackCd: 1.2, xp: 75, radius: 13,
+  },
+  abomination: {
+    hp: 150, ac: 12, atk: 6, dmgDice: 1, dmgSides: 10, dmgMod: 3,
+    speed: 88, aggroR: 240, leashR: 9999, attackRange: 52, attackCd: 1.7, xp: 170, radius: 18,
+  },
+  blight_mother: {
+    hp: 640, ac: 13, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
+    speed: 78, aggroR: 0, leashR: 9999, attackRange: 58, attackCd: 1.6, xp: 1000, radius: 26, ranged: 240,
+  },
 }
 
-export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll'])
-export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother'])
+export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll', 'ghoul', 'abomination'])
+export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother', 'blight_mother'])
 /** Фаза 6: панцирь скорпиона трескается от телекинеза — Аард оглушает надолго. */
 export const STUN2_WEAK = new Set<EnemyType>(['scorpion', 'pit_master'])
 /** Фаза 6.2: крики Ту'ум расшатывают мёртвую волю драугров. */

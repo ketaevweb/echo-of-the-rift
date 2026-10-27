@@ -198,6 +198,9 @@ export interface PropDef {
     | 'wordwall'
     | 'rune_door'
     | 'snowtree'
+    // Фаза 6.3 (Багровая Мара):
+    | 'blight'
+    | 'bastion'
   pos: Vec
   w?: number
   h?: number
@@ -244,6 +247,10 @@ export type EnemyType =
   | 'draugr'
   | 'frost_troll'
   | 'dragon'
+  // Фаза 6.3 (Багровая Мара):
+  | 'ghoul'
+  | 'abomination'
+  | 'blight_mother'
 
 export interface InteractableDef {
   id: string

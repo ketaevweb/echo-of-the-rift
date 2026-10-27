@@ -23,11 +23,11 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, zoneOf } from './data/world'
+import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, zoneOf } from './data/world'
 import { sfx, setAmbient } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
-import { EngineCtx, RenderMode, ToastKind, ZoneId } from './core/ctx'
+import { EngineCtx, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
 import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
@@ -187,6 +187,9 @@ export class GameEngine implements EngineCtx {
   // --- Фаза 6.2: Стылое Пределье (Thu'um и руны) ---
   shoutLv = { force: 0, frost: 0 }
   runes = { ...RUNE_INIT }
+
+  // --- Фаза 6.3: Багровая Мара (оборона бастиона, транзитное — не сейвится) ---
+  siege: SiegeState | null = null
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -402,15 +405,27 @@ export class GameEngine implements EngineCtx {
     if (zoneOf(this.player.pos.x, this.player.pos.y) === zone) return
     if (!this.player.alive) return
     this.zoneBusy = true
-    // Фаза 6/6.2: из Гранита назад — через врата его стороны, из Пределья — через свои;
-    // иначе — обычные врата
-    let gate = zone === 'veld' ? GATES.veld : zone === 'granite' ? GR_GATES.granite : zone === 'frost' ? FR_GATES.frost : GATES.valley
+    // Фаза 6/6.2/6.3: из Гранита назад — через врата его стороны, из Пределья — через свои,
+    // из Мары — через врата её стороны; иначе — обычные врата
+    let gate =
+      zone === 'veld'
+        ? GATES.veld
+        : zone === 'granite'
+          ? GR_GATES.granite
+          : zone === 'frost'
+            ? FR_GATES.frost
+            : zone === 'mara'
+              ? MA_GATES.mara
+              : GATES.valley
     const from = zoneOf(this.player.pos.x, this.player.pos.y)
     if (zone === 'valley' && from === 'granite') {
       gate = GR_GATES.valleySide
     }
     if (zone === 'granite' && from === 'frost') {
       gate = FR_GATES.graniteSide
+    }
+    if (zone === 'granite' && from === 'mara') {
+      gate = MA_GATES.graniteSide
     }
     sfx('portal')
     useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })
@@ -517,7 +532,7 @@ export class GameEngine implements EngineCtx {
   syncUi() {
     syncUiSys(this)
     // Эмбиент по зоне (Фаза 3/6/6.2)
-    setAmbient(this.zone === 'veld' ? 'veld' : this.zone === 'granite' ? 'granite' : this.zone === 'frost' ? 'frost' : 'valley')
+    setAmbient(this.zone === 'veld' ? 'veld' : this.zone === 'granite' ? 'granite' : this.zone === 'frost' ? 'frost' : this.zone === 'mara' ? 'mara' : 'valley')
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------

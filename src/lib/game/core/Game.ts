@@ -16,6 +16,7 @@ import { updateParticles } from '../systems/combat'
 import { updateArea, updateEnding } from '../systems/quest'
 import { updatePit } from '../systems/career'
 import { updateFrost } from '../systems/frost'
+import { updateMara } from '../systems/mara'
 import type { EngineCtx } from './ctx'
 import { Clock } from './Clock'
 
@@ -23,6 +24,8 @@ import { Clock } from './Clock'
 
 /** Фиксированный порядок систем. НЕ менять произвольно: ввод → партия → ИИ → статусы → разделение → эффекты → мир. */
 export function stepWorld(ctx: EngineCtx, dt: number): void {
+  // Игровое время (respawnAt врагов, endingAt финала) — тик потерялся при рефакторинге 0.9
+  ctx.time += dt
   updatePlayer(ctx, dt)
   for (const e of ctx.entities) {
     if (e.kind === 'companion') updateCompanion(ctx, e, dt)
@@ -36,6 +39,7 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   updateParticles(ctx, dt)
   updatePit(ctx) // Фаза 6: волны/победа ямы
   updateFrost(ctx, dt) // Фаза 6.2: дракон Стылого Пределья
+  updateMara(ctx, dt) // Фаза 6.3: оборона Бастиона (волны штурма)
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
   // Фаза 3: сутки, масло, зона
