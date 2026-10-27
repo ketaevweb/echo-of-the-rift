@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useGame, type DiceRollHudState } from '@/lib/game/store'
 import { getEngine } from '@/lib/game/engine'
-import { PORTRAIT_IMG } from '@/lib/game/data/portraits'
+import { PORTRAIT_IMG, PORTRAIT_ROMANCE } from '@/lib/game/data/portraits'
+
+/** v1.5: спикер → ключ романса в сторе. */
+const ROMANCE_KEY_OF: Record<string, 'kaya' | 'asher'> = {
+  Кайя: 'kaya',
+  Ашер: 'asher',
+}
 
 // ============================================================
 // Фаза 5 — диалоговый оверлей:
@@ -19,7 +25,11 @@ import { PORTRAIT_IMG } from '@/lib/game/data/portraits'
 
 /** Стилизованный бюст 64×64. Стиль: тёмный силуэт + один акцентный цвет фракции. */
 function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
-  const imgSrc = PORTRAIT_IMG[speaker] ?? null
+  // v1.5: активный романс — романсовый вариант портрета (тот же персонаж, тёплый свет)
+  const romance = useGame((s) => s.romance)
+  const rKey = ROMANCE_KEY_OF[speaker]
+  const romanceOn = !!(rKey && romance[rKey])
+  const imgSrc = (romanceOn ? PORTRAIT_ROMANCE[speaker] : undefined) ?? PORTRAIT_IMG[speaker] ?? null
   // спикеры, у которых PNG не загрузился → постоянный SVG-фолбэк
   const [failedSpeakers, setFailedSpeakers] = useState<Record<string, boolean>>({})
   const imgFailed = imgSrc !== null && !!failedSpeakers[speaker]
@@ -27,7 +37,7 @@ function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
   if (imgSrc && !imgFailed) {
     return (
       <img
-        key={speaker}
+        key={imgSrc}
         src={imgSrc}
         alt={`Портрет: ${speaker}`}
         onError={() => setFailedSpeakers((m) => ({ ...m, [speaker]: true }))}

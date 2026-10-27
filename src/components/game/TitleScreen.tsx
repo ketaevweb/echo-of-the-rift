@@ -55,7 +55,7 @@ export default function TitleScreen() {
           <h1 className="game-title-font mt-3 text-5xl font-bold leading-none text-[#f5e6c4] drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)] sm:text-7xl">
             ЭХО РАЗЛОМА
           </h1>
-          <p className="mt-1.5 text-xs tracking-[0.3em] text-[#9a8f78]">ВЕРСИЯ 1.4</p>
+          <p className="mt-1.5 text-xs tracking-[0.3em] text-[#9a8f78]">ВЕРСИЯ 1.5</p>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-[#cfc0a0] sm:text-base">
             РПГ-прототип, сотканный из шести великих игр: ведьмачьи знаки и контракты, тактический отряд
             Dragon Age, северный мир и крики силы, кубики d20 Baldur&apos;s Gate, наставники Готики

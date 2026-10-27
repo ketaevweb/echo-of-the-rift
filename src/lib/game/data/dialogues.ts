@@ -492,7 +492,8 @@ export const DIALOGUES: Record<string, DialogueTree> = {
   // ---------------- Кайя у Камней Древних ----------------
   stones_kaya: {
     id: 'stones_kaya',
-    start: (ctx) => (ctx.companion('kaya') ? 'joined_chat' : 'intro'),
+    start: (ctx) =>
+      ctx.companion('kaya') ? (ctx.flag('romance_kaya') ? 'romance_chat' : 'joined_chat') : 'intro',
     nodes: {
       intro: {
         speaker: 'Кайя',
@@ -526,6 +527,32 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       joined_chat: {
         speaker: 'Кайя',
         text: 'Веди, Смотритель. Лёд наготове, Торвальд щёлкает щитом — значит, всё в порядке.',
+        choices: [
+          {
+            text: 'Кайя... после всего этого — мы ведь не просто отряд?',
+            cond: 'appr.kaya>=60,!flag.romance_kaya,!flag.romance_asher', // v1.5: ветка романса (GDD 01: Кайя — «взаимная вера»)
+            goto: 'romance_offer',
+          },
+          { text: 'В путь.', goto: null },
+        ],
+      },
+      // v1.5: признание — флаг romance_kaya, «одновременно — нет» (GDD 01 §81)
+      romance_offer: {
+        speaker: 'Кайя',
+        text: 'Кайя замолкает. Впервые с момента встречи искра между её пальцев гаснет. «Думаешь, я не замечала? Ты закрываешь меня собой в каждой волне. Я из Рощи, Смотритель. Мы там верим один раз — и навсегда. Не пошути сейчас. Я твоя?»',
+        choices: [
+          { text: 'Ты — моя. С этого дня и до края Разлома.', action: 'flag:romance_kaya', goto: 'romance_yes' },
+          { text: '(Промолчать — ещё рано)', goto: null },
+        ],
+      },
+      romance_yes: {
+        speaker: 'Кайя',
+        text: 'Искра вспыхивает снова — теперь тёплая, как очаг. «Тогда слушай: где ты — там я. И Торвальд, конечно. Он ревёт третий день. Думает, я не слышу».',
+        choices: [{ text: 'В путь... вместе.', goto: null }],
+      },
+      romance_chat: {
+        speaker: 'Кайя',
+        text: '«Веди. Лёд наготове — а под бронёй у меня теперь твоё обещание. Не заставляй его остывать».',
         choices: [{ text: 'В путь.', goto: null }],
       },
     },
@@ -1641,7 +1668,7 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       if (ship.stage === 1) return 'hint_log'
       if (ship.stage === 2) return 'hint_hall'
       if (signal && !signal.done && signal.stage === 1) return 'hint_relay'
-      return 'after'
+      return ctx.flag('romance_asher') ? 'romance_chat' : 'after' // v1.5: романс — отдельный бытовой узел
     },
     nodes: {
       greet: {
@@ -1760,7 +1787,33 @@ export const DIALOGUES: Record<string, DialogueTree> = {
       after: {
         speaker: 'Ашер',
         text: 'Плато живое: дроны в небе, ретрансляторы поют, полоса читается. Бывает же — двенадцать лет ждать одного гостя, а потом таких как ты не сосчитать.',
-        choices: [{ text: 'До встречи, техник.', goto: null }],
+        choices: [
+          {
+            text: 'Ашер... когда это закончится — я бы вернулся сюда не за квестом.',
+            cond: 'flag.asherLoyal,!flag.romance_asher,!flag.romance_kaya', // v1.5: роман после лояльности (GDD 01: Ашер — «юмор и раны»)
+            goto: 'romance_offer',
+          },
+          { text: 'До встречи, техник.', goto: null },
+        ],
+      },
+      // v1.5: признание — флаг romance_asher, «одновременно — нет» (GDD 01 §81)
+      romance_offer: {
+        speaker: 'Ашер',
+        text: 'Ашер смеётся — и осекается, будто звук ему не принадлежит. «Двенадцать лет я чинил корабль, который не взлетит. А потом ты пришёл — и я поймал себя на том, что чиню себя. Думаешь, переверсталось? Костёр у трапа горит каждую ночь. Место рядом — свободно».',
+        choices: [
+          { text: 'Место занято. Навсегда.', action: 'flag:romance_asher', goto: 'romance_yes' },
+          { text: '(Промолчать)', goto: null },
+        ],
+      },
+      romance_yes: {
+        speaker: 'Ашер',
+        text: '«Тогда так и запишем в журнал: пассажир найден, рейс — куда скажет Смотритель». Он пожимает твою руку двумя — как жмёт экипаж при присяге.',
+        choices: [{ text: 'До рейда.', goto: null }],
+      },
+      romance_chat: {
+        speaker: 'Ашер',
+        text: 'Костёр у трапа горит. Дроны выучили правило: когда вы двое у огня — не беспокоить. «Расскажи ещё про долину. Про ту, которую мы починим».',
+        choices: [{ text: 'Расскажу. Обещаю.', goto: null }],
       },
     },
   },

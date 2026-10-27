@@ -254,5 +254,7 @@ export function syncUi(ctx: EngineCtx): void {
     assault: assaultHud(ctx),
     // Фаза 7: рейд в Сердце Разлома — зеркало HUD
     raid: raidHud(ctx),
+    // v1.5: романсы — зеркало флагов (портретные варианты + эпилог)
+    romance: { kaya: !!ctx.flags.romance_kaya, asher: !!ctx.flags.romance_asher },
   })
 }

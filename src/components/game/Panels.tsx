@@ -5,7 +5,7 @@ import { Coins, Keyboard, ScrollText, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { getEngine, BESTIARY_INFO } from '@/lib/game/engine'
-import { PORTRAIT_IMG } from '@/lib/game/data/portraits'
+import { PORTRAIT_IMG, PORTRAIT_ROMANCE } from '@/lib/game/data/portraits'
 import { ITEMS } from '@/lib/game/data/items'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { EffQuality, GameSettings, QUALITY_NAME, QualityId } from '@/lib/game/settings'
@@ -835,6 +835,7 @@ function MenuBtn({
 
 function EndingPanel() {
   const ending = useGame((s) => s.ending)
+  const romance = useGame((s) => s.romance) // v1.5: тёплые мини-портреты в судьбах
   if (!ending) return null
   return (
     <Panel title={`КОНЦОВКА: ${ending.name.toUpperCase()}`} wide>
@@ -852,11 +853,16 @@ function EndingPanel() {
             <p className="game-title-font text-[11px] tracking-[0.25em] text-[#8a8068]">СУДЬБЫ ОТРЯДА</p>
             {ending.fates.map((f) => (
               <div key={f.name} className="flex items-start gap-3 rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
-                {PORTRAIT_IMG[f.name] && (
-                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded border border-[#5a4632]">
-                    <img src={PORTRAIT_IMG[f.name]} alt={f.name} className="h-full w-full object-cover object-top" draggable={false} />
-                  </span>
-                )}
+                {(() => {
+                  // v1.5: у романсовых судеб — романсовый вариант портрета
+                  const rKey = f.name === 'Кайя' ? 'kaya' : f.name === 'Ашер' ? 'asher' : null
+                  const src = (rKey && romance[rKey] ? PORTRAIT_ROMANCE[f.name] : undefined) ?? PORTRAIT_IMG[f.name]
+                  return src ? (
+                    <span className="h-10 w-10 shrink-0 overflow-hidden rounded border border-[#5a4632]">
+                      <img src={src} alt={f.name} className="h-full w-full object-cover object-top" draggable={false} />
+                    </span>
+                  ) : null
+                })()}
                 <span className="min-w-0">
                   <p className="text-xs font-bold text-[#e8d5a8]">{f.name}</p>
                   <p className="mt-1 text-xs leading-relaxed text-[#9a8f78]">{f.text}</p>

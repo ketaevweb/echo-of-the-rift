@@ -40,3 +40,13 @@ export const PORTRAIT_IMG: Record<string, string> = {
   // Финал
   'Пожиратель Эха': '/images/portraits/devourer.png',
 }
+
+/**
+ * v1.5 — романсовые варианты портретов (GDD 04 §6: «3 романсовых варианта»;
+ * реализованы для двух романсов билда — Кайя и Ашер, Нэри не в билде).
+ * Показываются в диалоге и в судьбах эпилога, когда флаг романса активен.
+ */
+export const PORTRAIT_ROMANCE: Record<string, string> = {
+  Кайя: '/images/portraits/kaya-romance.png',
+  Ашер: '/images/portraits/asher-romance.png',
+}

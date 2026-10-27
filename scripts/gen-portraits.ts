@@ -173,6 +173,21 @@ const SPECS: Spec[] = [
       'worn mechanic engineer of a crashed starship, grease-stained hands, patchwork tech armor over a coat, ' +
       'scruffy beard, tired amber eyes that still hope, wrench on belt, faint teal neon glow from tools, sand-brass accents',
   },
+  // ---------- v1.5: романсовые варианты (GDD 04 §6) — тот же персонаж, тёплый свет ----------
+  {
+    slug: 'kaya-romance',
+    prompt:
+      'young traveling magister woman, long moss-green hair, thin silver diadem, soft genuine warm smile, ' +
+      'small glowing spark hovering between her cupped hands lighting her face from below, ' +
+      'closer intimate framing, sage-green traveler cloak, soft green and amber hearth-light accents',
+  },
+  {
+    slug: 'asher-romance',
+    prompt:
+      'worn mechanic engineer of a crashed starship, patchwork tech armor over a coat, scruffy beard, ' +
+      'rare genuine relieved smile, relaxed shoulders, battered wrench held to his chest like a keepsake, ' +
+      'warm campfire glow lighting him from below at night, faint teal neon glow from tools, sand-brass and amber accents',
+  },
   // ---------- Финал ----------
   {
     slug: 'devourer',

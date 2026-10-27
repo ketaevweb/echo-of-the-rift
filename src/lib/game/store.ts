@@ -249,6 +249,8 @@ interface GameStore {
   assault: { wave: number; waves: number } | null
   // Фаза 7: рейд в Сердце Разлома (волны)
   raid: { wave: number; waves: number } | null
+  // v1.5: активные романсы (GDD 07 §2: companion.<id>.romance; Нэри не в билде)
+  romance: { kaya: boolean; asher: boolean }
   // Фаза 5
   diceRoll: DiceRollHudState | null
   // Фаза 8: настройки (зеркало localStorage), действующий пресет и FPS
@@ -281,6 +283,7 @@ export const useGame = create<GameStore>((set) => ({
   toasts: [],
   areaToast: null,
   bossBar: null,
+  romance: { kaya: false, asher: false },
   shop: null,
   trainer: null,
   ending: null,

@@ -103,6 +103,9 @@ function evalToken(ctx: EngineCtx, s: string): boolean {
   if (m) return ctx.career.faction !== null && ctx.career.rank[ctx.career.faction] >= parseInt(m[1], 10)
   m = s.match(/^rep:([\w-]+)>=(\d+)$/)
   if (m) return ctx.career.rep[m[1] as CareerId] >= parseInt(m[2], 10)
+  // v1.5: одобрение компаньона (ветка романса — GDD 02: «+60»)
+  m = s.match(/^appr\.(kaya|torvald)>=(\d+)$/)
+  if (m) return ctx.approval[m[1] as 'kaya' | 'torvald'] >= parseInt(m[2], 10)
   return true
 }
 
