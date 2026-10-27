@@ -11,6 +11,7 @@ import { sfx } from '../sfx'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { beam, damage, floater, ring } from './combat'
+import { bark } from '../combatVoice'
 
 /** Порог одобрения, открывающий парные приёмы. */
 export const APPROVAL_SYNERGY = 60
@@ -108,6 +109,7 @@ export function trySynergyWallAndHammer(ctx: EngineCtx, coneEnemies: Entity[]) {
   ring(ctx, tor.pos, '#d9a441', 70, 0.7)
   beam(ctx, tor.pos, ctx.player.pos, '#d9a441')
   floater(ctx, tor.pos, 'СТЕНА И МОЛОТ!', '#d9a441', 18)
+  bark('synergy', { companionId: 'torvald' }) // v1.4: реплика Торвальда
   for (const e of coneEnemies) {
     e.stunT = Math.max(e.stunT, 2.4)
     damage(ctx, e, d(6) + 4, { color: '#d9a441' })
@@ -135,6 +137,7 @@ export function trySynergyFrostAndFlame(ctx: EngineCtx, coneEnemies: Entity[]) {
   beam(ctx, kaya.pos, t.pos, '#bfe3ea')
   ring(ctx, t.pos, '#bfe3ea', 90, 0.7)
   floater(ctx, t.pos, 'МОРОЗ И ПЛАМЯ!', '#bfe3ea', 18)
+  bark('synergy', { companionId: 'kaya' }) // v1.4: реплика Кайи
   for (const e of ctx.entities) {
     if (e.kind !== 'enemy' || !e.alive) continue
     if (Math.hypot(e.pos.x - t.pos.x, e.pos.y - t.pos.y) > 95) continue

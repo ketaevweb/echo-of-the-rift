@@ -71,6 +71,7 @@ import {
   questMarker as questMarkerSys,
 } from './systems/quest'
 import { syncUi as syncUiSys, findActiveBoss } from './systems/uiSync'
+import { preloadCombatVoice, resetBossBark } from './combatVoice'
 
 /** Телепорт через врата прерывает ямный бой (арена остаётся в Граните). */
 function endPitFightSafe(ctx: GameEngine) {
@@ -232,6 +233,9 @@ export class GameEngine implements EngineCtx {
     this.resize()
     // Фаза 8: применяем сохранённые настройки (громкости + пресет качества)
     this.applySettings(useGame.getState().settings)
+    // v1.4: прелоад статичных WAV боевых реплик + сброс трекера босса
+    preloadCombatVoice()
+    resetBossBark()
   }
 
   // ---------------- Инициализация ----------------

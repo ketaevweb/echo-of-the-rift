@@ -21,6 +21,8 @@ import { assaultHud } from './disputed'
 import { raidHud } from './finale'
 import { Entity } from '../types'
 import { hotkeyLabelForAbility, labelFor } from '../bindings'
+import { bossSpawnBark } from '../combatVoice'
+import { CompanionId } from '../data/combatVoice'
 
 /** Активный босс (жив, в бою) — для bossBar и темы босса (v1.1). */
 export function findActiveBoss(ctx: EngineCtx): Entity | null {
@@ -32,7 +34,8 @@ export function findActiveBoss(ctx: EngineCtx): Entity | null {
           e.enemyType === 'pit_master' ||
           e.enemyType === 'dragon' ||
           e.enemyType === 'blight_mother' ||
-          e.enemyType === 'horde_chief') &&
+          e.enemyType === 'horde_chief' ||
+          e.enemyType === 'rb_captain') && // v1.4: капитан — полноценный босс (бар/тема/угроза)
         e.alive &&
         e.aiState !== 'idle',
     ) ?? null
@@ -157,6 +160,11 @@ export function syncUi(ctx: EngineCtx): void {
     judgQ,
   ].find((q) => q.stage > 0 && !q.done) ?? null
   const boss = findActiveBoss(ctx)
+  // v1.4: спавн босса — угроза босса + реплика живого компаньона (трекинг внутри модуля)
+  const barkBuddy = ctx.entities.find(
+    (e) => e.kind === 'companion' && e.alive && (e.id === 'kaya' || e.id === 'torvald'),
+  )
+  bossSpawnBark(boss ? boss.enemyType! : null, (barkBuddy?.id as CompanionId) ?? null)
   // Фаза 6.2: крики Ту'ум — зеркало HUD
   const shouts: ShoutHud[] = [
     {

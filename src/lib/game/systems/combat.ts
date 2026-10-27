@@ -23,6 +23,8 @@ import { advanceQuest, checkProof, grantKey } from './quest'
 import { approvalOnDowned, approvalOnKill, trySynergyFrostAndFlame, trySynergyWallAndHammer } from './party'
 import { careerRank, endPitFight } from './career'
 import { dragonSoulAbsorb } from './frost'
+import { bark } from '../combatVoice'
+import { CompanionId } from '../data/combatVoice'
 
 // ---------------- Атаки ----------------
 
@@ -111,7 +113,16 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
       )
     }
     if (t.kind === 'player') ctx.hp = t.hp
-    if (t.kind === 'player' || t.kind === 'companion') sfx('hit')
+    if (t.kind === 'player' || t.kind === 'companion') {
+      sfx('hit')
+      // v1.4: герой при смерти (HP < 30%) — предупреждение живого компаньона
+      if (t.kind === 'player' && t.hp > 0 && t.hp < ctx.maxHp * 0.3) {
+        const buddy = ctx.entities.find(
+          (e) => e.kind === 'companion' && e.alive && (e.id === 'kaya' || e.id === 'torvald'),
+        )
+        if (buddy) bark('lowhp', { companionId: buddy.id as CompanionId })
+      }
+    }
   }
   if (t.team === 'hostile' && t.aiState === 'idle') t.aiState = 'chase'
   if (t.hp <= 0) {
@@ -122,6 +133,8 @@ export function damage(ctx: EngineCtx, t: Entity, amount: number, opts: { crit?:
       t.downT = 12
       approvalOnDowned(ctx, t) // Фаза 4: компаньон выведен из боя — доверие падает
       floater(ctx, t.pos, t.name + ' выведен из боя!', '#e0653a', 14)
+      // v1.4: реплика выбитого компаньона
+      if (t.id === 'kaya' || t.id === 'torvald') bark('down', { companionId: t.id })
     } else if (t.kind === 'player') onPlayerDeath(ctx)
   }
 }
@@ -131,6 +144,13 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
   ctx.kills++
   sfx('death')
   approvalOnKill(ctx, e.pos) // Фаза 4: живой компаньон рядом — +1 доверие
+  // v1.4: редкая похвала компаньона за убийство (шанс/кулдаун внутри bark)
+  {
+    const buddy = ctx.entities.find(
+      (x) => x.kind === 'companion' && x.alive && (x.id === 'kaya' || x.id === 'torvald'),
+    )
+    if (buddy) bark('kill', { companionId: buddy.id as CompanionId })
+  }
   if (e.zoneId) {
     const z = SPAWN_ZONES.find((zz) => zz.id === e.zoneId)
     if (z) e.respawnAt = ctx.time + z.respawnSec
