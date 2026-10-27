@@ -13,7 +13,8 @@ const ROMANCE_KEY_OF: Record<string, 'kaya' | 'asher'> = {
 }
 
 // ============================================================
-// Фаза 5 — диалоговый оверлей:
+// Фаза 5 — диалоговый оверлей (v1.7: субтитры на языке интерфейса —
+// t() ТОЛЬКО на точках отображения; ключи арта/романса — сырые RU-имена):
 //  • портретный SVG-арт всех постоянных NPC;
 //  • таймер-выборы (ME2): полоса убывает, молчание = вариант;
 //  • видимый бросок d20 (BG3) поверх панели;
@@ -40,7 +41,7 @@ function PortraitArt({ speaker, color }: { speaker: string; color: string }) {
       <img
         key={imgSrc}
         src={imgSrc}
-        alt={t('Портрет: {x}', { x: speaker })}
+        alt={t('Портрет: {x}', { x: t(speaker) })}
         onError={() => setFailedSpeakers((m) => ({ ...m, [speaker]: true }))}
         className="h-full w-full select-none object-cover object-top"
         draggable={false}
@@ -327,7 +328,7 @@ function DiceRollOverlay({ roll }: { roll: DiceRollHudState }) {
         }`}
       >
         <p className="game-title-font text-xs tracking-[0.3em] text-[#c9b06b]">{t('БРОСОК D20')}</p>
-        <p className="mt-1 truncate text-[11px] text-[#cfc0a0]">{roll.label}</p>
+        <p className="mt-1 truncate text-[11px] text-[#cfc0a0]">{t(roll.label)}</p>
         <div className="mt-2 flex justify-center">
           <D20 value={settled ? roll.roll : shown} success={settled ? roll.success : true} />
         </div>
@@ -401,10 +402,10 @@ export default function DialogueOverlay() {
           {/* Текст */}
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-3">
-              <p className="game-title-font text-base font-semibold text-[#f5c96b]">{dialogue.speaker}</p>
-              <p className="text-[11px] uppercase tracking-widest text-[#8a8068]">{dialogue.role}</p>
+              <p className="game-title-font text-base font-semibold text-[#f5c96b]">{t(dialogue.speaker)}</p>
+              <p className="text-[11px] uppercase tracking-widest text-[#8a8068]">{t(dialogue.role)}</p>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-[#e8d5a8]">{dialogue.text}</p>
+            <p className="mt-2 text-sm leading-relaxed text-[#e8d5a8]">{t(dialogue.text)}</p>
             {/* Таймер-выбор (Фаза 5) */}
             {dialogue.timer && dialogue.timer > 0 && (
               <div className="mt-3">
@@ -427,7 +428,7 @@ export default function DialogueOverlay() {
                   <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border text-[10px] font-bold ${busy ? 'border-[#3a2e20] text-[#5a5044]' : 'border-[#5a4632] text-[#9a8f78] group-hover:border-[#d9a441] group-hover:text-[#d9a441]'}`}>
                     {i + 1}
                   </span>
-                  <span className="min-w-0 flex-1">{c.text}</span>
+                  <span className="min-w-0 flex-1">{t(c.text)}</span>
                   {c.origin && (
                     <span className="shrink-0 rounded bg-[#2a1f2e] px-1.5 py-0.5 text-[10px] tracking-wider text-[#c9a3e8]" title={t('Реплика происхождения')}>
                       {t('✦ ПРОИСХОЖДЕНИЕ')}
@@ -435,12 +436,12 @@ export default function DialogueOverlay() {
                   )}
                   {c.tag && !c.origin && (
                     <span className="shrink-0 rounded bg-[#3a2e20] px-1.5 py-0.5 text-[10px] tracking-wider text-[#d9a441]">
-                      {c.tag}
+                      {t(c.tag)}
                     </span>
                   )}
                   {c.checkLabel && (
                     <span className="shrink-0 rounded border border-[#d9a441]/50 px-1.5 py-0.5 text-[10px] text-[#f5c96b]">
-                      {c.checkLabel}
+                      {t(c.checkLabel)}
                     </span>
                   )}
                 </button>

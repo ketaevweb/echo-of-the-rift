@@ -33,7 +33,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.6') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.7') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
 
 # 3. Переключение EN на титуле
 say "SWITCH TO EN (title footer)"
@@ -92,7 +92,7 @@ say "SWITCH BACK TO RU IN GAME"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Русский'); b.click(); return 'clicked'; })()" >/dev/null
 sleep 1.5
 echo -n "settings ru: "
-agent-browser eval "(() => { const t=document.body.innerText; return JSON.stringify({ title: t.includes('НАСТРОЙКИ'), gfx: t.includes('ГРАФИКА'), hint: t.includes('Диалоги и озвучка остаются русскими') }); })()"
+agent-browser eval "(() => { const t=document.body.innerText; return JSON.stringify({ title: t.includes('НАСТРОЙКИ'), gfx: t.includes('ГРАФИКА'), hint: t.includes('озвучка реплик остаётся русской') }); })()"
 agent-browser eval "window.__echoEngine.closePanel(); 'closed'"
 sleep 1.5
 echo -n "hud ru: "

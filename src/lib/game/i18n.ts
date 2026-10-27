@@ -1,5 +1,5 @@
 // ============================================================
-// ЭХО РАЗЛОМА — i18n (v1.6 «Локализация I», GDD 06 §2)
+// ЭХО РАЗЛОМА — i18n (v1.6 «Локализация I» + v1.7 «Локализация II», GDD 06 §2)
 // Gettext-подход: русский текст в коде остаётся КАНОНИЧЕСКИМ
 // ключом; словарь EN (data/i18n-en.ts) отображает RU → EN.
 // Правила:
@@ -10,12 +10,13 @@
 //  • локаль живёт в localStorage ('echo-rift-locale'), реактивна
 //    для React через useLocale() (useSyncExternalStore — без
 //    гидратационных рассинхронов), для движка — обычный t().
-// Диалоговые деревья (data/dialogues.ts) сознательно НЕ
-// переводятся в v1.6 — «оригинальная озвучка + локализованный
-// интерфейс» (как релизы с RU VO + EN UI). Словарь расширяем.
+// v1.7: диалоговые деревья (data/dialogues.ts) переведены — субтитры
+// на языке интерфейса; TTS-озвучка остаётся русской (оригинальный VO).
+// t() в диалоговом оверлее — только на точках отображения: ключи
+// арта/романсов/сущностей остаются сырыми RU-именами. Словарь расширяем.
 // ============================================================
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { EN } from './data/i18n-en'
 
 export type Locale = 'ru' | 'en'
@@ -35,11 +36,11 @@ function readStored(): Locale {
   }
 }
 
-/** Однократная инициализация с клиентом (модульный сайд-эффект, SSR-безопасно). */
-if (typeof window !== 'undefined' && !hydrated) {
-  hydrated = true
-  current = readStored()
-}
+// v1.7: локаль читается из localStorage НЕ при импорте модуля, а ПОСЛЕ
+// гидратации (первым смонтированным useLocale-подписчиком). SSR всегда
+// рендерит RU-канон; клиент переключает пост-фактум — гидратационных
+// рассинхронов нет (v1.6 читала localStorage до гидратации: при reload
+// с locale=en тексты SSR (RU) расходились с первым рендером (EN)).
 
 export function getLocale(): Locale {
   return current
@@ -91,5 +92,16 @@ const serverSnapshot = () => 'ru' as Locale
 
 /** Реактивная локаль для компонентов (перерисовка при переключении). */
 export function useLocale(): Locale {
+  // v1.7: первый mounted-подписчик применяет сохранённую локаль ПОСЛЕ гидратации.
+  useEffect(() => {
+    if (!hydrated) {
+      hydrated = true
+      const stored = readStored()
+      if (stored !== current) {
+        current = stored
+        subs.forEach((fn) => fn())
+      }
+    }
+  }, [])
   return useSyncExternalStore(subscribeLocale, clientSnapshot, serverSnapshot)
 }

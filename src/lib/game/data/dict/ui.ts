@@ -4,7 +4,7 @@ export const EN_UI: Record<string, string> = {
   // ---------- Титульный экран ----------
   'ХРОНИКИ СЕВЕРНОЙ ДОЛИНЫ': 'CHRONICLES OF THE NORTHERN VALLEY',
   'ЭХО РАЗЛОМА': 'ECHO OF THE RIFT',
-  'ВЕРСИЯ 1.6': 'VERSION 1.6',
+  'ВЕРСИЯ 1.7': 'VERSION 1.7',
   "РПГ-прототип, сотканный из шести великих игр: ведьмачьи знаки и контракты, тактический отряд Dragon Age, северный мир и крики силы, кубики d20 Baldur's Gate, наставники Готики и диалоги в духе Mass Effect.":
     "An RPG prototype woven from six great games: Witcher signs and contracts, the Dragon Age tactical party, a northern world with Words of Power, Baldur's Gate d20 dice, Gothic mentors and Mass Effect-style dialogue.",
   'ПРОИСХОЖДЕНИЕ СМОТРИТЕЛЯ': 'WATCHER ORIGIN',
@@ -254,8 +254,8 @@ export const EN_UI: Record<string, string> = {
   'ЯЗЫК / LANGUAGE': 'ЯЗЫК / LANGUAGE',
   'Русский': 'Русский',
   'English': 'English',
-  'Интерфейс переключается мгновенно. Диалоги и озвучка остаются русскими (v1.7 — «Локализация II»).':
-    'The UI switches instantly. Dialogues and voiceover remain Russian (v1.7 — "Localization II").',
+  'Интерфейс переключается мгновенно. Диалоги переведены (v1.7 — «Локализация II»); озвучка реплик остаётся русской — оригинальный VO.':
+    'The UI switches instantly. Dialogues are translated (v1.7 — "Localization II"); voiceover stays Russian — original VO.',
 
   // ---------- Раскладка клавиш ----------
   'Бой': 'Combat',
@@ -286,7 +286,7 @@ export const EN_UI: Record<string, string> = {
     'Click an action → press a new key (Esc — cancel). WASD/arrows — movement (fixed), Esc — menu. Russian layout works automatically.',
 
   // ---------- Титры ----------
-  'ВЕРСИЯ 1.6 · ФАЗЫ 0–8 ЗАКРЫТЫ': 'VERSION 1.6 · PHASES 0–8 COMPLETE',
+  'ВЕРСИЯ 1.7 · ЛОКАЛИЗАЦИЯ II ЗАВЕРШЕНА': 'VERSION 1.7 · LOCALIZATION II COMPLETE',
   'ВДОХНОВЕНИЯ': 'INSPIRATIONS',
   'The Witcher 3 — знаки, контракты, бестиарий': 'The Witcher 3 — signs, contracts, bestiary',
   'Dragon Age: Origins — отряд и тактическая пауза': 'Dragon Age: Origins — party and tactical pause',

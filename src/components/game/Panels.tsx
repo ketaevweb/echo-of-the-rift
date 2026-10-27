@@ -764,7 +764,7 @@ function SettingsPanel() {
             </span>
           </Row>
           <p className="text-[11px] leading-snug text-[#8a8068]">
-            {t('Интерфейс переключается мгновенно. Диалоги и озвучка остаются русскими (v1.7 — «Локализация II»).')}
+            {t('Интерфейс переключается мгновенно. Диалоги переведены (v1.7 — «Локализация II»); озвучка реплик остаётся русской — оригинальный VO.')}
           </p>
         </div>
         <KeybindsSection />
@@ -780,7 +780,7 @@ export function CreditsBody() {
     <div className="flex flex-col gap-4 text-sm">
       <div className="text-center">
         <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">{t('ЭХО РАЗЛОМА')}</p>
-        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ 1.6 · ФАЗЫ 0–8 ЗАКРЫТЫ')}</p>
+        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ 1.7 · ЛОКАЛИЗАЦИЯ II ЗАВЕРШЕНА')}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
