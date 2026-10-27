@@ -268,10 +268,23 @@ export const ENEMY_STATS: Record<EnemyType, EnemyStats> = {
     hp: 640, ac: 13, atk: 7, dmgDice: 2, dmgSides: 8, dmgMod: 4,
     speed: 78, aggroR: 0, leashR: 9999, attackRange: 58, attackCd: 1.6, xp: 1000, radius: 26, ranged: 240,
   },
+  // ---------------- Фаза 6.4: Спорные Земли ----------------
+  raider: {
+    hp: 58, ac: 12, atk: 5, dmgDice: 1, dmgSides: 6, dmgMod: 2,
+    speed: 118, aggroR: 240, leashR: 680, attackRange: 42, attackCd: 1.2, xp: 80, radius: 13,
+  },
+  hexer: {
+    hp: 46, ac: 11, atk: 4, dmgDice: 1, dmgSides: 6, dmgMod: 2,
+    speed: 100, aggroR: 260, leashR: 700, attackRange: 210, attackCd: 1.8, xp: 85, radius: 13, ranged: 220,
+  },
+  horde_chief: {
+    hp: 620, ac: 14, atk: 8, dmgDice: 2, dmgSides: 8, dmgMod: 4,
+    speed: 104, aggroR: 0, leashR: 9999, attackRange: 58, attackCd: 1.4, xp: 1100, radius: 24,
+  },
 }
 
-export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll', 'ghoul', 'abomination'])
-export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother', 'blight_mother'])
+export const FIRE_WEAK = new Set<EnemyType>(['wolf', 'alpha', 'bogling', 'frost_troll', 'ghoul', 'abomination', 'raider', 'hexer'])
+export const STUN_WEAK = new Set<EnemyType>(['horror', 'boss', 'ash_shade', 'ash_mother', 'blight_mother', 'horde_chief'])
 /** Фаза 6: панцирь скорпиона трескается от телекинеза — Аард оглушает надолго. */
 export const STUN2_WEAK = new Set<EnemyType>(['scorpion', 'pit_master'])
 /** Фаза 6.2: крики Ту'ум расшатывают мёртвую волю драугров. */

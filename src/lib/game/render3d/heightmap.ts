@@ -6,7 +6,7 @@
 // сущностей/камеры на землю каждый кадр (дешёвая, без аллокаций).
 // ============================================================
 
-import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, MA_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW, BASTION, BLIGHT_WELLS, MARA_RIDGE } from '../data/world'
+import { LAKE, ROADS, WORLD, GATES, POOLS, RIDGE, GRIDGE, GR_GATES, FRIDGE, FR_GATES, MA_GATES, HAVEN, RUNE_CAVE, WORD_WALL_FORCE, WORD_WALL_FROST, ROOST, BARROW, BASTION, BLIGHT_WELLS, MARA_RIDGE, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE } from '../data/world'
 
 // ---------------- Детерминированный шум ----------------
 
@@ -93,6 +93,10 @@ const ROOST_FLAT = { x: ROOST.pos.x, y: ROOST.pos.y, r: 250 }
 const BARROW_FLAT = { x: BARROW.pos.x, y: BARROW.pos.y, r: 110 }
 // Фаза 6.3: ключевые точки Багровой Мары
 const BASTION_FLAT = { x: BASTION.pos.x, y: BASTION.pos.y, rx: 210, ry: 150 }
+// Фаза 6.4: ключевые точки Спорных Земель
+const GROVE_FLAT = { x: GROVE.pos.x, y: GROVE.pos.y, rx: 200, ry: 150 }
+const HORDE_FLAT = { x: HORDE_CAMP.pos.x, y: HORDE_CAMP.pos.y, rx: 190, ry: 140 }
+const SHRINE_FLAT = { x: SHRINE.pos.x, y: SHRINE.pos.y, r: 100 }
 
 export const WATER_LEVEL = -1.6
 
@@ -240,6 +244,20 @@ export function heightAt(x: number, y: number): number {
       h = h * (1 - fro) + bowl * fro
     }
   }
+  // Спорные Земли (Фаза 6.4): сухая вересковая пустошь — пологие гряды и прогалы
+  if (x > KRAJ.x + 40) {
+    const kz = 1 - falloff(x - (KRAJ.x + 40), 0, 320)
+    const heath = (fbm(x / 330 + 113, y / 330 + 27, 3) - 0.5) * 6 + 1.6
+    h = h * (1 - kz) + heath * kz
+  }
+  // --- Фаза 6.4: Рубежный Кряж к Спорным Землям (вертикальная стена по x) ---
+  // ВАЖНО: после слоёв тундры/верещатника — иначе тундра Пределья (fz=1 при x≥5750) стирает стену
+  const dk = Math.abs(x - KRAJ.x)
+  if (dk < 330) {
+    const jag = (fbm(x / 110 + 107, y / 110 + 67, 2) - 0.5) * 11
+    const t = falloff(dk, 70, 260)
+    h += t * t * (61 + jag)
+  }
   // Плоские пятачки: колония, рудник, барьер, врата (обе зоны)
   const tcol = inEllipse(x, y, COLONY_FLAT.x, COLONY_FLAT.y, COLONY_FLAT.rx, COLONY_FLAT.ry)
   const fcol = falloff(tcol, 0.75, 0.55)
@@ -287,6 +305,21 @@ export function heightAt(x: number, y: number): number {
     const fg = falloff(tg, 90, 80)
     h = h * (1 - fg) + 1.8 * fg
   }
+  // Плоские пятачки Спорных Земель (Фаза 6.4): роща, лагерь Орды, погост
+  const tgr = inEllipse(x, y, GROVE_FLAT.x, GROVE_FLAT.y, GROVE_FLAT.rx, GROVE_FLAT.ry)
+  const fgr = falloff(tgr, 0.75, 0.55)
+  h = h * (1 - fgr) + 3.4 * fgr
+  const tho = inEllipse(x, y, HORDE_FLAT.x, HORDE_FLAT.y, HORDE_FLAT.rx, HORDE_FLAT.ry)
+  const fho = falloff(tho, 0.75, 0.55)
+  h = h * (1 - fho) + 2.6 * fho
+  const fshr = falloff(Math.hypot(x - SHRINE_FLAT.x, y - SHRINE_FLAT.y), SHRINE_FLAT.r * 0.7, SHRINE_FLAT.r * 0.6)
+  h = h * (1 - fshr) + 4.5 * fshr
+  // Плоские пятачки у Врат Спорных Земель (обе стороны Рубежного Кряжа)
+  for (const g of [DF_GATES.frostSide, DF_GATES.disputed]) {
+    const tg = Math.hypot(x - g.x, y - g.y)
+    const fg = falloff(tg, 90, 80)
+    h = h * (1 - fg) + 1.8 * fg
+  }
 
   return h
 }
@@ -325,6 +358,12 @@ const C_BLIGHT: [number, number, number] = [0.29, 0.15, 0.12]
 const C_BLIGHT2: [number, number, number] = [0.21, 0.11, 0.10]
 const C_VEIN: [number, number, number] = [0.46, 0.16, 0.13]
 const C_ROTTED: [number, number, number] = [0.17, 0.13, 0.11]
+// Палитра Спорных Земель (Фаза 6.4): сухой вереск, пепел Орды, зелень Рощи
+const C_HEATH: [number, number, number] = [0.46, 0.40, 0.20]
+const C_HEATH2: [number, number, number] = [0.38, 0.33, 0.17]
+const C_SCORCHRED: [number, number, number] = [0.36, 0.17, 0.11]
+const C_GROVE: [number, number, number] = [0.26, 0.34, 0.16]
+const C_GROVE2: [number, number, number] = [0.20, 0.28, 0.13]
 
 function lerp3(a: [number, number, number], b: [number, number, number], t: number, out: [number, number, number]) {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -467,6 +506,42 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
     const dmr = Math.abs(y - MARA_RIDGE.y)
     if (dmr < 320) {
       lerp3(tmpA, C_ROCK, falloff(dmr, 70, 250) * 0.9, tmpA)
+    }
+  }
+
+  // --- Фаза 6.4: Спорные Земли — вересковые пустоши (после Пределья/Мары: перекрывает их на востоке) ---
+  if (x > KRAJ.x - 120) {
+    // нарастание вереска вглубь зоны (как снег Пределья — 1 - falloff)
+    const dz = 1 - falloff(x - (KRAJ.x - 120), 0, 420)
+    if (dz > 0.01) {
+      // пятна сухого вереска — золотисто-оливковая база пустоши
+      const heath = fbm(x / 220 + 117, y / 220 + 61, 3)
+      lerp3(tmpA, heath > 0.5 ? C_HEATH : C_HEATH2, dz, tmpB)
+      tmpA[0] = tmpB[0]
+      tmpA[1] = tmpB[1]
+      tmpA[2] = tmpB[2]
+      // багровые проплеши пепла Орды — гуще к лагерю
+      const dho = Math.hypot(x - HORDE_CAMP.pos.x, y - HORDE_CAMP.pos.y)
+      if (dho < 340) {
+        const patchy = 0.55 + fbm(x / 90 + 151, y / 90 + 83, 2) * 0.45
+        lerp3(tmpA, C_SCORCHRED, falloff(dho, 160, 180) * patchy * dz, tmpA)
+      }
+      // зелень Рощи Садовников — живое пятно среди сухостоя
+      const dgr = Math.hypot(x - GROVE.pos.x, y - GROVE.pos.y)
+      if (dgr < 260) {
+        const gr = fbm(x / 130 + 141, y / 130 + 71, 2)
+        lerp3(tmpA, gr > 0.5 ? C_GROVE : C_GROVE2, falloff(dgr, 150, 110) * dz, tmpA)
+      }
+      // обугленный погост — тёмный уголь
+      const dsh = Math.hypot(x - SHRINE.pos.x, y - SHRINE.pos.y)
+      if (dsh < 140) {
+        lerp3(tmpA, C_SCORCH, falloff(dsh, 70, 70) * 0.95, tmpA)
+      }
+    }
+    // Рубежный Кряж — голый камень
+    const dkg = Math.abs(x - KRAJ.x)
+    if (dkg < 320) {
+      lerp3(tmpA, C_ROCK, falloff(dkg, 70, 250) * 0.9, tmpA)
     }
   }
 

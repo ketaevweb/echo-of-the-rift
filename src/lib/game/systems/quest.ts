@@ -26,6 +26,7 @@ import { approvalOnQuestDone } from './party'
 import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, startPitFight } from './career'
 import { cycleRune, learnWord } from './frost'
 import { startSiege } from './mara'
+import { applyLandscapeShift, spawnHordeChief } from './disputed'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -40,6 +41,7 @@ export function dialogueCtx(ctx: EngineCtx) {
     quest: (id: string) => ctx.quests[id],
     flag: (name: string) => !!ctx.flags[name],
     faction: ctx.faction,
+    origin: ctx.origin,
     companion: (id: string) => ctx.companionIds[id as 'kaya' | 'torvald'],
     has: (item: string, qty = 1) => countItem(ctx, item) >= qty,
     lp: ctx.lp,
@@ -312,6 +314,11 @@ export function runAction(ctx: EngineCtx, action: string) {
             boss.summonStage = 1
             floater(ctx, boss.pos, 'Слова жгут его!', '#c9a3e8', 15)
           }
+        } else if (arg1 === 'fight_horde') {
+          // Фаза 6.4: путь силы — Гхарз выходит на бой за Семя
+          closeDialogue(ctx)
+          spawnHordeChief(ctx)
+          ctx.toast('Гхарз хрипит: «ПИР БУДЕТ ТВОЙ!» — босс вышел.', 'warn')
         }
         break
       case 'heal':
@@ -327,6 +334,12 @@ export function runAction(ctx: EngineCtx, action: string) {
           startSiege(ctx)
         }
         break
+      // Фаза 6.4: выбор, меняющий ландшафт (BG3)
+      case 'shift':
+        if (arg1 === 'grove_saved') applyLandscapeShift(ctx, 'grove_saved')
+        if (arg1 === 'grove_burned') applyLandscapeShift(ctx, 'grove_burned')
+        if (arg1 === 'horde_broken') applyLandscapeShift(ctx, 'horde_broken')
+        break
     }
   }
   ctx.syncUi()
@@ -338,10 +351,10 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
   if (it.action.startsWith('dialogue:')) {
     openDialogue(ctx, it.action.slice(9))
   } else if (it.action.startsWith('portal:')) {
-    // Врата Тумана / Врата Гранита / Врата Пределья / Врата Мары (Фаза 3/6/6.2/6.3)
+    // Врата Тумана / Врата Гранита / Врата Пределья / Врата Мары / Врата Спорных Земель
     const zone = it.action.slice(7)
-    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost' || zone === 'mara') {
-      ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost' | 'mara')
+    if (zone === 'veld' || zone === 'valley' || zone === 'granite' || zone === 'frost' || zone === 'mara' || zone === 'disputed') {
+      ctx.travelTo(zone as 'veld' | 'valley' | 'granite' | 'frost' | 'mara' | 'disputed')
     }
   } else if (it.action.startsWith('purge:')) {
     // Мор-сгустки Мары (Фаза 6.3): выжечь скверну в жилах — квест Хольта
@@ -358,6 +371,25 @@ export function runInteractable(ctx: EngineCtx, it: InteractableDef) {
         advanceQuest(ctx, questId, 2)
       } else {
         ctx.toast(`Мор-сгусток: ${q.counter}/3`, 'quest')
+        saveGame(ctx, false)
+        ctx.syncUi()
+      }
+    }
+  } else if (it.action.startsWith('dig:')) {
+    // Узлы беженцев Спорных Земель (Фаза 6.4): откопать пожитки Пруши
+    const questId = it.action.slice(4)
+    ctx.removedProps.add(it.id)
+    ctx.flags['dig_' + it.id] = true
+    ring(ctx, it.pos, '#d9a441', 60, 0.8)
+    floater(ctx, it.pos, 'УЗЕЛ ОТКОПАН', '#d9a441', 14)
+    sfx('quest')
+    const q = ctx.quests[questId]
+    if (q && !q.done) {
+      q.counter++
+      if (q.stage === 1 && q.counter >= 3) {
+        advanceQuest(ctx, questId, 2)
+      } else {
+        ctx.toast(`Узел беженцев: ${q.counter}/3`, 'quest')
         saveGame(ctx, false)
         ctx.syncUi()
       }
@@ -607,13 +639,52 @@ export function questMarker(ctx: EngineCtx): Vec | null {
     if (fd.stage === 2 || fd.stage === 3) return { ...ROOST.pos }
     return NPCS.find((n) => n.id === 'ingrid')!.pos
   }
+  // Спорные Земли (Фаза 6.4)
+  const dq = ctx.quests.disputed
+  if (dq.stage > 0 && !dq.done) {
+    const ulva = NPCS.find((n) => n.id === 'ulva')?.pos ?? { x: 7330, y: 1090 }
+    const gharz = NPCS.find((n) => n.id === 'gharz')?.pos ?? { x: 7230, y: 2860 }
+    if (dq.stage === 1) return { ...ulva }
+    if (dq.stage === 2) return { ...gharz }
+    if (dq.stage === 3) return { x: 7330, y: 1150 }
+    if (dq.stage === 4) return { x: 7250, y: 2920 }
+    return { ...ulva }
+  }
+  const dh = ctx.quests.disputed_hoard
+  if (dh.stage > 0 && !dh.done) {
+    if (dh.stage === 1) {
+      const dig = [
+        { id: 'dig1', pos: { x: 7020, y: 1080 } },
+        { id: 'dig2', pos: { x: 7520, y: 1560 } },
+        { id: 'dig3', pos: { x: 6980, y: 2350 } },
+      ].find((dd) => !ctx.flags['dig_' + dd.id])
+      if (dig) return { ...dig.pos }
+    }
+    return NPCS.find((n) => n.id === 'prusha')!.pos
+  }
+  const ds = ctx.quests.disputed_scout
+  if (ds.stage > 0 && !ds.done) {
+    if (ds.stage === 1) return { x: 7050, y: 1900 }
+    return NPCS.find((n) => n.id === 'tarben')!.pos
+  }
   return null
 }
 
 export function updateArea(ctx: EngineCtx) {
-  // Фолбэк по зоне (Фаза 3/6/6.2): юг за Хребтом — Вельд, восток за Каменным Хребтом — Гранит,
-  // восток за Стылым Хребтом — Стылое Пределье
-  let name = ctx.zone === 'veld' ? 'Вельд' : ctx.zone === 'granite' ? 'Гранитная Долина' : ctx.zone === 'frost' ? 'Стылое Пределье' : 'Долина'
+  // Фолбэк по зоне (Фаза 3/6/6.2/6.4): юг за Хребтом — Вельд, восток за Каменным Хребтом — Гранит,
+  // восток за Стылым Хребтом — Стылое Пределье, восток за Рубежным Кряжем — Спорные Земли
+  let name =
+    ctx.zone === 'veld'
+      ? 'Вельд'
+      : ctx.zone === 'granite'
+        ? 'Гранитная Долина'
+        : ctx.zone === 'frost'
+          ? 'Стылое Пределье'
+          : ctx.zone === 'mara'
+            ? 'Багровая Мара'
+            : ctx.zone === 'disputed'
+              ? 'Спорные Земли'
+              : 'Долина'
   for (const a of AREAS) {
     if (a.id === 'wilds') continue
     const [x, y, w, h] = a.rect
@@ -669,6 +740,14 @@ export function openEnding(ctx: EngineCtx) {
     )
   }
   epilogue.push('А Смотритель? Смотритель всегда найдёт работу. Монстров много, контрактов больше.')
+  // Фаза 6.4: судьба Спорных Землей — след выбора в ландшафте
+  if (ctx.flags.groveBurned) {
+    epilogue.push('Спорные Земли говорят только углём: вереск выгорел, Роща — пепел, а Орда пела, пока горели чужие шатры.')
+  } else if (ctx.flags.groveSaved) {
+    epilogue.push('Спорные Земли вереском зацвели: Семя благословлено, фонари Рощи горят до сих пор, и беженцы называют тебя тем, кто не продался.')
+  } else if (ctx.flags.hordeBroken) {
+    epilogue.push('Пепельная Орда рассеялась после набега на Рощу, но Семя в сердце рощи так и не нашло покоя.')
+  }
   // Фаза 6: карьера Гранита вписана в судьбу героя
   if (ctx.career.faction) {
     epilogue.push(
@@ -676,7 +755,7 @@ export function openEnding(ctx: EngineCtx) {
     )
   }
   const mins = Math.floor(ctx.playtime / 60)
-  const keys = ['key_granite'].filter((k) => ctx.flags[k]).length
+  const keys = ['key_granite', 'key_disputed'].filter((k) => ctx.flags[k]).length
   const stats: Array<[string, string]> = [
     ['Уровень', String(ctx.level)],
     ['Убито врагов', String(ctx.kills)],

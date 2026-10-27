@@ -23,11 +23,11 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, zoneOf } from './data/world'
+import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, zoneOf } from './data/world'
 import { sfx, setAmbient } from './sfx'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
-import { EngineCtx, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
+import { EngineCtx, AssaultState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
 import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
 import { renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
@@ -190,6 +190,9 @@ export class GameEngine implements EngineCtx {
 
   // --- Фаза 6.3: Багровая Мара (оборона бастиона, транзитное — не сейвится) ---
   siege: SiegeState | null = null
+
+  // --- Фаза 6.4: Спорные Земли (набег Орды, транзитное — не сейвится) ---
+  assault: AssaultState | null = null
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -405,8 +408,8 @@ export class GameEngine implements EngineCtx {
     if (zoneOf(this.player.pos.x, this.player.pos.y) === zone) return
     if (!this.player.alive) return
     this.zoneBusy = true
-    // Фаза 6/6.2/6.3: из Гранита назад — через врата его стороны, из Пределья — через свои,
-    // из Мары — через врата её стороны; иначе — обычные врата
+    // Фаза 6/6.2/6.3/6.4: из Гранита назад — через врата его стороны, из Пределья — через свои,
+    // из Мары — через врата её стороны, из Спорных Земель — через свои; иначе — обычные врата
     let gate =
       zone === 'veld'
         ? GATES.veld
@@ -416,7 +419,9 @@ export class GameEngine implements EngineCtx {
             ? FR_GATES.frost
             : zone === 'mara'
               ? MA_GATES.mara
-              : GATES.valley
+              : zone === 'disputed'
+                ? DF_GATES.disputed
+                : GATES.valley
     const from = zoneOf(this.player.pos.x, this.player.pos.y)
     if (zone === 'valley' && from === 'granite') {
       gate = GR_GATES.valleySide
@@ -426,6 +431,9 @@ export class GameEngine implements EngineCtx {
     }
     if (zone === 'granite' && from === 'mara') {
       gate = MA_GATES.graniteSide
+    }
+    if (zone === 'frost' && from === 'disputed') {
+      gate = DF_GATES.frostSide
     }
     sfx('portal')
     useGame.getState().patch({ zoneFade: { label: gate.label, phase: 'out' } })
@@ -531,8 +539,20 @@ export class GameEngine implements EngineCtx {
 
   syncUi() {
     syncUiSys(this)
-    // Эмбиент по зоне (Фаза 3/6/6.2)
-    setAmbient(this.zone === 'veld' ? 'veld' : this.zone === 'granite' ? 'granite' : this.zone === 'frost' ? 'frost' : this.zone === 'mara' ? 'mara' : 'valley')
+    // Эмбиент по зоне (Фаза 3/6/6.2/6.4)
+    setAmbient(
+      this.zone === 'veld'
+        ? 'veld'
+        : this.zone === 'granite'
+          ? 'granite'
+          : this.zone === 'frost'
+            ? 'frost'
+            : this.zone === 'mara'
+              ? 'mara'
+              : this.zone === 'disputed'
+                ? 'disputed'
+                : 'valley',
+    )
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------

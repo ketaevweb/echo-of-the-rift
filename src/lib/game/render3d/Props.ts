@@ -252,6 +252,7 @@ export class Props3d {
         roof.castShadow = true
         g.add(body, roof)
         place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.2)
+        if (p.id) this.removable.set(p.id, [g]) // Фаза 6.4: хижина Рощи исчезает по сдвигам
         break
       }
 
@@ -263,6 +264,7 @@ export class Props3d {
         tent.castShadow = true
         g.add(tent)
         place(this.group, g, x, y, 0, seedRot(p.seed ?? 1))
+        if (p.id) this.removable.set(p.id, [g]) // Фаза 6.4: шатры беженцев/Орды исчезают по сдвигам
         break
       }
 
@@ -316,6 +318,8 @@ export class Props3d {
         g.add(flame, light)
         place(this.group, g, x, y)
         this.fires.push({ light, flame, base: 1 })
+        // Фаза 6.4: костры с id (grove_fire/grove_pyre/hc_fire1/hc_fire2) скрываются сдвигами
+        if (p.id) this.removable.set(p.id, [g])
         break
       }
 
@@ -492,6 +496,7 @@ export class Props3d {
         g.add(disc, core, light)
         place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.4)
         this.spinners.push(core)
+        if (p.id) this.removable.set(p.id, [g])
         break
       }
 
@@ -817,6 +822,168 @@ export class Props3d {
         glow.position.y = 5
         g.add(glow)
         place(this.group, g, x, y, 0, 0)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      // --- Фаза 6.4: Спорные Земли (ландшафт, перестраиваемый выборами) ---
+
+      case 'grove_tree': {
+        // Роща Садовников: крупное дерево с золотисто-зелёной кроной (выгорает по сдвигам)
+        const g = new THREE.Group()
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.6, 17, 7), groundMat(0x4a3626))
+        trunk.position.y = 8.5
+        trunk.castShadow = true
+        const crownA = new THREE.Mesh(new THREE.IcosahedronGeometry(9.5, 0), groundMat(0x4a5a26, 0.85))
+        crownA.position.y = 19
+        crownA.scale.set(1.15, 0.95, 1.1)
+        crownA.castShadow = true
+        const crownB = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(6.4, 0),
+          new THREE.MeshStandardMaterial({ color: 0x6a7a2e, emissive: 0x5a6a24, emissiveIntensity: 0.18, roughness: 0.85 }),
+        )
+        crownB.position.set(3.4, 26, 1.2)
+        crownB.castShadow = true
+        g.add(trunk, crownA, crownB)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1))
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'burnt_tree': {
+        // Обугленный ствол: рваные ветки и тлеющий уголёк у подножия (после выжигания рощи)
+        const g = new THREE.Group()
+        const charMat = groundMat(0x18120e, 0.98)
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2.6, 15, 6), charMat)
+        trunk.position.y = 7.5
+        trunk.rotation.z = (seedRot(p.seed ?? 1) - Math.PI) * 0.08
+        trunk.castShadow = true
+        g.add(trunk)
+        for (let i = 0; i < 3; i++) {
+          const a = seedRot((p.seed ?? 1) + i * 37)
+          const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 6 + (i % 2) * 2.4, 4), charMat)
+          branch.position.set(Math.cos(a) * 2.4, 9 + i * 2.2, Math.sin(a) * 2.4)
+          branch.rotation.z = Math.cos(a) * 0.85
+          branch.rotation.x = Math.sin(a) * 0.85
+          branch.castShadow = true
+          g.add(branch)
+        }
+        const ember = new THREE.Mesh(
+          new THREE.SphereGeometry(1.7, 8, 6),
+          new THREE.MeshStandardMaterial({ color: 0x8a2a16, emissive: 0xd94a30, emissiveIntensity: 0.9, roughness: 0.5 }),
+        )
+        ember.position.set(2.6, 0.8, -1.4)
+        g.add(ember)
+        place(this.group, g, x, y)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'totem': {
+        // Тотем Пепельной Орды: бревно с черепами и багровыми полосами, венчает рогатый череп
+        const g = new THREE.Group()
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.1, 22, 6), groundMat(0x3a2a1a))
+        log.position.y = 11
+        log.castShadow = true
+        g.add(log)
+        const skullMat = groundMat(0xb8ac92, 0.9)
+        const jawMat = groundMat(0x8a7f68)
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0x6a2018, emissive: 0xc94f3d, emissiveIntensity: 0.85, roughness: 0.5 })
+        for (let i = 0; i < 3; i++) {
+          const hy = 5.5 + i * 6
+          const skull = new THREE.Mesh(new THREE.BoxGeometry(4.6, 4.2, 4.2), skullMat)
+          skull.position.y = hy
+          skull.rotation.y = seedRot((p.seed ?? 1) + i)
+          skull.castShadow = true
+          const jaw = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.4, 3.2), jawMat)
+          jaw.position.y = hy - 2.7
+          g.add(skull, jaw)
+          // багровая полоса между черепами
+          if (i < 2) {
+            const stripe = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.05, 1.6, 6), stripeMat)
+            stripe.position.y = hy + 3
+            g.add(stripe)
+          }
+        }
+        const topSkull = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 6), skullMat)
+        topSkull.position.y = 24.4
+        topSkull.castShadow = true
+        g.add(topSkull)
+        for (const sx of [-1, 1]) {
+          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.9, 6.5, 5), groundMat(0x2a2018))
+          horn.position.set(sx * 2.8, 27.6, 0)
+          horn.rotation.z = -sx * 0.55
+          g.add(horn)
+        }
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.6)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'lantern': {
+        // Фонарь Рощи: тонкий столб с тёплой светящейся сферой (роща расцветает по сдвигам)
+        const g = new THREE.Group()
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, 12, 5), groundMat(0x4a3a28))
+        post.position.y = 6
+        post.castShadow = true
+        const bulb = new THREE.Mesh(
+          new THREE.SphereGeometry(2.1, 10, 8),
+          new THREE.MeshStandardMaterial({ color: 0xf5c96b, emissive: 0xf5c96b, emissiveIntensity: 0.9, roughness: 0.4 }),
+        )
+        bulb.position.y = 13
+        const light = new THREE.PointLight(0xf5c96b, 60, 70, 2)
+        light.position.y = 13.5
+        g.add(post, bulb, light)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1))
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'bloom': {
+        // Цветы Семени: золотые головки на тонких стеблях с лёгким свечением
+        const g = new THREE.Group()
+        const stemMat = groundMat(0x4a5a26, 0.95)
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xd9b84a, emissive: 0xd9b84a, emissiveIntensity: 0.55, roughness: 0.5 })
+        for (let i = 0; i < 4; i++) {
+          const a = seedRot((p.seed ?? 1) + i * 53)
+          const ox = Math.cos(a) * (1.6 + (i % 2) * 1.8)
+          const oz = Math.sin(a) * (1.6 + ((i + 1) % 2) * 1.8)
+          const stemH = 4.5 + (i % 3) * 1.6
+          const stem = new THREE.Mesh(new THREE.ConeGeometry(0.42, stemH, 4), stemMat)
+          stem.position.set(ox, stemH / 2, oz)
+          stem.rotation.z = (seedRot((p.seed ?? 1) + i) - Math.PI) * 0.1
+          const head = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 0), headMat)
+          head.position.set(ox, stemH + 0.8, oz)
+          g.add(stem, head)
+        }
+        const glow = new THREE.PointLight(0xd9b84a, 34, 46, 2)
+        glow.position.y = 5
+        g.add(glow)
+        place(this.group, g, x, y)
+        if (p.id) this.removable.set(p.id, [g])
+        break
+      }
+
+      case 'rubble': {
+        // Обломки разбитого лагеря: груда обугленных камней и рваное бревно
+        const g = new THREE.Group()
+        const rubbleMat = groundMat(0x2e2620, 0.97)
+        for (let i = 0; i < 3; i++) {
+          const a = seedRot((p.seed ?? 1) + i * 41)
+          const chunk = i === 1
+            ? new THREE.Mesh(new THREE.BoxGeometry(8, 3.4, 4.2), rubbleMat)
+            : new THREE.Mesh(new THREE.DodecahedronGeometry(2.6 + i * 0.7, 0), rubbleMat)
+          chunk.position.set(Math.cos(a) * 3.4, 1.6 + (i % 2) * 1.1, Math.sin(a) * 3.4)
+          chunk.rotation.set(seedRot((p.seed ?? 1) + i) * 0.3, seedRot((p.seed ?? 1) + i * 7), 0)
+          chunk.castShadow = true
+          g.add(chunk)
+        }
+        const logBit = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 9, 5), groundMat(0x241a12))
+        logBit.rotation.set(0, seedRot((p.seed ?? 1) + 17), Math.PI / 2.2)
+        logBit.position.set(-2.4, 1.1, 2.2)
+        logBit.castShadow = true
+        g.add(logBit)
+        place(this.group, g, x, y, 0, seedRot(p.seed ?? 1) * 0.5)
         if (p.id) this.removable.set(p.id, [g])
         break
       }

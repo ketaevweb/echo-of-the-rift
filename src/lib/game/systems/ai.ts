@@ -7,7 +7,7 @@
 
 import { ABILITY_MAP, ENEMY_STATS } from '../data/abilities'
 import { ENEMY_NAME } from '../data/tables'
-import { ASH_MOTHER, BLIGHT_WELLS, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
+import { ASH_MOTHER, BLIGHT_WELLS, DIG_SPOTS, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
 import { Entity, Stance, Vec } from '../types'
 import { sfx } from '../sfx'
 import { d, rndRange } from '../core/util'
@@ -19,6 +19,8 @@ import { openDialogue } from './quest'
 import { companionIndex, formationSlot } from './party'
 import { pitMasterLogic, spawnPitMaster } from './career'
 import { blightMotherLogic } from './mara'
+import { hordeChiefLogic } from './disputed'
+import { syncShiftProps } from './disputed'
 import { spawnDragon } from './frost'
 
 export { spawnPitMaster }
@@ -54,6 +56,10 @@ export function spawnWorld(ctx: EngineCtx) {
   for (const n of NPCS) {
     if (n.id === 'kaya' && ctx.companionIds.kaya) continue
     if (n.id === 'torvald_npc' && ctx.companionIds.torvald) continue
+    // Фаза 6.4: выборы меняют ландшафт — выжженная роща прячет Ульву и Прушу,
+    // мирный уход Гхарза прячет его диалоговое ядро
+    if (ctx.flags.groveBurned && (n.id === 'ulva' || n.id === 'prusha')) continue
+    if ((ctx.flags.hordeLeft || ctx.flags.gharzDead) && n.id === 'gharz') continue
     ctx.entities.push(
       makeEntity(ctx, {
         id: n.id,
@@ -102,6 +108,12 @@ export function spawnWorld(ctx: EngineCtx) {
   // Фаза 6.3: выжженные мор-сгустки остаются выжженными после загрузки
   for (const w of BLIGHT_WELLS) {
     if (ctx.flags['well_' + w.id]) ctx.removedProps.add(w.id)
+  }
+  // Фаза 6.4: ландшафтные сдвиги Спорных Земель (роща/лагерь/цветы) — по флагам
+  syncShiftProps(ctx)
+  // Фаза 6.4: откопанные узлы беженцев остаются откопанными
+  for (const d of DIG_SPOTS) {
+    if (ctx.flags['dig_' + d.id]) ctx.removedProps.add(d.id)
   }
   // Фаза 4: спавним по наличию в мире (а не по флагу — сейв ставит
   // companionIds=true до spawnWorld, и старый гвард молча терял партию при загрузке)
@@ -548,6 +560,8 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
   if (e.enemyType === 'pit_master') pitMasterLogic(ctx, e, dist, dt)
   // Фаза 6.3: Мор-Мать управляет собой полностью (взрыв/плевок/призыв)
   if (e.enemyType === 'blight_mother') blightMotherLogic(ctx, e, dist, dt)
+  // Фаза 6.4: Гхарз управляет собой полностью (рывок/рёв/призыв)
+  if (e.enemyType === 'horde_chief') hordeChiefLogic(ctx, e, dist, dt)
   // Фаза 6.2: дракон управляет собой полностью (полёт/стрейф/посадка)
   if (e.enemyType === 'dragon') return
 

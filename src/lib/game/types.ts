@@ -149,6 +149,8 @@ export interface DialogueCtx {
   quest: (id: string) => QuestState
   flag: (name: string) => boolean
   faction: Faction
+  /** Фаза 6.4: происхождение героя — ветки-интро (например, пепельный разговор Гхарза). */
+  origin: OriginId
   companion: (id: string) => boolean
   has: (item: string, qty?: number) => boolean
   lp: number
@@ -201,6 +203,13 @@ export interface PropDef {
     // Фаза 6.3 (Багровая Мара):
     | 'blight'
     | 'bastion'
+    // Фаза 6.4 (Спорные Земли, BG3): ландшафт, перестраиваемый выборами
+    | 'grove_tree'
+    | 'burnt_tree'
+    | 'totem'
+    | 'lantern'
+    | 'bloom'
+    | 'rubble'
   pos: Vec
   w?: number
   h?: number
@@ -251,6 +260,10 @@ export type EnemyType =
   | 'ghoul'
   | 'abomination'
   | 'blight_mother'
+  // Фаза 6.4 (Спорные Земли, BG3):
+  | 'raider'
+  | 'hexer'
+  | 'horde_chief'
 
 export interface InteractableDef {
   id: string

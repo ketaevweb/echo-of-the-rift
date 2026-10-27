@@ -1,5 +1,5 @@
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
-import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD, FRIDGE, HAVEN, ROOST } from '../data/world'
+import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD, FRIDGE, HAVEN, ROOST, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE } from '../data/world'
 
 // ---------------- Терен (запекается один раз) ----------------
 
@@ -249,6 +249,57 @@ export function bakeTerrain(): HTMLCanvasElement {
   ctx.fillStyle = ro
   ctx.beginPath()
   ctx.arc(ROOST.pos.x, ROOST.pos.y, ROOST.r, 0, Math.PI * 2)
+  ctx.fill()
+
+  // --- Фаза 6.4: Рубежный Кряж и Спорные Земли ---
+  // Вертикальный хребет — тёмная каменная полоса
+  const kg = ctx.createLinearGradient(KRAJ.x - KRAJ.band, 0, KRAJ.x + KRAJ.band, 0)
+  kg.addColorStop(0, 'rgba(74,70,64,0)')
+  kg.addColorStop(0.5, 'rgba(74,70,64,0.95)')
+  kg.addColorStop(1, 'rgba(74,70,64,0)')
+  ctx.fillStyle = kg
+  ctx.fillRect(KRAJ.x - KRAJ.band, 0, KRAJ.band * 2, WORLD.h)
+  // Вересковая пустошь: золотисто-оливковая база + сухие пятна
+  const dg = ctx.createLinearGradient(6900, 0, WORLD.w, 0)
+  dg.addColorStop(0, 'rgba(106,92,52,0.5)')
+  dg.addColorStop(1, 'rgba(106,92,52,0.85)')
+  ctx.fillStyle = dg
+  ctx.fillRect(6900, 0, WORLD.w - 6900, WORLD.h)
+  for (let i = 0; i < 420; i++) {
+    const x = KRAJ.x + 240 + rnd() * (WORLD.w - KRAJ.x - 320)
+    const y = rnd() * WORLD.h
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(150,126,68,0.25)' : 'rgba(74,66,40,0.3)'
+    ctx.beginPath()
+    ctx.arc(x, y, 16 + rnd() * 50, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // Вытоптанный пятачок у Врат Спорных Земель
+  ctx.fillStyle = 'rgba(112,96,60,0.5)'
+  ctx.beginPath()
+  ctx.ellipse(DF_GATES.disputed.x + 30, DF_GATES.disputed.y, 110, 76, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Прогалина Рощи — зелёный остров среди вереска
+  ctx.fillStyle = 'rgba(60,74,36,0.8)'
+  ctx.beginPath()
+  ctx.ellipse(GROVE.pos.x, GROVE.pos.y, 220, 160, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(74,90,40,0.55)'
+  ctx.beginPath()
+  ctx.ellipse(GROVE.pos.x, GROVE.pos.y - 16, 140, 96, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Пятно Орды — багрово-угольная проплешина
+  ctx.fillStyle = 'rgba(74,36,24,0.85)'
+  ctx.beginPath()
+  ctx.ellipse(HORDE_CAMP.pos.x, HORDE_CAMP.pos.y, 200, 150, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(58,26,18,0.7)'
+  ctx.beginPath()
+  ctx.ellipse(HORDE_CAMP.pos.x - 40, HORDE_CAMP.pos.y + 20, 120, 84, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Обугленный погост — тёмное выжженное пятно
+  ctx.fillStyle = 'rgba(46,42,32,0.85)'
+  ctx.beginPath()
+  ctx.ellipse(SHRINE.pos.x, SHRINE.pos.y, 90, 68, 0, 0, Math.PI * 2)
   ctx.fill()
 
   // Тёмная рамка мира
@@ -930,6 +981,162 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number) {
       ctx.fill()
       break
     }
+    // --- Фаза 6.4: Спорные Земли ---
+    case 'grove_tree': {
+      // Роща Садовников: крупное дерево с золотисто-зелёной кроной
+      const s = 0.9 + ((p.seed ?? 0) % 30) / 100
+      const pulse = 0.5 + 0.5 * Math.sin(t * 1.8 + pos.x)
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 5, 22 * s, 8 * s, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#4a3628'
+      ctx.fillRect(pos.x - 4 * s, pos.y - 18 * s, 8 * s, 20 * s)
+      ctx.fillStyle = '#4a5a26'
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 34 * s, 26 * s, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#6a7a2e'
+      ctx.beginPath()
+      ctx.arc(pos.x - 10 * s, pos.y - 42 * s, 17 * s, 0, Math.PI * 2)
+      ctx.arc(pos.x + 12 * s, pos.y - 36 * s, 15 * s, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = `rgba(217,184,74,${0.1 + pulse * 0.1})`
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 38 * s, 30 * s + pulse * 3, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'burnt_tree': {
+      // Выгоревший ствол: чёрный обугленный скелет с тлеющим углём
+      const s = 0.85 + ((p.seed ?? 0) % 30) / 100
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.6 + pos.x)
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 12 * s, 5 * s, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#18120e'
+      ctx.lineWidth = 5 * s
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x - 2, pos.y - 30 * s)
+      ctx.stroke()
+      ctx.lineWidth = 2.5 * s
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 1, pos.y - 14 * s)
+      ctx.lineTo(pos.x - 11 * s, pos.y - 22 * s)
+      ctx.moveTo(pos.x - 1, pos.y - 20 * s)
+      ctx.lineTo(pos.x + 9 * s, pos.y - 30 * s)
+      ctx.moveTo(pos.x - 2, pos.y - 26 * s)
+      ctx.lineTo(pos.x - 5 * s, pos.y - 36 * s)
+      ctx.stroke()
+      ctx.fillStyle = `rgba(217,74,48,${0.35 + pulse * 0.4})`
+      ctx.beginPath()
+      ctx.arc(pos.x + 3 * s, pos.y + 1, 2.6 + pulse * 1.2, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'totem': {
+      // Тотем Орды: бревно с черепами и багровыми полосами
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + pos.x)
+      ctx.fillStyle = 'rgba(0,0,0,0.26)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 11, 4.5, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#3a2a1a'
+      ctx.fillRect(pos.x - 5, pos.y - 46, 10, 49)
+      ctx.fillStyle = '#2c2014'
+      ctx.fillRect(pos.x + 1, pos.y - 46, 4, 49)
+      ctx.fillStyle = '#c9b89a'
+      for (const sy of [-36, -22, -8]) {
+        ctx.fillRect(pos.x - 4, pos.y + sy, 8, 7)
+      }
+      ctx.fillStyle = `rgba(201,79,61,${0.4 + pulse * 0.35})`
+      for (const sy of [-28, -14]) {
+        ctx.fillRect(pos.x - 5, pos.y + sy, 10, 3)
+      }
+      break
+    }
+    case 'lantern': {
+      // Фонарь Садовников: тонкий столб с тёплым светом
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2 + pos.x)
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 2, 7, 3, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const g = ctx.createRadialGradient(pos.x, pos.y - 26, 2, pos.x, pos.y - 26, 34)
+      g.addColorStop(0, `rgba(245,201,107,${0.3 + pulse * 0.18})`)
+      g.addColorStop(1, 'rgba(245,201,107,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(pos.x - 34, pos.y - 60, 68, 68)
+      ctx.strokeStyle = '#4a3a28'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x, pos.y - 26)
+      ctx.stroke()
+      ctx.fillStyle = `rgba(245,201,107,${0.75 + pulse * 0.25})`
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 29, 3.5 + pulse * 1.2, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'bloom': {
+      // Цветы Семени: три золотых бутона на стеблях
+      const pulse = 0.5 + 0.5 * Math.sin(t * 1.6 + pos.x * 0.7)
+      ctx.fillStyle = `rgba(217,184,74,${0.1 + pulse * 0.12})`
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y - 8, 10 + pulse * 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#3f5a32'
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 5, pos.y)
+      ctx.lineTo(pos.x - 5, pos.y - 7)
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x, pos.y - 9)
+      ctx.moveTo(pos.x + 5, pos.y)
+      ctx.lineTo(pos.x + 5, pos.y - 6)
+      ctx.stroke()
+      ctx.fillStyle = `rgba(217,184,74,${0.65 + pulse * 0.35})`
+      ctx.beginPath()
+      ctx.arc(pos.x - 5, pos.y - 8, 2.6, 0, Math.PI * 2)
+      ctx.arc(pos.x, pos.y - 10, 3, 0, Math.PI * 2)
+      ctx.arc(pos.x + 5, pos.y - 7, 2.6, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'rubble': {
+      // Обломки разбитого лагеря: тёмные глыбы и бревно
+      ctx.fillStyle = 'rgba(0,0,0,0.24)'
+      ctx.beginPath()
+      ctx.ellipse(pos.x, pos.y + 3, 17, 6, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#2e2620'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 13, pos.y + 2)
+      ctx.lineTo(pos.x - 8, pos.y - 9)
+      ctx.lineTo(pos.x + 1, pos.y - 5)
+      ctx.lineTo(pos.x + 3, pos.y + 3)
+      ctx.closePath()
+      ctx.fill()
+      ctx.beginPath()
+      ctx.moveTo(pos.x + 2, pos.y + 3)
+      ctx.lineTo(pos.x + 8, pos.y - 6)
+      ctx.lineTo(pos.x + 15, pos.y - 1)
+      ctx.lineTo(pos.x + 13, pos.y + 4)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = '#4a3628'
+      ctx.lineWidth = 4
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(pos.x - 6, pos.y - 2)
+      ctx.lineTo(pos.x + 10, pos.y - 8)
+      ctx.stroke()
+      break
+    }
   }
 }
 
@@ -1230,6 +1437,154 @@ export function drawEntity(
       // Стылый тролль: белошёрстная громила
       drawHumanoid(ctx, e, t, '#d8dcd4', 'sword')
       break
+    // --- Фаза 6.4: Спорные Земли ---
+    case 'raider': {
+      // Мародёр Орды: низкий, в рогатом шлеме, с углями-глазами
+      const bob = Math.sin(e.walkPhase * 10) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.6 : 0.4)
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius)
+      const bx = e.pos.x
+      const by = e.pos.y - 8 + bob
+      // рваная повязка
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#2e2620'
+      ctx.beginPath()
+      ctx.ellipse(bx, by, e.radius * 0.78, e.radius * 0.95, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'
+      ctx.beginPath()
+      ctx.ellipse(bx - e.radius * 0.25, by + 3, e.radius * 0.4, e.radius * 0.7, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // голова — смуглая кожа
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a382c'
+      ctx.beginPath()
+      ctx.arc(bx, by - e.radius * 0.95, e.radius * 0.5, 0, Math.PI * 2)
+      ctx.fill()
+      // рогатый шлем
+      ctx.fillStyle = '#5a5048'
+      ctx.beginPath()
+      ctx.arc(bx, by - e.radius * 1.05, e.radius * 0.46, Math.PI, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#c9b89a'
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(bx - e.radius * 0.4, by - e.radius * 1.2)
+      ctx.lineTo(bx - e.radius * 0.72, by - e.radius * 1.62)
+      ctx.moveTo(bx + e.radius * 0.4, by - e.radius * 1.2)
+      ctx.lineTo(bx + e.radius * 0.72, by - e.radius * 1.62)
+      ctx.stroke()
+      // угли-глаза
+      ctx.fillStyle = '#e0653a'
+      ctx.beginPath()
+      ctx.arc(bx - 2.4, by - e.radius * 0.95, 1.4, 0, Math.PI * 2)
+      ctx.arc(bx + 2.4, by - e.radius * 0.95, 1.4, 0, Math.PI * 2)
+      ctx.fill()
+      drawWeaponSwing(ctx, e, '#8a7a54')
+      break
+    }
+    case 'hexer': {
+      // Колдун Орды: худая фигура в капюшоне с багровым посохом
+      const bob = Math.sin(e.walkPhase * 10) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.4 : 0.4)
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * 0.9)
+      const bx = e.pos.x
+      const by = e.pos.y - 8 + bob
+      // худая мантия
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#2e2024'
+      ctx.beginPath()
+      ctx.moveTo(bx - e.radius * 0.62, e.pos.y + 2)
+      ctx.quadraticCurveTo(bx - e.radius * 0.5, by - e.radius * 0.7, bx, by - e.radius * 1.0)
+      ctx.quadraticCurveTo(bx + e.radius * 0.5, by - e.radius * 0.7, bx + e.radius * 0.62, e.pos.y + 2)
+      ctx.closePath()
+      ctx.fill()
+      // капюшон
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#241a1e'
+      ctx.beginPath()
+      ctx.arc(bx, by - e.radius * 1.0, e.radius * 0.46, Math.PI * 0.9, Math.PI * 2.1)
+      ctx.fill()
+      // тень лица с углями
+      ctx.fillStyle = '#120c10'
+      ctx.beginPath()
+      ctx.ellipse(bx, by - e.radius * 0.98, e.radius * 0.3, e.radius * 0.34, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const glow = 0.5 + 0.5 * Math.sin(t * 4 + e.eid)
+      ctx.fillStyle = `rgba(224,101,58,${0.6 + glow * 0.4})`
+      ctx.beginPath()
+      ctx.arc(bx - 2.2, by - e.radius * 1.0, 1.3, 0, Math.PI * 2)
+      ctx.arc(bx + 2.2, by - e.radius * 1.0, 1.3, 0, Math.PI * 2)
+      ctx.fill()
+      // посох с багровой головкой
+      const fx = Math.cos(e.facing)
+      const fy = Math.sin(e.facing)
+      ctx.strokeStyle = '#3a2a1c'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(bx - fy * e.radius * 0.7, by + fx * e.radius * 0.7)
+      ctx.lineTo(bx - fy * e.radius * 0.7 + fx * 6, by + fx * e.radius * 0.7 + fy * 6 - e.radius * 1.8)
+      ctx.stroke()
+      ctx.fillStyle = `rgba(201,79,61,${0.55 + glow * 0.45})`
+      ctx.beginPath()
+      ctx.arc(bx - fy * e.radius * 0.7 + fx * 6, by + fx * e.radius * 0.7 + fy * 6 - e.radius * 1.9, 3.6 + glow * 1.4, 0, Math.PI * 2)
+      ctx.fill()
+      break
+    }
+    case 'horde_chief': {
+      // Вожак Орды: громила с клыками и багровым знаменем
+      const bob = Math.sin(e.walkPhase * 9) * (Math.hypot(e.vel.x, e.vel.y) > 4 ? 1.8 : 0.5)
+      shadowBlob(ctx, e.pos.x, e.pos.y, e.radius * 1.35)
+      const bx = e.pos.x
+      const by = e.pos.y - 12 + bob
+      const s = 1.5
+      const hy = by - e.radius * 1.15 * s
+      const hr = e.radius * 0.5 * s
+      // знамя за спиной
+      ctx.strokeStyle = '#3a2a1c'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(bx - e.radius * 1.1, by + e.radius * 0.6)
+      ctx.lineTo(bx - e.radius * 1.1, by - e.radius * 3.4)
+      ctx.stroke()
+      ctx.fillStyle = '#b0563a'
+      ctx.beginPath()
+      ctx.moveTo(bx - e.radius * 1.1, by - e.radius * 3.3)
+      ctx.lineTo(bx + e.radius * 0.1, by - e.radius * 3.0)
+      ctx.lineTo(bx - e.radius * 0.2, by - e.radius * 2.2)
+      ctx.lineTo(bx - e.radius * 1.1, by - e.radius * 2.0)
+      ctx.closePath()
+      ctx.fill()
+      // торс
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#3a2a22'
+      ctx.beginPath()
+      ctx.ellipse(bx, by, e.radius * 0.95 * s, e.radius * 1.05 * s, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'
+      ctx.beginPath()
+      ctx.ellipse(bx - e.radius * 0.3, by + 4, e.radius * 0.42, e.radius * 0.7, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // голова
+      ctx.fillStyle = e.hitT > 0 ? '#ffffff' : '#4a382c'
+      ctx.beginPath()
+      ctx.arc(bx, hy, hr, 0, Math.PI * 2)
+      ctx.fill()
+      // белые клыки
+      ctx.fillStyle = '#e8e0d0'
+      ctx.beginPath()
+      ctx.moveTo(bx - hr * 0.55, hy + hr * 0.7)
+      ctx.lineTo(bx - hr * 0.3, hy + hr * 0.12)
+      ctx.lineTo(bx - hr * 0.08, hy + hr * 0.68)
+      ctx.closePath()
+      ctx.moveTo(bx + hr * 0.55, hy + hr * 0.7)
+      ctx.lineTo(bx + hr * 0.3, hy + hr * 0.12)
+      ctx.lineTo(bx + hr * 0.08, hy + hr * 0.68)
+      ctx.closePath()
+      ctx.fill()
+      // ярко-оранжевые глаза
+      ctx.fillStyle = '#ff8a3a'
+      ctx.beginPath()
+      ctx.arc(bx - hr * 0.42, hy - hr * 0.1, 1.8, 0, Math.PI * 2)
+      ctx.arc(bx + hr * 0.42, hy - hr * 0.1, 1.8, 0, Math.PI * 2)
+      ctx.fill()
+      drawWeaponSwing(ctx, e, '#c9c4bc')
+      break
+    }
     case 'dragon': {
       // Иммолтакс 2D: крылатая тень в полёте/на земле
       const alt = e.cds['alt'] ?? 0

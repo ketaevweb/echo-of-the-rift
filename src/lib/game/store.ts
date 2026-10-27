@@ -238,6 +238,8 @@ interface GameStore {
   shouts: ShoutHud[]
   // Фаза 6.3: оборона Бастиона (волны + прочность частокола)
   siege: { wave: number; waves: number; gateHp: number } | null
+  // Фаза 6.4: набег Орды на Рощу (волны)
+  assault: { wave: number; waves: number } | null
   // Фаза 5
   diceRoll: DiceRollHudState | null
   setScreen: (s: Screen) => void
@@ -280,6 +282,7 @@ export const useGame = create<GameStore>((set) => ({
   career: null,
   shouts: [],
   siege: null,
+  assault: null,
   diceRoll: null,
   setScreen: (s) => set({ screen: s }),
   setPanel: (p) => set({ panel: p }),

@@ -244,6 +244,32 @@ export const ITEMS: Record<string, ItemDef> = {
     ac: 4,
     icon: 'Shield',
   },
+  // ---------------- Фаза 6.4: Спорные Земли ----------------
+  key_disputed: {
+    id: 'key_disputed',
+    name: 'Ключ-осколок: Спорные Земли',
+    desc: 'Тёплый многогранник — отпечаток Семени Разлома. Один из шести. Пахнет вереском и пеплом.',
+    type: 'quest',
+    price: 0,
+    icon: 'Key',
+  },
+  heather_tunic: {
+    id: 'heather_tunic',
+    name: 'Вересковый тарч-туника',
+    desc: 'Сшита Прушей из пожитков беженцев: вереск в швах заглушает чужой шёпот (+4 КД).',
+    type: 'armor',
+    price: 300,
+    ac: 4,
+    icon: 'Shirt',
+  },
+  horde_tusk: {
+    id: 'horde_tusk',
+    name: 'Клык Гхарза',
+    desc: 'Огромный клык вожака Орды. Грим даст за него цену, а пепельные мародёры больше не соберутся.',
+    type: 'misc',
+    price: 150,
+    icon: 'Bone',
+  },
 }
 
 export const SELL_RATE = 0.4

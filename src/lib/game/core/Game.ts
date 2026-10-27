@@ -17,6 +17,7 @@ import { updateArea, updateEnding } from '../systems/quest'
 import { updatePit } from '../systems/career'
 import { updateFrost } from '../systems/frost'
 import { updateMara } from '../systems/mara'
+import { updateDisputed } from '../systems/disputed'
 import type { EngineCtx } from './ctx'
 import { Clock } from './Clock'
 
@@ -40,6 +41,7 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   updatePit(ctx) // Фаза 6: волны/победа ямы
   updateFrost(ctx, dt) // Фаза 6.2: дракон Стылого Пределья
   updateMara(ctx, dt) // Фаза 6.3: оборона Бастиона (волны штурма)
+  updateDisputed(ctx, dt) // Фаза 6.4: набег Орды на Рощу (волны + триггер близости)
   ctx.buffT = Math.max(0, ctx.buffT - dt)
   ctx.shake = Math.max(0, ctx.shake - dt * 26)
   // Фаза 3: сутки, масло, зона

@@ -203,6 +203,28 @@ export function onEnemyKilled(ctx: EngineCtx, e: Entity) {
     goldLoot = 220
     addItem(ctx, 'blight_heart', 1)
     useGame.getState().patch({ bossBar: null })
+  } else if (type === 'raider') {
+    // Фаза 6.4: пепельный мародёр — уголь и золото Орды, счётчик Тарбена
+    goldLoot = 12 + Math.floor(Math.random() * 14)
+    bumpScouts(ctx, type)
+  } else if (type === 'hexer') {
+    goldLoot = 20 + Math.floor(Math.random() * 16)
+  } else if (type === 'horde_chief') {
+    // Фаза 6.4: Гхарз пал — Семя переходит по праву сильного
+    ctx.flags.gharzDead = true
+    goldLoot = 260
+    addItem(ctx, 'horde_tusk', 1)
+    const gharzNpc = ctx.entities.find((x) => x.kind === 'npc' && x.id === 'gharz')
+    if (gharzNpc) gharzNpc.alive = false
+    const dq = ctx.quests.disputed
+    if (!dq.done && dq.stage === 4) {
+      addItem(ctx, 'key_disputed', 1)
+      ctx.flags.key_disputed = true
+      ctx.flags.seedTaken = true
+      advanceQuest(ctx, 'disputed', 6)
+      ctx.toast('Семя Разлома у тебя. Роща — пепел, Орда — без вожака.', 'quest')
+    }
+    useGame.getState().patch({ bossBar: null })
   } else if (type === 'boss') {
     goldLoot = 150
     addItem(ctx, 'rift_shard', 3)
@@ -247,6 +269,18 @@ function bumpGlands(ctx: EngineCtx) {
     const c = q.counter
     if (c >= 5) ctx.toast('Пять мор-желёз собраны — к досенту Хольту в Бастион!', 'quest')
     else ctx.toast(`Желёзы скверны: ${c}/5`, 'info')
+  }
+}
+
+/** Фаза 6.4: счётчик мародёров-разведчиков для квеста Тарбена. */
+function bumpScouts(ctx: EngineCtx, type: Entity['enemyType']) {
+  if (type !== 'raider') return
+  const q = ctx.quests.disputed_scout
+  if (q.stage === 1 && !q.done) {
+    q.counter++
+    const c = q.counter
+    if (c >= 4) ctx.toast('Четыре метки стёрты — к Тарбену!', 'quest')
+    else ctx.toast(`Глаза Орды: ${c}/4`, 'info')
   }
 }
 

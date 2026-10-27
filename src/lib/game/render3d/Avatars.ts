@@ -682,6 +682,121 @@ function buildPitMaster(): { group: THREE.Group; refs: HumanoidRefs } {
   return built
 }
 
+// ---------------- Спорные Земли: мародёр / колдун / вожак Орды (Фаза 6.4) ----------------
+
+/** Мародёр Пепельной Орды: низкий жилистый грабитель с угольными пятнами и рогатым шлемом. */
+function buildRaider(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#2e2620', 0x4a382c, { helmet: true, scale: 0.9 })
+  // угольные пятна на торсе (пепел костров Орды)
+  const soot = mat(0x18120e, { roughness: 0.98 })
+  for (const [px, py, pz] of [[-2.2, 20.8, 5.9], [2.4, 18.2, 5.9], [0, 19.5, -5.9]]) {
+    const patch = new THREE.Mesh(new THREE.SphereGeometry(1.5, 6, 5), soot)
+    patch.position.set(px, py, pz)
+    patch.scale.set(1.2, 0.8, 0.5)
+    built.group.add(patch)
+  }
+  // рваная набедренная повязка
+  const rag = new THREE.Mesh(
+    new THREE.ConeGeometry(5.4, 8, 7, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x2e2620, roughness: 0.98, side: THREE.DoubleSide }),
+  )
+  rag.position.y = 10.5
+  built.group.add(rag)
+  // рогатый шлем: два маленьких конуса по бокам каски
+  for (const sx of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(1.1, 4.6, 5), mat(0x3a2a22))
+    horn.position.set(sx * 3.2, 30.6, 0)
+    horn.rotation.z = -sx * 0.6
+    built.group.add(horn)
+  }
+  // глаза-угли под каской
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd96b3a })
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 4), eyeMat)
+    eye.position.set(sx * 1.7, 27.3, 4.1)
+    built.group.add(eye)
+  }
+  return built
+}
+
+/** Колдун Орды: худой чародей в капюшоне с тлеющим багровым посохом. */
+function buildHexer(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#2e2024', 0x5a4a3c, { hood: true, scale: 1.05 })
+  // рваная мантия-подол
+  const robe = new THREE.Mesh(
+    new THREE.ConeGeometry(7.2, 15, 8, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x2e2024, roughness: 0.98, side: THREE.DoubleSide }),
+  )
+  robe.position.y = 9.5
+  built.group.add(robe)
+  // посох в правой руке: тёмное древко с тлеющей багровой головкой
+  const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 30, 5), mat(0x3a2a22))
+  staff.position.y = -8
+  built.refs.armR.add(staff)
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(2.2, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x8a2a1c, emissive: 0xc94f3d, emissiveIntensity: 1.05, roughness: 0.4 }),
+  )
+  orb.position.y = 8
+  built.refs.armR.add(orb)
+  // глаза тлеют из-под капюшона
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd96b3a })
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 4), eyeMat)
+    eye.position.set(sx * 1.5, 24.9, 3.4)
+    built.group.add(eye)
+  }
+  return built
+}
+
+/** Гхарз Кровавый Пёс — вожак Пепельной Орды: громила в пластинах со штандартом на спине. */
+function buildHordeChief(): { group: THREE.Group; refs: HumanoidRefs } {
+  const built = buildHumanoid('#3a2a22', 0x4a382c, { sword: true, scale: 1.8 })
+  // массивная нагрудная пластина
+  const plate = mat(0x3a2a22, { metalness: 0.35, roughness: 0.5 })
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(7.4, 10, 8), plate)
+  chest.position.set(0, 20.5, 1.4)
+  chest.scale.set(1.15, 0.95, 0.72)
+  chest.castShadow = true
+  built.group.add(chest)
+  // наплечники-пластины
+  for (const sx of [-1, 1]) {
+    const pad = new THREE.Mesh(new THREE.ConeGeometry(4.6, 5.6, 6), plate)
+    pad.position.set(sx * 8.8, 25.4, 0)
+    pad.rotation.z = -sx * 0.55
+    pad.castShadow = true
+    built.group.add(pad)
+  }
+  // клыки-бивни из нижней челюсти (торчат вверх)
+  const tuskMat = mat(0xd8d2c0, { roughness: 0.55 })
+  for (const sx of [-1, 1]) {
+    const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.8, 5), tuskMat)
+    tusk.position.set(sx * 1.7, 24.9, 3.6)
+    tusk.rotation.x = -0.1
+    built.group.add(tusk)
+  }
+  // знамя-штандарт на спине: шест + багровое полотнище
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 34, 5), mat(0x2a201a))
+  pole.position.set(0, 28, -6.6)
+  pole.rotation.x = 0.1
+  built.group.add(pole)
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(9, 15),
+    new THREE.MeshStandardMaterial({ color: 0xb0563a, emissive: 0x6a2a1a, emissiveIntensity: 0.3, side: THREE.DoubleSide, roughness: 0.85 }),
+  )
+  banner.position.set(0, 22, -7.1)
+  banner.rotation.x = 0.1
+  built.group.add(banner)
+  // глаза ярко горят
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd94a30 })
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.75, 6, 4), eyeMat)
+    eye.position.set(sx * 1.9, 28.1, 4.0)
+    built.group.add(eye)
+  }
+  return built
+}
+
 // ---------------- Аватар сущности ----------------
 
 export class Avatar {
@@ -760,6 +875,15 @@ export class Avatar {
       case 'blight_mother':
         built = buildBlightMother()
         break
+      case 'raider':
+        built = buildRaider()
+        break
+      case 'hexer':
+        built = buildHexer()
+        break
+      case 'horde_chief':
+        built = buildHordeChief()
+        break
       case 'dragon':
         built = buildDragon()
         break
@@ -807,6 +931,9 @@ export class Avatar {
     | 'ghoul'
     | 'abomination'
     | 'blight_mother'
+    | 'raider'
+    | 'hexer'
+    | 'horde_chief'
     | 'dragon'
     | 'boss'
     | 'humanoid' {
@@ -830,6 +957,9 @@ export class Avatar {
       case 'ghoul': return 'ghoul'
       case 'abomination': return 'abomination'
       case 'blight_mother': return 'blight_mother'
+      case 'raider': return 'raider'
+      case 'hexer': return 'hexer'
+      case 'horde_chief': return 'horde_chief'
       case 'dragon': return 'dragon'
       case 'boss': return 'boss'
       default: return 'humanoid'

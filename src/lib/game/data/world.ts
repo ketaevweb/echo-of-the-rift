@@ -47,12 +47,28 @@ import {
   MARA_ROADS,
   MARA_SPAWN_ZONES,
 } from './mara'
+import {
+  DF_GATES,
+  DIG_SPOTS,
+  DISPUTED_AREAS,
+  DISPUTED_INTERACTABLES,
+  DISPUTED_MARKERS,
+  DISPUTED_NPCS,
+  DISPUTED_PROPS,
+  DISPUTED_ROADS,
+  DISPUTED_SPAWN_ZONES,
+  GROVE,
+  HORDE_CAMP,
+  KRAJ,
+  SHRINE,
+} from './disputed'
 
 /** Мир: долина Хеймхолл на северо-западе, Вельд на юге за Хребтом (Фаза 3),
  *  Гранитная Долина на востоке за Каменным Хребтом (Фаза 6),
  *  Стылое Пределье за Стылым Хребтом (Фаза 6.2),
- *  Багровая Мара на юге Гранита за Багровым хребтом (Фаза 6.3). */
-export const WORLD = { w: 6360, h: 4200 }
+ *  Багровая Мара на юге Гранита за Багровым хребтом (Фаза 6.3),
+ *  Спорные Земли за Рубежным Кряжем (Фаза 6.4). */
+export const WORLD = { w: 7760, h: 4200 }
 
 /** Южная граница «старой» долины — генераторы леса/камней долины клампятся к ней. */
 const VALLEY_BOTTOM = 2380
@@ -73,6 +89,7 @@ export const AREAS: AreaDef[] = [
   ...GRANITE_AREAS,
   ...FROST_AREAS,
   ...MARA_AREAS,
+  ...DISPUTED_AREAS,
   { id: 'wilds', name: 'Долина', rect: [0, 0, WORLD.w, RIDGE_OF_WORLD] },
 ]
 
@@ -109,6 +126,8 @@ export const ROADS: Vec[][] = [
   ...FROST_ROADS,
   // Тропы Багровой Мары (Фаза 6.3)
   ...MARA_ROADS,
+  // Тропы Спорных Земель (Фаза 6.4)
+  ...DISPUTED_ROADS,
 ]
 
 function lcg(seed: number) {
@@ -136,6 +155,8 @@ function blocked(px: number, py: number): boolean {
   if (Math.abs(px - GRIDGE.x) < 340) return true
   // Стылый Хребет к Пределью (Фаза 6.2)
   if (Math.abs(px - FRIDGE.x) < 340) return true
+  // Рубежный Кряж к Спорным Землям (Фаза 6.4)
+  if (Math.abs(px - KRAJ.x) < 340) return true
   // Деревня, лагерь, озеро, камни, разлом, врата
   if (px > 640 && px < 1380 && py > 1310 && py < 1830) return true
   if (px > 2380 && px < 2900 && py > 1500 && py < 1920) return true
@@ -145,6 +166,7 @@ function blocked(px: number, py: number): boolean {
   if (Math.hypot(px - GATES.valley.x, py - GATES.valley.y) < 150) return true
   if (Math.hypot(px - GR_GATES.valleySide.x, py - GR_GATES.valleySide.y) < 150) return true
   if (Math.hypot(px - FR_GATES.graniteSide.x, py - FR_GATES.graniteSide.y) < 150) return true
+  if (Math.hypot(px - DF_GATES.frostSide.x, py - DF_GATES.frostSide.y) < 150) return true
   // Дороги (включая вельдские и гранитные)
   for (const road of ROADS) {
     for (let i = 0; i < road.length - 1; i++) {
@@ -257,6 +279,7 @@ export const PROPS: PropDef[] = [
   ...GRANITE_PROPS,
   ...FROST_PROPS,
   ...MARA_PROPS,
+  ...DISPUTED_PROPS,
   ...buildTrees(),
   ...buildRocks(),
   ...buildShrubsFixed(),
@@ -277,6 +300,8 @@ export const NPCS: NpcDef[] = [
   ...FROST_NPCS,
   // Багровая Мара (Фаза 6.3)
   ...MARA_NPCS,
+  // Спорные Земли (Фаза 6.4)
+  ...DISPUTED_NPCS,
 ]
 
 export const SPAWN_ZONES: SpawnZoneDef[] = [
@@ -289,6 +314,7 @@ export const SPAWN_ZONES: SpawnZoneDef[] = [
   ...GRANITE_SPAWN_ZONES,
   ...FROST_SPAWN_ZONES,
   ...MARA_SPAWN_ZONES,
+  ...DISPUTED_SPAWN_ZONES,
 ]
 
 export const UNIQUE_SPAWNS: Array<{ id: string; enemy: 'alpha' | 'captain' | 'boss'; pos: Vec; cond?: string }> = [
@@ -308,6 +334,7 @@ export const INTERACTABLES: InteractableDef[] = [
   ...GRANITE_INTERACTABLES,
   ...FROST_INTERACTABLES,
   ...MARA_INTERACTABLES,
+  ...DISPUTED_INTERACTABLES,
 ]
 
 export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
@@ -321,6 +348,7 @@ export const AREA_MARKERS: Array<{ pos: Vec; label: string }> = [
   ...GRANITE_MARKERS,
   ...FROST_MARKERS,
   ...MARA_MARKERS,
+  ...DISPUTED_MARKERS,
 ]
 
 // Реэкспорты Вельда/Гранита/Пределья/Марый для движка/рендеров (единая точка импорта мира)
@@ -354,11 +382,24 @@ export {
   SIEGE_GATE_HP,
   SIEGE_WAVES,
 } from './mara'
+export {
+  DF_GATES,
+  DIG_SPOTS,
+  GROVE,
+  GROVE_HEART,
+  HORDE_BREAK,
+  HORDE_CAMP,
+  HORDE_WAVES,
+  KRAJ,
+  SHIFT_PROPS,
+  SHRINE,
+} from './disputed'
 
-/** Зона по мировой точке: Пределье (восток за Стылым Хребтом) приоритетнее,
- *  затем Гранит (восток за Каменным Хребтом), в юге которого — Мара (Фаза 6.3),
- *  затем Вельд (юг за Хребтом), остальное — долина. */
-export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' | 'mara' {
+/** Зона по мировой точке: Спорные Земли (восток за Рубежным Кряжем) приоритетнее,
+ *  затем Пределье (восток за Стылым Хребтом), затем Гранит (восток за Каменным Хребтом),
+ *  в юге которого — Мара (Фаза 6.3), затем Вельд (юг за Хребтом), остальное — долина. */
+export function zoneOf(x: number, y: number): 'valley' | 'veld' | 'granite' | 'frost' | 'mara' | 'disputed' {
+  if (x > KRAJ.x) return 'disputed'
   if (x > FRIDGE.x) return 'frost'
   if (x > GRIDGE.x) return y > MARA_RIDGE.y ? 'mara' : 'granite'
   return y > RIDGE.y ? 'veld' : 'valley'

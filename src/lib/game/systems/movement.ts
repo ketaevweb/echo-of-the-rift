@@ -5,7 +5,7 @@
 // (WASD/клик-движение, автопатака по цели, стамина).
 // ============================================================
 
-import { WORLD, RIDGE, GRIDGE, FRIDGE, MARA_RIDGE } from '../data/world'
+import { WORLD, RIDGE, GRIDGE, FRIDGE, MARA_RIDGE, KRAJ } from '../data/world'
 import { Entity } from '../types'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
@@ -49,6 +49,12 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   const mhi = MARA_RIDGE.y + MARA_RIDGE.band
   if (nx > GRIDGE.x && ny > mlo - er && ny < mhi + er) {
     ny = e.pos.y >= MARA_RIDGE.y ? Math.max(ny, mhi + er) : Math.min(ny, mlo - er)
+  }
+  // Рубежный Кряж к Спорным Землям непроходим (Фаза 6.4): только через Врата.
+  const dlo = KRAJ.x - KRAJ.band
+  const dhi = KRAJ.x + KRAJ.band
+  if (nx > dlo - er && nx < dhi + er) {
+    nx = e.pos.x >= KRAJ.x ? Math.max(nx, dhi + er) : Math.min(nx, dlo - er)
   }
   for (const c of ctx.colliders) {
     if (c.propId && ctx.removedProps.has(c.propId)) continue

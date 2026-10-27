@@ -17,6 +17,7 @@ import { xpNext } from './progression'
 import { nearestInteraction, stageText } from './quest'
 import { CAREER_NAME, CAREER_PERKS, heroRank, RANK_NAME } from './career'
 import { siegeHud } from './mara'
+import { assaultHud } from './disputed'
 
 export function syncUi(ctx: EngineCtx): void {
   const st = useGame.getState()
@@ -102,16 +103,33 @@ export function syncUi(ctx: EngineCtx): void {
   const maraQ = quests.find((q) => q.id === 'mara')!
   const maraWQ = quests.find((q) => q.id === 'mara_wells')!
   const maraGQ = quests.find((q) => q.id === 'mara_glands')!
-  const sideQ = [contractQ, veldQ, graniteQ, oreQ, scorpQ, frostWQ, frostDQ, maraQ, maraWQ, maraGQ].find(
-    (q) => q.stage > 0 && !q.done,
-  ) ?? null
+  // Фаза 6.4: квесты Спорных Земель тоже попадают в трекер побочек
+  const dispQ = quests.find((q) => q.id === 'disputed')!
+  const dispHQ = quests.find((q) => q.id === 'disputed_hoard')!
+  const dispSQ = quests.find((q) => q.id === 'disputed_scout')!
+  const sideQ = [
+    contractQ,
+    veldQ,
+    graniteQ,
+    oreQ,
+    scorpQ,
+    frostWQ,
+    frostDQ,
+    maraQ,
+    maraWQ,
+    maraGQ,
+    dispQ,
+    dispHQ,
+    dispSQ,
+  ].find((q) => q.stage > 0 && !q.done) ?? null
   const boss = ctx.entities.find(
     (e) =>
       (e.enemyType === 'boss' ||
         e.enemyType === 'ash_mother' ||
         e.enemyType === 'pit_master' ||
         e.enemyType === 'dragon' ||
-        e.enemyType === 'blight_mother') &&
+        e.enemyType === 'blight_mother' ||
+        e.enemyType === 'horde_chief') &&
       e.alive &&
       e.aiState !== 'idle',
   )
@@ -190,11 +208,15 @@ export function syncUi(ctx: EngineCtx): void {
             ? 'СТЫЛОЕ ПРЕДЕЛЬЕ'
             : ctx.zone === 'mara'
               ? 'БАГРОВАЯ МАРА'
-              : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
+              : ctx.zone === 'disputed'
+                ? 'СПОРНЫЕ ЗЕМЛИ'
+                : 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
     formation: ctx.formation,
     career,
     shouts,
     // Фаза 6.3: оборона Бастиона — зеркало HUD
     siege: siegeHud(ctx),
+    // Фаза 6.4: набег Орды — зеркало HUD
+    assault: assaultHud(ctx),
   })
 }

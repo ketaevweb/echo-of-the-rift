@@ -31,7 +31,7 @@ export interface SceneView {
   telegraphs: Telegraph[]
   playerAlive: boolean
   // Фаза 3: атмосфера
-  zone: 'valley' | 'veld' | 'granite' | 'frost' | 'mara'
+  zone: 'valley' | 'veld' | 'granite' | 'frost' | 'mara' | 'disputed'
   dayT: number
   // Фаза 4: тактическая пауза — линии приказов + кольцо выбора
   tactical?: boolean
@@ -191,6 +191,20 @@ export function drawScene(v: SceneView) {
       const sy = ((i * 91.7 + t * (44 + (i % 7) * 11)) % (h + 40)) - 20
       ctx.beginPath()
       ctx.arc(sx, sy, 1.2 + (i % 3) * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  // Фаза 6.4: глухой вересковый туман Спорных Земель + пыль спора
+  if (v.zone === 'disputed') {
+    ctx.fillStyle = 'rgba(122,104,66,0.15)'
+    ctx.fillRect(0, 0, w, h)
+    const t = v.time
+    ctx.fillStyle = 'rgba(226,196,130,0.35)'
+    for (let i = 0; i < 30; i++) {
+      const sx = ((i * 173.3 + t * (14 + (i % 4) * 7)) % (w + 40)) - 20
+      const sy = ((i * 111.9 + t * (20 + (i % 6) * 8)) % (h + 40)) - 20
+      ctx.beginPath()
+      ctx.arc(sx, sy, 0.9 + (i % 3) * 0.6, 0, Math.PI * 2)
       ctx.fill()
     }
   }
