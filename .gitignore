@@ -63,3 +63,6 @@ server.log
 /db
 *.db
 /.ref
+
+/upload/
+/tool-results/
