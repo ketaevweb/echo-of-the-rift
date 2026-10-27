@@ -25,7 +25,8 @@ import {
 } from './types'
 import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, zoneOf } from './data/world'
 import { sfx, setAmbient, setMuted, setVolumes } from './sfx'
-import { musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
+import { setVoiceVolume } from './voice'
+import { musicBoss, musicBossPhase, musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
 import { EffQuality, QUALITY_NAME, stepDown, writeSettings } from './settings'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
@@ -69,7 +70,7 @@ import {
   openDialogue as openDialogueSys,
   questMarker as questMarkerSys,
 } from './systems/quest'
-import { syncUi as syncUiSys } from './systems/uiSync'
+import { syncUi as syncUiSys, findActiveBoss } from './systems/uiSync'
 
 /** Телепорт через врата прерывает ямный бой (арена остаётся в Граните). */
 function endPitFightSafe(ctx: GameEngine) {
@@ -348,6 +349,7 @@ export class GameEngine implements EngineCtx {
   applySettings(s = useGame.getState().settings) {
     setMuted(s.muted)
     setVolumes({ music: s.musicVol, sfx: s.sfxVol, amb: s.ambVol })
+    setVoiceVolume(s.voiceOn ? s.voiceVol : 0) // v1.1: озвучка реплик
     if (s.quality !== 'auto') this.effQuality = s.quality
     this.view3d?.setQuality(this.effQuality)
     useGame.getState().patch({ effQuality: this.effQuality })
@@ -616,6 +618,10 @@ export class GameEngine implements EngineCtx {
     const storm = this.siege !== null || this.assault !== null || this.raid !== null
     musicCombat(storm || nearestEnemyOf(this, this.player, 340) !== null)
     musicPaused(this.tacticalPaused)
+    // v1.1: адаптивная тема босса — 3 фазы по HP (GDD 04 §4.3)
+    const boss = findActiveBoss(this)
+    musicBoss(boss !== null)
+    if (boss) musicBossPhase(Math.max(0, Math.min(1, boss.hp / Math.max(1, boss.maxHp))))
   }
 
   // ---------------- Рендер (делегаты render2d) ----------------

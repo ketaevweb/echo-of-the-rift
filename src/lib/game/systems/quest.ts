@@ -29,6 +29,7 @@ import { CAREER_NAME, addRep, heroRank, joinCareer, rankUp, spawnPitMaster, star
 import { cycleRune, learnWord } from './frost'
 import { startSiege } from './mara'
 import { applyLandscapeShift, spawnHordeChief } from './disputed'
+import { speakLine, stopVoice } from '../voice'
 
 export function initQuests(ctx: EngineCtx) {
   for (const q of QUESTS) {
@@ -142,6 +143,8 @@ export function setNode(ctx: EngineCtx, nodeId: string) {
     },
     diceRoll: null, // новый узел — старый бросок не должен висеть
   })
+  // v1.1: озвучка ключевых реплик (2 голоса, GDD 04 §4.3) — только у VOICE_OF-спикеров
+  speakLine(node.speaker, node.text)
 }
 
 /** Сущность спикера для кинокамеры: NPC/уникальный враг с тем же именем в 450 ед. от героя. */
@@ -205,6 +208,7 @@ export function closeDialogue(ctx: EngineCtx) {
   ctx.dlgChoices = []
   ctx.dialogueFocusEid = null // кинокамера возвращается к герою
   useGame.getState().patch({ dialogue: null, diceRoll: null })
+  stopVoice() // v1.1: реплика обрывается вместе с диалогом
 }
 
 export function runAction(ctx: EngineCtx, action: string) {

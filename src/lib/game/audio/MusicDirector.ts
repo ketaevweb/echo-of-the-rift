@@ -3,6 +3,9 @@
 // Горизонтальные слои: explore (пэд-аккорды домена + колокольчики)
 // и combat (пульс баса + напряжённая квинта), кроссфейд 2 с,
 // стингеры событий, lowpass «под водой» в тактической паузе.
+// v1.1 (бэклог GDD 04 §4.3): адаптивные темы боссов — слой boss
+// с 3 фазами по HP (0: дрон + сердцебиение, 1: +остинато тритона,
+// 2: +хаос-кластеры), стингер на входе в новую фазу.
 // Всё синтезируется WebAudio — без внешних ассетов.
 // ============================================================
 
@@ -52,6 +55,21 @@ let nextChordAt = 0
 let nextBellAt = 0
 let nextBeatAt = 0
 
+// v1.1: слой босса и его фазы
+let bossGain: GainNode | null = null
+let bossOn = false
+let bossLevel = 0 // 0 — база, 1 — остинато, 2 — хаос
+let bossHp01 = 1
+let nextBossHitAt = 0
+let nextOstinatoAt = 0
+let nextChaosAt = 0
+let droneOscs: OscillatorNode[] = []
+let droneGain: GainNode | null = null
+
+const BOSS_BEAT = 0.84 // сердцебиение босса (~71 bpm, «тук-тук»)
+const OSTINATO_STEP = 0.21 // восьмые остинато
+const CHAOS_STEP = 0.47 // кластеры фазы 2
+
 /** Полутоны от тоники → частота. */
 function semis(root: number, s: number): number {
   return root * Math.pow(2, s / 12)
@@ -73,6 +91,9 @@ function init() {
   combatGain = core.ctx.createGain()
   combatGain.gain.value = 0
   combatGain.connect(lowpass)
+  bossGain = core.ctx.createGain()
+  bossGain.gain.value = 0
+  bossGain.connect(lowpass)
   nextChordAt = core.ctx.currentTime + 0.4
   nextBellAt = core.ctx.currentTime + 2.5
   nextBeatAt = core.ctx.currentTime + 0.5
@@ -164,6 +185,164 @@ function scheduleBeat(at: number) {
   }
 }
 
+// ---------------- v1.1: слой босса (тема + фазы по HP) ----------------
+
+/** Непрерывный дрон темы босса (две расстроенные пилы на тонике домена /2). */
+function ensureDrone() {
+  const c = audioCore()
+  if (!c || !bossGain || droneOscs.length > 0) return
+  droneGain = c.ctx.createGain()
+  droneGain.gain.value = 0
+  droneGain.connect(bossGain)
+  const root = MOTIFS[domain].root / 2
+  for (const det of [-4, 5]) {
+    const osc = c.ctx.createOscillator()
+    osc.type = 'sawtooth'
+    osc.frequency.value = root
+    osc.detune.value = det
+    osc.connect(droneGain)
+    osc.start()
+    droneOscs.push(osc)
+  }
+  droneGain.gain.setTargetAtTime(0.05, c.ctx.currentTime, 1.2)
+}
+
+function releaseDrone() {
+  const c = audioCore()
+  if (!c || !droneGain) return
+  const t = c.ctx.currentTime
+  droneGain.gain.cancelScheduledValues(t)
+  droneGain.gain.setTargetAtTime(0, t, 0.6)
+  const oscs = droneOscs
+  const g = droneGain
+  droneOscs = []
+  droneGain = null
+  window.setTimeout(() => {
+    for (const o of oscs) {
+      try {
+        o.stop()
+      } catch {
+        /* уже остановлен */
+      }
+    }
+    g.disconnect()
+  }, 2500)
+}
+
+/** Перестроить дрон под новый домен (если босс активен). */
+function retuneDrone() {
+  const c = audioCore()
+  if (!c) return
+  const root = MOTIFS[domain].root / 2
+  for (const o of droneOscs) o.frequency.setTargetAtTime(root, c.ctx.currentTime, 0.8)
+}
+
+/** «Тук-тук» — двойной удар сердца босса. */
+function scheduleBossHit(at: number) {
+  if (!bossGain) return
+  const c = audioCore()
+  if (!c) return
+  const loud = 0.2 + 0.08 * bossLevel
+  for (const [dt, vol] of [[0, loud], [0.31, loud * 0.55]] as Array<[number, number]>) {
+    const osc = c.ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(96, at + dt)
+    osc.frequency.exponentialRampToValueAtTime(38, at + dt + 0.22)
+    const g = c.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at + dt)
+    g.gain.linearRampToValueAtTime(vol, at + dt + 0.015)
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dt + 0.34)
+    osc.connect(g)
+    g.connect(bossGain)
+    osc.start(at + dt)
+    osc.stop(at + dt + 0.4)
+  }
+}
+
+/** Фаза 1+: остинато тритона — приглушённые восьмые. */
+const OSTINATO_PATTERN = [0, 0, 3, 0, 5, 3, 0, -2]
+let ostinatoIdx = 0
+
+function scheduleOstinato(at: number) {
+  if (!bossGain) return
+  const c = audioCore()
+  if (!c) return
+  const root = MOTIFS[domain].root / 2
+  const f = root * Math.pow(2, OSTINATO_PATTERN[ostinatoIdx % OSTINATO_PATTERN.length] / 12)
+  ostinatoIdx++
+  const osc = c.ctx.createOscillator()
+  osc.type = 'square'
+  osc.frequency.value = f
+  const g = c.ctx.createGain()
+  g.gain.setValueAtTime(0.0001, at)
+  g.gain.linearRampToValueAtTime(0.032, at + 0.015)
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.17)
+  osc.connect(g)
+  g.connect(bossGain)
+  osc.start(at)
+  osc.stop(at + 0.2)
+}
+
+/** Фаза 2+: хаос — кластеры из диссонирующих пар высоких треугольников. */
+function scheduleChaos(at: number) {
+  if (!bossGain) return
+  const c = audioCore()
+  if (!c) return
+  const root = MOTIFS[domain].root * 6
+  for (const s of [0, 1]) {
+    const osc = c.ctx.createOscillator()
+    osc.type = 'triangle'
+    osc.frequency.value = root * Math.pow(2, s / 12)
+    const g = c.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at)
+    g.gain.linearRampToValueAtTime(0.028, at + 0.28)
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.8)
+    osc.connect(g)
+    g.connect(bossGain)
+    osc.start(at)
+    osc.stop(at + 0.85)
+  }
+}
+
+/** Войти/выйти из боя с боссом — кроссфейд слоя темы 2 с. */
+export function musicBoss(on: boolean) {
+  init()
+  if (!started || bossOn === on) return
+  bossOn = on
+  const c = audioCore()
+  if (!c || !bossGain || !exploreGain) return
+  const t = c.ctx.currentTime
+  bossGain.gain.cancelScheduledValues(t)
+  bossGain.gain.setTargetAtTime(on ? 1 : 0, t, CROSSFADE / 3)
+  // explore дополнительно глушим под тему босса
+  exploreGain.gain.cancelScheduledValues(t)
+  exploreGain.gain.setTargetAtTime(on ? 0.3 : combatOn ? 0.45 : 1, t, CROSSFADE / 3)
+  if (on) {
+    ensureDrone()
+    nextBossHitAt = t + 0.3
+    nextOstinatoAt = t + 0.4
+    nextChaosAt = t + 0.6
+  } else {
+    releaseDrone()
+    bossLevel = 0
+    bossHp01 = 1
+  }
+}
+
+/** Фаза темы по HP босса (0..1): >0.66 база, >0.33 остинато, ниже — хаос. */
+export function musicBossPhase(hp01: number) {
+  init()
+  if (!started) return
+  bossHp01 = Math.max(0, Math.min(1, hp01))
+  const lv = bossHp01 > 0.66 ? 0 : bossHp01 > 0.33 ? 1 : 2
+  if (lv !== bossLevel) {
+    const up = lv > bossLevel
+    bossLevel = lv
+    // Стингер на входе в новую, более тяжёлую фазу
+    if (up && bossOn) stinger('boss')
+  }
+}
+
 // ---------------- Стингеры событий ----------------
 
 function stinger(kind: 'boss' | 'level' | 'quest') {
@@ -202,6 +381,7 @@ export function musicDomain(zone: ZoneId) {
   if (domain === zone) return
   domain = zone
   chordIdx = 0
+  if (bossOn) retuneDrone()
 }
 
 /** Войти/выйти из боя — кроссфейд explore ⇄ combat 2 с. */
@@ -255,9 +435,32 @@ export function musicTick() {
   } else {
     nextBeatAt = now + 0.2
   }
+  // v1.1: слой босса — сердцебиение всегда, остинато/хаос по фазам HP
+  if (bossOn) {
+    while (nextBossHitAt < horizon) {
+      scheduleBossHit(Math.max(nextBossHitAt, now + 0.05))
+      nextBossHitAt += BOSS_BEAT
+    }
+    if (bossLevel >= 1) {
+      while (nextOstinatoAt < horizon) {
+        scheduleOstinato(Math.max(nextOstinatoAt, now + 0.05))
+        nextOstinatoAt += OSTINATO_STEP
+      }
+    } else {
+      nextOstinatoAt = now + 0.2
+    }
+    if (bossLevel >= 2) {
+      while (nextChaosAt < horizon) {
+        scheduleChaos(Math.max(nextChaosAt, now + 0.05))
+        nextChaosAt += CHAOS_STEP
+      }
+    } else {
+      nextChaosAt = now + 0.3
+    }
+  }
 }
 
 /** Фаза 8: дебаг-снимок для QA-ворота (GDD 08) — состояние слоёв директора. */
 export function musicDebug() {
-  return { started, domain, combat: combatOn, paused: pausedOn }
+  return { started, domain, combat: combatOn, paused: pausedOn, boss: { on: bossOn, level: bossLevel, hp: Math.round(bossHp01 * 100) } }
 }

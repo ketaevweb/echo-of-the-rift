@@ -15,6 +15,9 @@ export interface GameSettings {
   sfxVol: number
   ambVol: number
   muted: boolean
+  /** v1.1: озвучка ключевых реплик (TTS, 2 голоса). */
+  voiceOn: boolean
+  voiceVol: number
 }
 
 export const SETTINGS_KEY = 'echo-rift-settings'
@@ -25,6 +28,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   sfxVol: 0.85,
   ambVol: 0.8,
   muted: false,
+  voiceOn: true,
+  voiceVol: 0.8,
 }
 
 export function readSettings(): GameSettings {
@@ -39,6 +44,8 @@ export function readSettings(): GameSettings {
       sfxVol: clamp01(p.sfxVol, DEFAULT_SETTINGS.sfxVol),
       ambVol: clamp01(p.ambVol, DEFAULT_SETTINGS.ambVol),
       muted: typeof p.muted === 'boolean' ? p.muted : DEFAULT_SETTINGS.muted,
+      voiceOn: typeof p.voiceOn === 'boolean' ? p.voiceOn : DEFAULT_SETTINGS.voiceOn,
+      voiceVol: clamp01(p.voiceVol, DEFAULT_SETTINGS.voiceVol),
     }
   } catch {
     return { ...DEFAULT_SETTINGS }

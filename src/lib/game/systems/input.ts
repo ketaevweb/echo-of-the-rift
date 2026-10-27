@@ -14,6 +14,7 @@ import { EngineCtx } from '../core/ctx'
 import { pickEntity } from '../core/entity'
 import { chooseOption, closeDialogue, doInteract, openDialogue, pickInteractable, runInteractable } from './quest'
 import { cycleFormation } from './party'
+import { ActionId, keyMatches } from '../bindings'
 
 interface InputHandlers {
   keyDown: (ev: KeyboardEvent) => void
@@ -23,6 +24,14 @@ interface InputHandlers {
 
 // Стабильные ссылки обработчиков на движок (для add/removeEventListener)
 const handlers = new WeakMap<EngineCtx, InputHandlers>()
+
+// Действия панелей → PanelId (открытие/закрытие через биндинги, v1.1)
+const PANEL_OF: Partial<Record<ActionId, PanelId>> = {
+  panel_char: 'char',
+  panel_inv: 'inv',
+  panel_journal: 'journal',
+  panel_map: 'map',
+}
 
 function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
   const store = useGame.getState()
@@ -47,17 +56,19 @@ function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
     return
   }
   if (store.panel) {
-    const map: Record<string, PanelId> = { c: 'char', i: 'inv', j: 'journal', m: 'map' }
-    const k = ev.key.toLowerCase()
-    if (map[k] && store.panel === map[k]) {
-      ctx.closePanel()
-      ev.preventDefault()
+    // v1.1: повторное нажатие клавиши панели закрывает её (по биндингам)
+    for (const [action, panel] of Object.entries(PANEL_OF)) {
+      if (panel && store.panel === panel && keyMatches(action as ActionId, ev.key)) {
+        ctx.closePanel()
+        ev.preventDefault()
+      }
     }
     return
   }
-  const k = ev.key.toLowerCase()
-  ctx.keys.add(k)
-  if (k === ' ') {
+  // v1.1: движение читается по «сырым» клавишам (WASD/стрелки не ремапятся),
+  // остальные действия — через биндинги (bindings.ts, русская раскладка нормализуется)
+  ctx.keys.add(ev.key.toLowerCase())
+  if (keyMatches('pause', ev.key)) {
     ctx.tacticalPaused = !ctx.tacticalPaused
     useGame.getState().patch({ paused: ctx.tacticalPaused })
     ctx.setTactical(ctx.tacticalPaused) // Фаза 4: изометрический отъём камеры
@@ -66,32 +77,36 @@ function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
     ev.preventDefault()
     return
   }
-  // Фаза 4: Tab — цикл цели по живым врагам (в бою и в паузе)
-  if (k === 'tab') {
+  // Фаза 4: смена цели по живым врагам (в бою и в паузе)
+  if (keyMatches('target', ev.key)) {
     cycleTarget(ctx)
     ev.preventDefault()
     return
   }
-  // Фаза 4: V — сменить строй отряда (клин ⇄ линия)
-  if (k === 'v' || k === 'м') {
+  // Фаза 4: строй отряда (клин ⇄ линия)
+  if (keyMatches('formation', ev.key)) {
     cycleFormation(ctx)
     ev.preventDefault()
     return
   }
-  if (k === 'f' || k === 'а') doInteract(ctx)
-  // Фаза 6.2: крики Ту'ум (R — Сила, T — Мороз; рус. раскладка К/Е)
-  if (k === 'r' || k === 'к') ctx.castAbility('shout_force')
-  if (k === 't' || k === 'е') ctx.castAbility('shout_frost')
-  if (k === 'c' || k === 'с') ctx.openPanel('char')
-  if (k === 'i' || k === 'ш') ctx.openPanel('inv')
-  if (k === 'j' || k === 'о') ctx.openPanel('journal')
-  if (k === 'm' || k === 'ь') ctx.openPanel('map')
-  if (k >= '1' && k <= '7') {
-    const id = ABILITY_BAR_IDS[parseInt(k, 10) - 1]
-    if (id) ctx.castAbility(id)
+  if (keyMatches('interact', ev.key)) doInteract(ctx)
+  // Фаза 6.2: крики Ту'ум
+  if (keyMatches('shout_force', ev.key)) ctx.castAbility('shout_force')
+  if (keyMatches('shout_frost', ev.key)) ctx.castAbility('shout_frost')
+  // v1.1: панели через биндинги
+  for (const [action, panel] of Object.entries(PANEL_OF)) {
+    if (panel && keyMatches(action as ActionId, ev.key)) ctx.openPanel(panel)
   }
-  if (k === 'q' || k === 'й') ctx.castAbility('potion_heal')
-  if (k === 'e' || k === 'у') ctx.castAbility('potion_stam')
+  // v1.1: слоты панели способностей 1–7 через биндинги ability1..7
+  for (let i = 1; i <= 7; i++) {
+    if (keyMatches(`ability${i}` as ActionId, ev.key)) {
+      const id = ABILITY_BAR_IDS[i - 1]
+      if (id) ctx.castAbility(id)
+    }
+  }
+  // Q/E — прямые ярлыки зелий (ремапятся независимо от слотов 6/7)
+  if (keyMatches('potion_heal', ev.key)) ctx.castAbility('potion_heal')
+  if (keyMatches('potion_stam', ev.key)) ctx.castAbility('potion_stam')
 }
 
 function onKeyUp(ctx: EngineCtx, ev: KeyboardEvent) {

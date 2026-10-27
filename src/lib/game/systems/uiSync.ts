@@ -19,6 +19,25 @@ import { CAREER_NAME, CAREER_PERKS, heroRank, RANK_NAME } from './career'
 import { siegeHud } from './mara'
 import { assaultHud } from './disputed'
 import { raidHud } from './finale'
+import { Entity } from '../types'
+import { hotkeyLabelForAbility, labelFor } from '../bindings'
+
+/** Активный босс (жив, в бою) — для bossBar и темы босса (v1.1). */
+export function findActiveBoss(ctx: EngineCtx): Entity | null {
+  return (
+    ctx.entities.find(
+      (e) =>
+        (e.enemyType === 'boss' ||
+          e.enemyType === 'ash_mother' ||
+          e.enemyType === 'pit_master' ||
+          e.enemyType === 'dragon' ||
+          e.enemyType === 'blight_mother' ||
+          e.enemyType === 'horde_chief') &&
+        e.alive &&
+        e.aiState !== 'idle',
+    ) ?? null
+  )
+}
 
 export function syncUi(ctx: EngineCtx): void {
   const st = useGame.getState()
@@ -72,7 +91,7 @@ export function syncUi(ctx: EngineCtx): void {
       name: ab.name,
       desc: ab.desc,
       icon: ab.icon,
-      hotkey: ab.hotkey,
+      hotkey: hotkeyLabelForAbility(ab.id) ?? ab.hotkey,
       cd: ctx.player.cds[cdKey] ?? 0,
       cdMax: ab.cooldown,
       unlocked,
@@ -128,24 +147,14 @@ export function syncUi(ctx: EngineCtx): void {
     raidQ,
     judgQ,
   ].find((q) => q.stage > 0 && !q.done) ?? null
-  const boss = ctx.entities.find(
-    (e) =>
-      (e.enemyType === 'boss' ||
-        e.enemyType === 'ash_mother' ||
-        e.enemyType === 'pit_master' ||
-        e.enemyType === 'dragon' ||
-        e.enemyType === 'blight_mother' ||
-        e.enemyType === 'horde_chief') &&
-      e.alive &&
-      e.aiState !== 'idle',
-  )
+  const boss = findActiveBoss(ctx)
   // Фаза 6.2: крики Ту'ум — зеркало HUD
   const shouts: ShoutHud[] = [
     {
       id: 'shout_force',
       name: 'Крик: Сила',
       icon: 'Wind',
-      hotkey: 'R',
+      hotkey: labelFor('shout_force'),
       word: 'ФУС',
       lv: ctx.shoutLv?.force ?? 0,
       cd: ctx.player.cds['shout_force'] ?? 0,
@@ -155,7 +164,7 @@ export function syncUi(ctx: EngineCtx): void {
       id: 'shout_frost',
       name: 'Крик: Мороз',
       icon: 'Snowflake',
-      hotkey: 'T',
+      hotkey: labelFor('shout_frost'),
       word: 'ЛОК',
       lv: ctx.shoutLv?.frost ?? 0,
       cd: ctx.player.cds['shout_frost'] ?? 0,
@@ -200,7 +209,7 @@ export function syncUi(ctx: EngineCtx): void {
     trackerQuest: mainQ.done ? null : mainQ,
     contractQuest: sideQ,
     bossBar: boss ? { name: ENEMY_NAME[boss.enemyType!] ?? 'Хозяин', hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
-    interactHint: n ? `${n.label} — [F]` : null,
+    interactHint: n ? `${n.label} — [${labelFor('interact')}]` : null,
     bestiary: [...ctx.bestiary],
     // Фаза 3: масло, сутки, зона
     oil: ctx.oilT > 0 && ctx.oilKind ? { name: ITEMS[ctx.oilKind]?.name ?? 'Масло', remain: Math.ceil(ctx.oilT) } : null,

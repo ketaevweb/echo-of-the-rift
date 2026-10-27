@@ -402,3 +402,33 @@ Stage Summary:
 - Аудио: полный директор (слои/кроссфейд/пауза/стингеры), голоса доменов, шаги по 4 поверхностям, UI-звуки, кубик.
 - Титры на титуле и в концовке; README синхронизирован с GDD.
 - Следующий шаг — бэклог после v1.0 (GDD 04 §4.3): TTS-озвучка, темы боссов по фазам, ремап клавиш.
+
+---
+Task ID: 17
+Agent: Z.ai Code (main)
+Task: v1.1 — бэклог после релиза (GDD 04 §4.3): TTS-озвучка ключевых реплик (2 голоса), адаптивные темы боссов по фазам HP, ремап клавиш.
+
+Work Log:
+- Предыстория: проверка repo показала, что Фазы 7 (460217d) и 8 (5735a98) уже закрыты и запушены — сводка сессии устарела. Актуальный бэклог после v1.0: TTS, темы боссов, ремап клавиш.
+- bindings.ts (новый): 19 действий (слоты 1–7, крики R/T, зелья Q/E, interact F, пауза Space, цель Tab, строй V, панели C/I/J/M), DEFAULT_BINDINGS, localStorage 'echo-rift-keybinds' с валидацией, нормализация русской раскладки CYR2LAT (биндинг хранится латиницей, работает на обеих), keyMatches/keyOwner/keyLabel/labelFor, hotkeyLabelForAbility для HUD.
+- input.ts: все действия кроме движения (WASD/стрелки фиксированы) переведены на биндинги; закрытие панелей повторным нажатием — по биндингам.
+- uiSync.ts: findActiveBoss() экспортирован (bossBar + тема босса); хоткеи способностей/криков и подсказка «— [F]» берутся из биндингов.
+- settings.ts: voiceOn/voiceVol в GameSettings (валидация readSettings).
+- MusicDirector.ts: слой boss — дрон (2 расстроенные пилы, тоника домена/2, retune при смене зоны), «тук-тук» сердцебиение 0.84 с, фаза 1 (+остинато тритона 8-ми), фаза 2 (+хаос-кластеры); musicBoss(on)/musicBossPhase(hp01) с порогами 66/33%, стингер на входе в фазу; musicDebug → boss{on,level,hp}.
+- engine.ts: syncUi — musicBoss(findActiveBoss)/musicBossPhase(hp/maxHp); applySettings — setVoiceVolume.
+- voice.ts (новый): speakLine — только спикеры VOICE_OF (19 имён, male/female), POST /api/tts, blob-URL кэш в памяти, дедуп inflight, гонки через lastReq, ошибки глотаются; stopVoice на closeDialogue; setVoiceVolume из applySettings.
+- app/api/tts/route.ts (новый): z-ai-web-dev-sdk ТОЛЬКО в бэкенде; male→xiaochen, female→tongtong; wav 24 кГц; дисковый кэш db/tts-cache/sha1(voice|text).wav (X-TTS-Cache: hit/miss); таймаут SDK 45 с через Promise.race; runtime nodejs. Клиентский fetch с AbortSignal.timeout(30 с).
+- quest.ts: setNode → speakLine(node.speaker, node.text); closeDialogue → stopVoice().
+- Panels.tsx: SettingsPanel — тумблер «Голоса реплик (TTS)» + слайдер «Озвучка реплик»; секция УПРАВЛЕНИЕ: 19 ремап-строк с захватом клавиши (capture-фаза, Esc — отмена), автосвобождение конфликтов с тостом, кнопка «Сбросить», скролл max-h-72.
+- SDK-инцидент: голос tongtong разово завис в next-server (1.9 GB RAM) — добавлены таймауты (45 с сервер/30 с клиент); через CLI все 7 голосов проверены рабочими на русском тексте.
+- E2E (agent-browser, 2 батча; особенностью песочницы оказалось, что dev-сервер живёт только внутри одного Bash-вызова — сервер поднимался в начале батча):
+  * Ремап: Настройки → УПРАВЛЕНИЕ (19 строк) → «Персонаж»→P (метка P, localStorage ["p"]) → Escape → p открывает ПЕРСОНАЖ → p закрывает → «Сбросить» (метка C, ["c"]) → c работает.
+  * TTS: ПРОДОЛЖИТЬ → диалог с Дорном (trainer_dorn) → POST /api/tts 200 → Audio(blob) создан (__ap.n=1) → WAV 1.15 MB в кэше; тумблер OFF → диалог с Гримом без нового Audio (n=1) → ON обратно.
+  * Тема босса: syncUi — прямой вызов (в headless rAF лагает): hp 80% → on:true level 0; 40% → level 1; 10% → level 2; выход → on:false, сброс. Боссбар HUD отрисован (скрин).
+  * Скриншоты: титул, диалог с озвучкой, настройки, боссбар; errors пусто, консоль чистая; tsc + lint зелёные.
+- README.md → v1.1 (структура + статус), GDD 04 §4.3 — пометка «Реализовано в v1.1».
+
+Stage Summary:
+- Бэклог после v1.0 закрыт полностью: озвучка (2 голоса, кэш, тумблер/громкость), адаптивные босс-темы (3 фазы + стингеры), ремап клавиш (19 действий, RU-раскладка, конфликты, сброс).
+- Версия проекта: v1.1. Dev-сервер песочницы не переживает Bash-вызов — для E2E поднимать внутри батча (worklog-заметка).
+- Следующие кандидаты: локализация, озвучка боевых реплик, ремастер портретов.

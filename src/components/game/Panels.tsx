@@ -1,13 +1,24 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Coins, ScrollText, X } from 'lucide-react'
+import { Coins, Keyboard, ScrollText, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { getEngine, BESTIARY_INFO } from '@/lib/game/engine'
 import { ITEMS } from '@/lib/game/data/items'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { EffQuality, GameSettings, QUALITY_NAME, QualityId } from '@/lib/game/settings'
+import {
+  ACTION_DEFS,
+  ActionId,
+  DEFAULT_BINDINGS,
+  getBindings,
+  isBindable,
+  keyLabel,
+  keyOwner,
+  normKey,
+  setBindings,
+} from '@/lib/game/bindings'
 import { boot, useGame } from '@/lib/game/store'
 import { GameIcon } from './GameIcon'
 
@@ -525,6 +536,118 @@ function VolSlider({
   )
 }
 
+// ---------------- v1.1: ремап клавиш (GDD 04 §4.3) ----------------
+
+function KeybindRow({
+  action,
+  name,
+  keyLabel: kl,
+  listening,
+  onStart,
+}: {
+  action: ActionId
+  name: string
+  keyLabel: string
+  listening: boolean
+  onStart: (a: ActionId) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded border border-[#3a2e20] bg-[#211a12]/70 px-2.5 py-1.5">
+      <span className="truncate text-xs text-[#cfc0a0]" title={name}>
+        {name}
+      </span>
+      <button
+        onClick={() => onStart(action)}
+        aria-label={`Назначить клавишу: ${name}`}
+        className={`min-w-[92px] shrink-0 rounded border px-2 py-1 text-[11px] font-semibold transition ${
+          listening
+            ? 'animate-pulse border-[#d9a441] bg-[#d9a441]/20 text-[#f5c96b]'
+            : 'border-[#5a4632] text-[#e8d5a8] hover:border-[#d9a441] hover:text-[#f5c96b]'
+        }`}
+      >
+        {listening ? 'Нажмите…' : kl}
+      </button>
+    </div>
+  )
+}
+
+function KeybindsSection() {
+  const [binds, setBindsState] = useState(() => getBindings())
+  const [listening, setListening] = useState<ActionId | null>(null)
+
+  // Захват клавиши в фазе перехвата — игровой обработчик не получает событие
+  useEffect(() => {
+    if (!listening) return
+    const h = (ev: KeyboardEvent) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+      if (ev.key === 'Escape') {
+        setListening(null)
+        return
+      }
+      if (!isBindable(ev.key)) return
+      const key = normKey(ev.key)
+      const nb = { ...getBindings() }
+      const self = nb[listening].includes(key)
+      if (!self) {
+        const owner = keyOwner(key)
+        if (owner && owner !== listening) {
+          nb[owner] = nb[owner].filter((k) => k !== key)
+          const def = ACTION_DEFS.find((d) => d.id === owner)?.name ?? owner
+          useGame.getState().pushToast(`Клавиша «${keyLabel(key)}» освобождена: ${def}`, 'info')
+        }
+        nb[listening] = [key]
+      }
+      setBindings(nb)
+      setBindsState(getBindings())
+      setListening(null)
+    }
+    window.addEventListener('keydown', h, true)
+    return () => window.removeEventListener('keydown', h, true)
+  }, [listening])
+
+  const groups = ['Бой', 'Партия', 'Панели'] as const
+  return (
+    <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="game-title-font flex items-center gap-2 text-xs tracking-[0.25em] text-[#9a8f78]">
+          <Keyboard className="h-3.5 w-3.5" /> УПРАВЛЕНИЕ
+        </p>
+        <button
+          onClick={() => {
+            setBindings(DEFAULT_BINDINGS)
+            setBindsState(getBindings())
+            useGame.getState().pushToast('Клавиши сброшены к стандартным', 'info')
+          }}
+          className="rounded border border-[#5a4632] px-2 py-1 text-[11px] text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+        >
+          Сбросить
+        </button>
+      </div>
+      <div className="game-scroll max-h-72 overflow-y-auto pr-1">
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {groups.map((g) =>
+            ACTION_DEFS.filter((d) => d.group === g).map((d) => (
+              <KeybindRow
+                key={d.id}
+                action={d.id}
+                name={d.name}
+                keyLabel={listening === d.id ? 'Нажмите…' : keyLabel(binds[d.id][0] ?? '')}
+                listening={listening === d.id}
+                onStart={setListening}
+              />
+            )),
+          )}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-snug text-[#8a8068]">
+        Клик по действию → новая клавиша (Esc — отмена). WASD/стрелки — движение (фиксировано), Esc — меню.
+        Русская раскладка работает автоматически.
+      </p>
+    </div>
+  )
+}
+
 function SettingsPanel() {
   const settings = useGame((s) => s.settings)
   const effQuality = useGame((s) => s.effQuality)
@@ -587,6 +710,16 @@ function SettingsPanel() {
           <VolSlider label="Музыка" value={settings.musicVol} onChange={(v) => apply({ musicVol: v })} />
           <VolSlider label="Эффекты" value={settings.sfxVol} onChange={(v) => apply({ sfxVol: v })} />
           <VolSlider label="Эмбиент" value={settings.ambVol} onChange={(v) => apply({ ambVol: v })} />
+          <VolSlider label="Озвучка реплик" value={settings.voiceVol} onChange={(v) => apply({ voiceVol: v })} />
+          <Row>
+            <span className="text-sm text-[#e8d5a8]">Голоса реплик (TTS)</span>
+            <button
+              onClick={() => apply({ voiceOn: !settings.voiceOn })}
+              className="rounded border border-[#5a4632] px-3 py-1.5 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+            >
+              {settings.voiceOn ? 'Включены' : 'Выключены'}
+            </button>
+          </Row>
           <Row>
             <span className="text-sm text-[#e8d5a8]">Общий звук</span>
             <button
@@ -597,11 +730,7 @@ function SettingsPanel() {
             </button>
           </Row>
         </div>
-        <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3 text-[12px] leading-relaxed text-[#a89a7d]">
-          <p className="mb-1 font-semibold text-[#c9b06b]">Управление</p>
-          WASD / ЛКМ — движение · 1–4 знаки · Q/E — зелья · F — взаимодействие · Пробел — тактическая пауза ·
-          V — строй · Tab — цель · C/I/J/M — панели · Esc — меню
-        </div>
+        <KeybindsSection />
       </div>
     </Panel>
   )
