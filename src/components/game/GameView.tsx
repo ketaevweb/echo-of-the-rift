@@ -28,6 +28,14 @@ export default function GameView() {
     const engine = createEngine(canvas, save, { canvas3d: canvas3dRef.current, mode, origin: boot.origin })
     const onResize = () => engine.resize()
     window.addEventListener('resize', onResize)
+    // v2.2: смена вьюпорта при входе/выходе из полного экрана, повороте телефона
+    // и коллапсе адресной строки Android (visualViewport) — канвас не «буксует»
+    // со старым размером (чёрные поля/обрезанный кадр после fullscreen)
+    const onFsChange = () => setTimeout(onResize, 60) // ждём применения нового вьюпорта
+    document.addEventListener('fullscreenchange', onFsChange)
+    document.addEventListener('webkitfullscreenchange', onFsChange)
+    window.addEventListener('orientationchange', onFsChange)
+    window.visualViewport?.addEventListener('resize', onResize)
     // миникарта рендерится в HUD (дочерний эффект уже отработал)
     engine.attachMinimap(wrapRef.current?.querySelector('[data-minimap]') as HTMLCanvasElement | null)
     engine.start()
@@ -35,6 +43,10 @@ export default function GameView() {
     if (wrapRef.current) ro.observe(wrapRef.current)
     return () => {
       window.removeEventListener('resize', onResize)
+      document.removeEventListener('fullscreenchange', onFsChange)
+      document.removeEventListener('webkitfullscreenchange', onFsChange)
+      window.removeEventListener('orientationchange', onFsChange)
+      window.visualViewport?.removeEventListener('resize', onResize)
       ro.disconnect()
       const e = getEngine()
       if (e) e.destroy()
@@ -56,7 +68,9 @@ export default function GameView() {
   const is3d = renderMode === '3d'
 
   return (
-    <div ref={wrapRef} className="relative h-screen w-screen overflow-hidden bg-[#12100c]">
+    // v2.2: h-dvh вместо h-screen — 100vh на Android не сжимается адресной строкой,
+    // из-за чего нижняя часть игры уходила под браузерный UI
+    <div ref={wrapRef} className="relative h-dvh w-screen overflow-hidden bg-[#12100c]">
       <canvas
         ref={canvas3dRef}
         className={`absolute inset-0 h-full w-full touch-none ${is3d ? 'block cursor-crosshair' : 'hidden'}`}

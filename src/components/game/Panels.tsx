@@ -562,6 +562,7 @@ const QUALITY_OPTS: Array<{ id: QualityId; name: string }> = [
   { id: 'high', name: 'Высокое' },
   { id: 'medium', name: 'Среднее' },
   { id: 'low', name: 'Низкое' },
+  { id: 'mobile', name: 'Мобильное' },
 ]
 
 function VolSlider({
@@ -755,7 +756,7 @@ function SettingsPanel() {
                 {t('действует:')} <b className="text-[#c9b06b]">{t(QUALITY_NAME[effQuality as EffQuality])}</b>
               </span>
             </div>
-            <div className="mt-2 grid grid-cols-4 gap-1.5">
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
               {QUALITY_OPTS.map((q) => (
                 <button
                   key={q.id}
@@ -773,6 +774,8 @@ function SettingsPanel() {
             </div>
             <p className="mt-1.5 text-[11px] leading-snug text-[#8a8068]">
               {t('«Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.')}
+              {' '}
+              {t('«Мобильное» — для телефонов: сниженное разрешение, без теней, дальность ×0.55 и кап 30 FPS.')}
             </p>
           </div>
           {/* v2.0: мобильное управление (GDD 06 §10) */}

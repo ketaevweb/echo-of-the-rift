@@ -11,6 +11,7 @@ import { Entity, Vec } from '../types'
 import { WORLD, zoneOf } from '../data/world'
 import type { ZoneId } from '../core/ctx'
 import { ZONE_DATA, zoneViewRect } from '../data/zones'
+import type { EffQuality } from '../settings'
 import { heightAt } from './heightmap'
 import { Terrain, buildSky } from './Terrain'
 import { Props3d } from './Props'
@@ -109,16 +110,25 @@ export class Renderer3d {
   private disposed = false
   /** v2.1: построенная зона (идемпотентность rebuildZone). */
   private builtZone: ZoneId
+  /** v2.2: действующий пресет качества (влияет на дальность/туман/снег). */
+  private q: EffQuality = 'medium'
+  /** v2.2: множитель плотности тумана (мобильный пресет прячет дальний клппинг). */
+  private fogBoost = 1
+  /** v2.2: был ли включён MSAA при создании контекста (для E2E-диагностики). */
+  private msaa: boolean
 
-  constructor(canvas: HTMLCanvasElement, zone: ZoneId = 'valley') {
+  constructor(canvas: HTMLCanvasElement, zone: ZoneId = 'valley', opts?: { quality?: EffQuality }) {
     this.canvas = canvas
     this.builtZone = zone
+    this.q = opts?.quality ?? 'medium'
     // v2.1: MSAA — самая дорогая часть кадра на мобильных GPU. При dpr ≥ 2.5
     // (телефоны) отключаем: при рендере в высоком разрешении лесенка и так не видна.
+    // v2.2: пресет «Мобильное» — MSAA выключен всегда (заполнение — главный бич).
     const dpr0 = window.devicePixelRatio || 1
+    this.msaa = this.q !== 'mobile' && dpr0 < 2.5
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: dpr0 < 2.5,
+      antialias: this.msaa,
       powerPreference: 'high-performance',
     })
     this.renderer.setPixelRatio(Math.min(2, dpr0))
@@ -257,10 +267,14 @@ export class Renderer3d {
   }
 
   /** v2.1: дальность камеры/видимости под размер зоны — дальние чанки
-   *  отсекаются фрустумом, туман их всё равно скрывает. */
+   *  отсекаются фрустумом, туман их всё равно скрывает.
+   *  v2.2: мобильный пресет режет дальность ×0.55 (и туман гуще) —
+   *  меньше вершин террен-чанков и инстансов на кадр. */
   private applyZoneRange(zone: ZoneId) {
     const [, , rw, rh] = zoneViewRect(zone)
-    const far = Math.max(2600, Math.min(9000, Math.max(rw, rh) * 1.35 + 700))
+    const factor = this.q === 'mobile' ? 0.55 : this.q === 'low' ? 0.8 : 1
+    const farMin = this.q === 'mobile' ? 1300 : 2600
+    const far = Math.max(farMin, Math.min(9000, (Math.max(rw, rh) * 1.35 + 700) * factor))
     this.camera.far = far
     this.camera.updateProjectionMatrix()
   }
@@ -276,13 +290,15 @@ export class Renderer3d {
   }
 
   /** Фаза 8: пресет качества (GDD 05 Ф8) — pixelRatio + тени.
-   *  v2.1: капы снижены под мобильные GPU — low 1.0, medium 1.25, high 1.75. */
-  setQuality(q: 'low' | 'medium' | 'high') {
+   *  v2.1: капы снижены под мобильные GPU — low 1.0, medium 1.25, high 1.75.
+   *  v2.2: «Мобильное» — 0.85, без теней, снег урезан, туман гуще, дальность ×0.55. */
+  setQuality(q: EffQuality) {
     if (this.disposed) return
+    this.q = q
     const dpr = window.devicePixelRatio || 1
-    this.renderer.setPixelRatio(q === 'low' ? 1 : q === 'medium' ? Math.min(1.25, dpr) : Math.min(1.75, dpr))
-    this.renderer.shadowMap.enabled = q !== 'low'
-    if (q !== 'low') {
+    this.renderer.setPixelRatio(q === 'mobile' ? 0.85 : q === 'low' ? 1 : q === 'medium' ? Math.min(1.25, dpr) : Math.min(1.75, dpr))
+    this.renderer.shadowMap.enabled = q === 'medium' || q === 'high'
+    if (q !== 'low' && q !== 'mobile') {
       const size = q === 'medium' ? 1024 : 2048
       if (this.sun.shadow.mapSize.x !== size) {
         this.sun.shadow.mapSize.set(size, size)
@@ -291,6 +307,9 @@ export class Renderer3d {
         this.sun.shadow.map = null
       }
     }
+    this.fogBoost = q === 'mobile' ? 1.3 : q === 'low' ? 1.12 : 1
+    // снег: на мобильном пресете рисуем только треть облака (850 → 380)
+    this.snow.geometry.setDrawRange(0, q === 'mobile' ? 380 : Infinity)
     // пересоздание программ материалов после переключения теней
     this.scene.traverse((o) => {
       const mesh = o as THREE.Mesh
@@ -298,7 +317,20 @@ export class Renderer3d {
       if (Array.isArray(mesh.material)) mesh.material.forEach((m) => (m.needsUpdate = true))
       else mesh.material.needsUpdate = true
     })
+    this.applyZoneRange(this.builtZone)
     this.resize()
+  }
+
+  /** v2.2: диагностика рендера для E2E/настроек. */
+  getQualityStats() {
+    return {
+      quality: this.q,
+      pixelRatio: this.renderer.getPixelRatio(),
+      shadows: this.renderer.shadowMap.enabled,
+      antialias: this.msaa,
+      far: Math.round(this.camera.far),
+      fogBoost: this.fogBoost,
+    }
   }
 
   private bindOrbit() {
@@ -441,33 +473,34 @@ export class Renderer3d {
     const k = 0.045 // плавность перехода (в т.ч. через затемнение портала)
     this.silenceAmt += (Math.max(0, Math.min(1, silenceGoal / 100)) - this.silenceAmt) * k
 
-    // Туман
+    // Туман (v2.2: целевая плотность × fogBoost — мобильный пресет прячет дальний клппинг)
+    const fb = this.fogBoost
     if (mara) {
       // Мара: багровая мор-дымка, гуще к ночи (DAO-вайб: мор-погода)
       this.tmpColor.setRGB(0.20 + dl * 0.30, 0.08 + dl * 0.10, 0.07 + dl * 0.08)
-      this.fog.density += (0.0026 - dl * 0.0008 - this.fog.density) * k
+      this.fog.density += ((0.0026 - dl * 0.0008) * fb - this.fog.density) * k
     } else if (frost) {
       // Пределье: белёсая метель — светло-серый туман, гуще к ночи
       this.tmpColor.setRGB(0.42 + dl * 0.38, 0.47 + dl * 0.36, 0.46 + dl * 0.34)
-      this.fog.density += (0.0026 - dl * 0.0009 - this.fog.density) * k
+      this.fog.density += ((0.0026 - dl * 0.0009) * fb - this.fog.density) * k
     } else if (granite) {
       // Гранит: пепельно-пылевой туман, тёплый серый
       this.tmpColor.setRGB(0.24 + dl * 0.42, 0.21 + dl * 0.36, 0.17 + dl * 0.28)
-      this.fog.density += (0.0019 - dl * 0.0007 - this.fog.density) * k
+      this.fog.density += ((0.0019 - dl * 0.0007) * fb - this.fog.density) * k
     } else if (disputed) {
       // Спорные Земли (Фаза 6.4): тёплый вересково-пыльный туман — сухой воздух пустошей
       this.tmpColor.setRGB(0.24 + dl * 0.40, 0.20 + dl * 0.30, 0.12 + dl * 0.16)
-      this.fog.density += (0.0019 - dl * 0.0007 - this.fog.density) * k
+      this.fog.density += ((0.0019 - dl * 0.0007) * fb - this.fog.density) * k
     } else if (rubezh) {
       // Внешний Рубеж (Фаза 6.5): чёрный космический воздух — туман почти отсутствует, звёзды видны
       this.tmpColor.setRGB(0.045 + dl * 0.16, 0.05 + dl * 0.17, 0.05 + dl * 0.15)
-      this.fog.density += (0.00115 - dl * 0.00035 - this.fog.density) * k
+      this.fog.density += ((0.00115 - dl * 0.00035) * fb - this.fog.density) * k
     } else if (veld) {
       this.tmpColor.setRGB(0.16 + dl * 0.32, 0.19 + dl * 0.33, 0.12 + dl * 0.28) // ночь → день
-      this.fog.density += (0.0023 - dl * 0.0008 - this.fog.density) * k
+      this.fog.density += ((0.0023 - dl * 0.0008) * fb - this.fog.density) * k
     } else {
       this.tmpColor.setRGB(0.07 + dl * 0.65, 0.09 + dl * 0.66, 0.09 + dl * 0.52)
-      this.fog.density += (0.00165 - dl * 0.00073 - this.fog.density) * k
+      this.fog.density += ((0.00165 - dl * 0.00073) * fb - this.fog.density) * k
     }
     this.fog.color.lerp(this.tmpColor, k)
 

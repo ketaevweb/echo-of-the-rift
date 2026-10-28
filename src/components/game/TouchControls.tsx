@@ -265,8 +265,10 @@ export default function TouchControls() {
   }
 
   const shoutsOpen = shouts.filter((s) => s.lv > 0)
-  const signs = abilities.slice(0, 5)
-  const potions = abilities.slice(5)
+  // v2.2: показываем только ОТКРЫТЫЕ умения — кластер не растёт с прогрессом,
+  // заблокированные слоты (ранее 40% прозрачности) не съедали место и путали
+  const signs = abilities.slice(0, 5).filter((a) => a.unlocked)
+  const potions = abilities.slice(5).filter((a) => a.unlocked)
 
   return (
     <div data-touch-root className="pointer-events-none absolute inset-0 z-30 select-none">
@@ -296,25 +298,29 @@ export default function TouchControls() {
         )}
       </div>
 
-      {/* Look-зона: правые 54% между шторкой меню и кластером (камера/пинч/тап) */}
+      {/* Look-зона: правые 54% между шторкой меню и кластером (камера/пинч/тап);
+          v2.2: чуть ниже кластера — ряд умений может занять две строки */}
       <div
         ref={lookRef}
         data-touch-look
         onPointerDown={lookDown}
-        className="pointer-events-auto absolute right-0 top-[14%] h-[42%] w-[54%] touch-none"
+        className="pointer-events-auto absolute right-0 top-[14%] h-[40%] w-[54%] touch-none"
         aria-hidden
       />
 
-      {/* Кластер действий — правый нижний угол */}
+      {/* Кластер действий — правый нижний угол.
+          v2.2: два ряда (умения+пауза / зелья+рука+цель), только открытые кнопки;
+          при переполнении ряд умений переносится вниз (flex-wrap) — правый верх
+          экрана (миникарта/трекер) остаётся свободен. */}
       <div
+        data-touch-cluster
         className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-2"
         style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {/* Ряд 0: крики (если открыты) */}
-        {shoutsOpen.length > 0 && <div className="pointer-events-auto flex gap-1.5">{shoutsOpen.map(shoutBtn)}</div>}
-        {/* Ряд 1: знаки + тактическая пауза */}
-        <div className="pointer-events-auto flex items-center gap-1.5">
+        {/* Ряд 1: открытые знаки + крики + тактическая пауза (переносится при нехватке ширины) */}
+        <div className="pointer-events-auto flex max-w-[288px] flex-wrap items-center justify-end gap-1.5">
           {signs.map(abilityBtn)}
+          {shoutsOpen.map(shoutBtn)}
           <button
             data-touch-action="pause"
             onPointerDown={press(() => getEngine() && triggerAction(getEngine()!, 'pause'))}

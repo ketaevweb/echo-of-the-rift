@@ -240,8 +240,11 @@ export const EN_UI: Record<string, string> = {
   'Высокое': 'High',
   'Среднее': 'Medium',
   'Низкое': 'Low',
+  'Мобильное': 'Mobile',
   '«Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.':
     '"Auto" watches FPS: the preset steps down on drops and back up when the frame rate is stably high.',
+  '«Мобильное» — для телефонов: сниженное разрешение, без теней, дальность ×0.55 и кап 30 FPS.':
+    '"Mobile" is for phones: reduced resolution, no shadows, 0.55× draw distance and a 30 FPS cap.',
   'ЗВУК': 'AUDIO',
   'Музыка': 'Music',
   'Эффекты': 'Effects',

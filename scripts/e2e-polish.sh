@@ -2,7 +2,7 @@
 # E2E v1.9→2.1 «Полировка» (версия обновлена в v2.0) — один батч: сервер + браузер в одном вызове.
 # Проверяет находки плейтеста:
 #   1. dev-бейдж Next.js скрыт (devIndicators: false) — не перекрывает HUD;
-#   2. единая версия: титул/настройки/титры = ВЕРСИЯ 2.1 (RU и EN);
+#   2. единая версия: титул/настройки/титры = ВЕРСИЯ 2.2 (RU и EN);
 #   3. чипы статов снаряжения: «урон N» у оружия, «КД N» у брони (RU/EN);
 #   4. метка магазина динамическая («ТОВАР: ГРИМ» / «WARES: GRIM»);
 #   5. тултипы описаний на строках магазина/сумки (title-атрибут);
@@ -38,7 +38,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "title ru: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.1') ? 'TITLE_OK' : 'TITLE_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.2') ? 'TITLE_OK' : 'TITLE_BAD'"
 echo -n "badge hidden: "
 agent-browser eval "(() => { const p=document.querySelector('nextjs-portal'); if(!p) return 'BADGE_HIDDEN'; const r=p.getBoundingClientRect(); return (r.width===0&&r.height===0) ? 'BADGE_HIDDEN' : 'BADGE_VISIBLE'; })()"
 
@@ -102,7 +102,7 @@ sleep 0.5
 agent-browser eval "(() => { [...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Настройки')?.click(); return 'ok'; })()" >/dev/null
 sleep 1
 echo -n "subtitle v2.0: "
-agent-browser eval "document.body.innerText.includes('Эхо Разлома · v2.1') ? 'SUB_OK' : 'SUB_BAD'"
+agent-browser eval "document.body.innerText.includes('Эхо Разлома · v2.2') ? 'SUB_OK' : 'SUB_BAD'"
 echo -n "hint versionless: "
 agent-browser eval "(() => { const t=document.body.innerText; return t.includes('озвучиваются на языке интерфейса.') && !t.includes('интерфейса (v') ? 'HINT_OK' : 'HINT_BAD'; })()"
 
@@ -115,18 +115,18 @@ sleep 1.5
 agent-browser eval "(() => { [...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='ТИТРЫ')?.click(); return 'ok'; })()" >/dev/null
 sleep 1
 echo -n "credits line: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.1 · МОБИЛЬНОЕ УПРАВЛЕНИЕ') ? 'CREDITS_OK' : 'CREDITS_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.2 · МОБИЛЬНОЕ УПРАВЛЕНИЕ') ? 'CREDITS_OK' : 'CREDITS_BAD'"
 
 # 8. EN: словарные записи полировки
 say "EN DICTIONARY"
 agent-browser eval "(() => { [...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='EN')?.click(); return 'ok'; })()" >/dev/null
 sleep 1.5
 echo -n "en title: "
-agent-browser eval "document.body.innerText.includes('VERSION 2.1') ? 'TITLE_EN_OK' : 'TITLE_EN_BAD'"
+agent-browser eval "document.body.innerText.includes('VERSION 2.2') ? 'TITLE_EN_OK' : 'TITLE_EN_BAD'"
 agent-browser eval "(() => { [...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='ТИТРЫ' || x.textContent.trim()==='CREDITS')?.click(); return 'ok'; })()" >/dev/null
 sleep 1
 echo -n "en credits: "
-agent-browser eval "document.body.innerText.includes('VERSION 2.1 · TOUCH CONTROLS') ? 'CREDITS_EN_OK' : 'CREDITS_EN_BAD'"
+agent-browser eval "document.body.innerText.includes('VERSION 2.2 · TOUCH CONTROLS') ? 'CREDITS_EN_OK' : 'CREDITS_EN_BAD'"
 agent-browser screenshot /home/z/my-project/.ref/v19-30-credits-en.png >/dev/null && echo "shot saved"
 
 # 9. Консоль

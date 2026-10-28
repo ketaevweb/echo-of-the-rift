@@ -4,9 +4,11 @@
 // Хранится в localStorage, зеркалится в zustand-сторе (store.ts).
 // ============================================================
 
-/** Пресет качества графики. 'auto' — авто-даунгрейд по FPS (GDD 06 §7). */
-export type QualityId = 'low' | 'medium' | 'high' | 'auto'
-/** Действующий пресет (результат auto-даунгрейда) — только 'low'|'medium'|'high'. */
+/** Пресет качества графики. 'auto' — авто-даунгрейд по FPS (GDD 06 §7).
+ *  v2.2: 'mobile' — аварийный пресет телефонов (низкое разрешение,
+ *  без теней/MSAA, дальность ×0.55, кап 30 FPS). */
+export type QualityId = 'mobile' | 'low' | 'medium' | 'high' | 'auto'
+/** Действующий пресет (результат auto-даунгрейда) — все, кроме 'auto'. */
 export type EffQuality = Exclude<QualityId, 'auto'>
 
 /** v2.0: режим сенсорного управления. 'auto' — по устройству (pointer: coarse / touchstart). */
@@ -45,7 +47,10 @@ export function readSettings(): GameSettings {
     if (!raw) return { ...DEFAULT_SETTINGS }
     const p = JSON.parse(raw) as Partial<GameSettings>
     return {
-      quality: p.quality === 'low' || p.quality === 'medium' || p.quality === 'high' || p.quality === 'auto' ? p.quality : DEFAULT_SETTINGS.quality,
+      quality:
+        p.quality === 'mobile' || p.quality === 'low' || p.quality === 'medium' || p.quality === 'high' || p.quality === 'auto'
+          ? p.quality
+          : DEFAULT_SETTINGS.quality,
       musicVol: clamp01(p.musicVol, DEFAULT_SETTINGS.musicVol),
       sfxVol: clamp01(p.sfxVol, DEFAULT_SETTINGS.sfxVol),
       ambVol: clamp01(p.ambVol, DEFAULT_SETTINGS.ambVol),
@@ -71,16 +76,25 @@ function clamp01(v: unknown, def: number): number {
   return typeof v === 'number' && isFinite(v) ? Math.max(0, Math.min(1, v)) : def
 }
 
-/** Порядок пресетов для авто-даунгрейда: high → medium → low. */
+/** Порядок пресетов для авто-даунгрейда (v2.2): high → medium → low → mobile. */
 export function stepDown(q: EffQuality): EffQuality {
-  return q === 'high' ? 'medium' : 'low'
+  return q === 'high' ? 'medium' : q === 'medium' ? 'low' : 'mobile'
+}
+
+/** Обратная ступень для авто-апгрейда: mobile → low → medium → high. */
+export function stepUp(q: EffQuality): EffQuality {
+  return q === 'mobile' ? 'low' : q === 'low' ? 'medium' : 'high'
 }
 
 export const QUALITY_NAME: Record<EffQuality, string> = {
+  mobile: 'Мобильное',
   low: 'Низкое',
   medium: 'Среднее',
   high: 'Высокое',
 }
+
+/** v2.2: кап частоты кадров пресета mobile (0 — без капа). */
+export const MOBILE_FPS_CAP = 30
 
 /** v2.0: подписи режима сенсорного управления (для настроек). */
 export const TOUCH_NAME: Record<TouchMode, string> = {

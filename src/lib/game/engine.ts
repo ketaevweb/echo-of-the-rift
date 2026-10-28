@@ -28,7 +28,7 @@ import { ZONE_DATA, zoneViewRect } from './data/zones'
 import { sfx, setAmbient, setMuted, setVolumes } from './sfx'
 import { setVoiceVolume } from './voice'
 import { musicBoss, musicBossPhase, musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
-import { EffQuality, QUALITY_NAME, stepDown, writeSettings } from './settings'
+import { EffQuality, MOBILE_FPS_CAP, QUALITY_NAME, stepDown, stepUp, writeSettings } from './settings'
 import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
 import { EngineCtx, AssaultState, RaidState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
@@ -217,6 +217,8 @@ export class GameEngine implements EngineCtx {
   // --- Фаза 8: действующий пресет качества (при auto — с авто-даунгрейдом) ---
   effQuality: EffQuality = 'medium'
   private upStreak = 0
+  /** v2.2: сенсорное устройство? (только для авто-даунгрейда в 'mobile') */
+  private touchDevice = false
 
   // --- Внутреннее ---
   private ctx2d: CanvasRenderingContext2D
@@ -230,10 +232,14 @@ export class GameEngine implements EngineCtx {
     this.renderMode = opts?.mode ?? '3d'
     this.origin = opts?.origin ?? 'warden'
     this.inputCanvas = this.renderMode === '3d' && this.canvas3d ? this.canvas3d : canvas
+    // v2.2: стартовый пресет ДО создания 3D-рендера — MSAA/разрешение верны с первого кадра
+    const s0 = useGame.getState().settings
+    if (s0.quality !== 'auto') this.effQuality = s0.quality
+    this.touchDevice = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
     if (this.renderMode === '3d' && this.canvas3d) {
       // v2.1: 3D-сцена строится сразу под зону (по умолчанию долина; при загрузке
       // сейва в другой земле enterZone перестроит — идемпотентно)
-      this.view3d = new Renderer3d(this.canvas3d, this.zone)
+      this.view3d = new Renderer3d(this.canvas3d, this.zone, { quality: this.effQuality })
     }
     this.ctx2d = canvas.getContext('2d') as CanvasRenderingContext2D
     // v2.1: терен запекается ПО ЗОНЕ (заглушка до первого enterZone).
@@ -415,13 +421,16 @@ export class GameEngine implements EngineCtx {
     writeSettings(s)
   }
 
-  /** FPS-метр цикла: зеркало в стор + авто-даунгрейд в режиме «Авто» (GDD 06 §7). */
+  /** FPS-метр цикла: зеркало в стор + авто-даунгрейд в режиме «Авто» (GDD 06 §7).
+   *  v2.2: цепочка high → medium → low → mobile (в 'mobile' упираемся только
+   *  на сенсорных устройствах — на десктопе терминал остаётся 'low'). */
   onFps(fps: number) {
     useGame.getState().patch({ fps })
     const q = useGame.getState().settings.quality
     if (q !== 'auto') return
-    // Даунгрейд: среднее < 42 FPS → ступень ниже (до low)
-    if (fps < 42 && this.effQuality !== 'low') {
+    // Даунгрейд: среднее < 42 FPS → ступень ниже (на телефоне — вплоть до «Мобильного»)
+    const bottom = this.touchDevice ? 'mobile' : 'low'
+    if (fps < 42 && this.effQuality !== bottom) {
       this.effQuality = stepDown(this.effQuality)
       this.view3d?.setQuality(this.effQuality)
       useGame.getState().patch({ effQuality: this.effQuality })
@@ -433,7 +442,7 @@ export class GameEngine implements EngineCtx {
     if (fps > 55 && this.effQuality !== 'high') {
       this.upStreak++
       if (this.upStreak >= 3) {
-        this.effQuality = this.effQuality === 'low' ? 'medium' : 'high'
+        this.effQuality = stepUp(this.effQuality)
         this.upStreak = 0
         this.view3d?.setQuality(this.effQuality)
         useGame.getState().patch({ effQuality: this.effQuality })
@@ -442,6 +451,12 @@ export class GameEngine implements EngineCtx {
     } else {
       this.upStreak = 0
     }
+  }
+
+  /** v2.2: кап частоты кадров цикла — пресет «Мобильное» держит 30 FPS,
+   *  экономя батарею и GPU (скип целых кадров, dt копится). */
+  frameCap(): number {
+    return this.effQuality === 'mobile' ? MOBILE_FPS_CAP : 0
   }
 
   /** Порядок систем симуляции — см. core/Game.stepWorld. */
@@ -592,7 +607,7 @@ export class GameEngine implements EngineCtx {
     this.unbindInput()
     this.inputCanvas = mode === '3d' ? this.canvas3d! : this.canvas
     if (mode === '3d') {
-      this.view3d = new Renderer3d(this.canvas3d!, this.zone)
+      this.view3d = new Renderer3d(this.canvas3d!, this.zone, { quality: this.effQuality })
       this.view3d.setQuality(this.effQuality) // Фаза 8: пресет качества и в новом 3D-виде
     } else {
       this.view3d?.dispose()

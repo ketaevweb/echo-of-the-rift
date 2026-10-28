@@ -95,6 +95,9 @@ export interface LoopHost {
   autosave(): void
   /** Фаза 8: FPS-метр цикла — движок ведёт авто-даунгрейд качества (GDD 06 §7). */
   onFps?(fps: number): void
+  /** v2.2: кап частоты кадров (пресет «Мобильное» — 30 FPS), 0/undefined — без капа.
+   *  Скипается ЦЕЛЫЙ кадр (сим+рендер), clock не тикает — dt копится корректно. */
+  frameCap?(): number
 }
 
 const SYNC_PERIOD = 0.12 // сек между syncUi/миникартой
@@ -108,12 +111,22 @@ export class GameLoop {
   // Фаза 8: скользящее среднее FPS (экспоненциальное) + окно оценки 3 с
   private fpsEma = 60
   private fpsWindow = 0
+  // v2.2: время последнего НЕСКИПНУТОГО кадра (для капа частоты кадров)
+  private lastFull = 0
 
   constructor(private host: LoopHost) {}
 
   start() {
     const step = (t: number) => {
       if (this.host.destroyed) return
+      // v2.2: кап FPS (пресет «Мобильное») — рендерим не чаще 1000/кап мс.
+      // Скипнутый кадр не тикает clock — dt копится до следующего полного кадра.
+      const cap = this.host.frameCap?.() ?? 0
+      if (cap > 0 && t - this.lastFull < 1000 / cap - 0.75) {
+        this.raf = requestAnimationFrame(step)
+        return
+      }
+      this.lastFull = t
       const dt = this.clock.tick(t)
       if (dt > 0) {
         this.fpsEma = this.fpsEma * 0.92 + (1 / Math.max(dt, 0.0001)) * 0.08

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, Play, RotateCcw, ScrollText, Swords, X } from 'lucide-react'
 import { boot, ORIGINS, useGame } from '@/lib/game/store'
 import { setLocale, t, useLocale } from '@/lib/game/i18n'
-import { useFullscreen } from '@/lib/game/fullscreen'
+import { useFullscreen, autoFullscreenIfTouch } from '@/lib/game/fullscreen'
 import { GAME_VERSION } from '@/lib/game/version'
 import { CreditsBody } from './Panels'
 import { GameIcon } from './GameIcon'
@@ -36,6 +36,10 @@ export default function TitleScreen() {
   const start = (mode: 'new' | 'continue') => {
     boot.mode = mode
     boot.origin = origin
+    // v2.2: на телефоне игра стартует в полном экране «как приложение» —
+    // клик по кнопке является user-жестом, который требует Fullscreen API.
+    // Десктоп не трогаем: там fullscreen ни к чему.
+    autoFullscreenIfTouch()
     useGame.getState().setScreen('game')
   }
 

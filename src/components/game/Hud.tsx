@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Heart, Map, Maximize2, Menu, Minimize2, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
+import { ChevronDown, Heart, Map, Maximize2, Menu, Minimize2, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
 import { t, useLocale } from '@/lib/game/i18n'
 import { useFullscreen } from '@/lib/game/fullscreen'
+import { QUALITY_NAME } from '@/lib/game/settings'
 import { GameIcon } from './GameIcon'
 
 /** Цели счётчиков побочных квестов для трекера (N из M). */
@@ -45,7 +46,12 @@ function PartyFrame({
   const isPlayer = p.id === 'player'
   const trusted = p.approval >= 60 // порог парных приёмов (Фаза 4)
   return (
-    <div className={`pointer-events-auto rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm ${compact ? 'w-32' : 'w-44 sm:w-56'}`}>
+    <div
+      className={`pointer-events-auto rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm ${
+        // v2.2: карточка игрока шире — «Смертник» не режется до «См...» (w-32 было тесно)
+        compact ? (isPlayer ? 'w-44' : 'w-36') : 'w-44 sm:w-56'
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${p.alive ? 'border-[#d9a441]/60 bg-[#241c14]' : 'border-[#c94f3d] bg-[#c94f3d]/20 text-[#e08a6b]'}`}>
@@ -134,9 +140,12 @@ export default function Hud() {
   const assault = useGame((s) => s.assault)
   const raid = useGame((s) => s.raid)
   const touchUi = useGame((s) => s.touchUi) // v2.0: сенсорные контролы активны
+  const effQuality = useGame((s) => s.effQuality) // v2.2: FPS-чип
+  const fps = useGame((s) => s.fps)
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false) // v2.1: шторка меню
+  const [trackerOpen, setTrackerOpen] = useState(false) // v2.2: свёрнутый трекер в таче
   const [fsOn, fsToggle, fsSupported] = useFullscreen()
 
   useEffect(() => {
@@ -164,15 +173,25 @@ export default function Hud() {
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans text-[#e8d5a8]">
-      {/* Отряд слева сверху (v2.1: в тач-режиме — компактные рамки, не спорятся с меню) */}
-      <div className="absolute left-3 top-3 flex flex-col gap-2">
+      {/* Отряд слева сверху (v2.1: в тач-режиме — компактные рамки, не спорятся с меню;
+          v2.2: под ними FPS-чип — игрок видит, что даёт пресет «Мобильное») */}
+      <div className="absolute left-3 top-3 flex flex-col gap-2" style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}>
         {party.map((p) => (
           <PartyFrame key={p.eid} p={p} compact={touchUi} />
         ))}
+        {touchUi && (
+          <p data-hud-fps className="w-fit rounded bg-[#181410]/70 px-1.5 py-0.5 text-[9px] tabular-nums text-[#8a8068] backdrop-blur-sm">
+            {fps} FPS · {t(QUALITY_NAME[effQuality])}
+          </p>
+        )}
       </div>
 
-      {/* Миникарта и трекер справа сверху (v2.0: на узких экранах — уже) */}
-      <div className={`absolute right-3 top-3 flex flex-col gap-2 ${touchUi ? 'w-36' : 'w-44 sm:w-56'}`}>
+      {/* Миникарта и трекер справа сверху (v2.0: на узких экранах — уже;
+          v2.2: safe-area — в полноэкранном режиме блок не уходит под вырез) */}
+      <div
+        className={`absolute right-3 top-3 flex flex-col gap-2 ${touchUi ? 'w-36' : 'w-44 sm:w-56'}`}
+        style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="pointer-events-auto overflow-hidden rounded border border-[#5a4632]/80 bg-[#181410]/85 p-1 backdrop-blur-sm">
           <canvas ref={miniRef} data-minimap width={214} height={160} className="h-auto w-full rounded-sm" />
           <div className="mt-1 flex items-center justify-between px-1 pb-0.5">
@@ -189,52 +208,116 @@ export default function Hud() {
             </button>
           </div>
         </div>
-        {(trackerQuest || contractQuest) && (
-          <div
-            onClick={() => getEngine()?.openPanel('journal')}
-            title={t('Открыть журнал [J]')}
-            className="pointer-events-auto cursor-pointer rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm transition hover:border-[#d9a441]/80"
-          >
-            {trackerQuest && (
-              <div>
-                <p className="text-[11px] font-semibold text-[#f5c96b]">{trackerQuest.name}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[#cfc0a0]">
-                  {trackerQuest.stage === 2 ? `${trackerQuest.stageText} (${trackerQuest.counter}/4)` : trackerQuest.stageText}
-                </p>
-              </div>
-            )}
-            {contractQuest && (
-              <div className={trackerQuest ? 'mt-2 border-t border-[#3a2e20] pt-2' : ''}>
-                <p className="text-[11px] font-semibold text-[#c9b06b]">{contractQuest.name}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[#a89a7d]">
-                  {contractQuest.counter > 0
-                    ? `${contractQuest.stageText} (${contractQuest.counter}/${CONTRACT_TOTALS[contractQuest.id] ?? contractQuest.counter})`
-                    : contractQuest.stageText}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+        {(trackerQuest || contractQuest) &&
+          (touchUi ? (
+            // v2.2: трекер в таче свёрнут в одну строку — правый кластер действий
+            // больше не наезжает на него; тап разворачивает полный текст
+            <div data-hud-tracker className="pointer-events-auto rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm">
+              <button
+                onClick={() => setTrackerOpen((v) => !v)}
+                aria-expanded={trackerOpen}
+                className="flex w-full touch-none items-center justify-between gap-1 text-left"
+              >
+                <span className="truncate text-[11px] font-semibold text-[#f5c96b]">
+                  {trackerQuest?.name ?? contractQuest?.name}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#8a8068] transition ${trackerOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {trackerOpen && (
+                <div
+                  onClick={() => getEngine()?.openPanel('journal')}
+                  title={t('Открыть журнал [J]')}
+                  className="mt-1.5 cursor-pointer border-t border-[#3a2e20] pt-1.5"
+                >
+                  {trackerQuest && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-[#f5c96b]">{trackerQuest.name}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-[#cfc0a0]">
+                        {trackerQuest.stage === 2 ? `${trackerQuest.stageText} (${trackerQuest.counter}/4)` : trackerQuest.stageText}
+                      </p>
+                    </div>
+                  )}
+                  {contractQuest && (
+                    <div className={trackerQuest ? 'mt-2' : ''}>
+                      <p className="text-[11px] font-semibold text-[#c9b06b]">{contractQuest.name}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-[#a89a7d]">
+                        {contractQuest.counter > 0
+                          ? `${contractQuest.stageText} (${contractQuest.counter}/${CONTRACT_TOTALS[contractQuest.id] ?? contractQuest.counter})`
+                          : contractQuest.stageText}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              onClick={() => getEngine()?.openPanel('journal')}
+              title={t('Открыть журнал [J]')}
+              className="pointer-events-auto cursor-pointer rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm transition hover:border-[#d9a441]/80"
+            >
+              {trackerQuest && (
+                <div>
+                  <p className="text-[11px] font-semibold text-[#f5c96b]">{trackerQuest.name}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[#cfc0a0]">
+                    {trackerQuest.stage === 2 ? `${trackerQuest.stageText} (${trackerQuest.counter}/4)` : trackerQuest.stageText}
+                  </p>
+                </div>
+              )}
+              {contractQuest && (
+                <div className={trackerQuest ? 'mt-2 border-t border-[#3a2e20] pt-2' : ''}>
+                  <p className="text-[11px] font-semibold text-[#c9b06b]">{contractQuest.name}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[#a89a7d]">
+                    {contractQuest.counter > 0
+                      ? `${contractQuest.stageText} (${contractQuest.counter}/${CONTRACT_TOTALS[contractQuest.id] ?? contractQuest.counter})`
+                      : contractQuest.stageText}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
       {/* v2.1: шторка меню — верх-центр в тач-режиме (нижний угол отдаётся контролам;
-          раньше кнопки лежали под джойстиком и были недоступны) */}
+          раньше кнопки лежали под джойстиком и были недоступны).
+          v2.2: рядом — постоянная кнопка полного экрана (не нужно искать в меню),
+          панель шторки скроллится — на низких экранах все пункты доступны. */}
       {touchUi && (
-        <div className="pointer-events-auto absolute left-1/2 top-3 z-20 -translate-x-1/2" style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}>
-          <button
-            data-hud-menu
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-11 w-11 touch-none items-center justify-center rounded-full border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition active:border-[#d9a441] active:text-[#f5c96b]"
-            aria-label={t('Меню игры')}
-            aria-expanded={menuOpen}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">{t('Меню игры')}</span>
-          </button>
+        <div
+          className="pointer-events-auto absolute left-1/2 top-3 z-20 -translate-x-1/2"
+          style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              data-hud-menu
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex h-11 w-11 touch-none items-center justify-center rounded-full border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition active:border-[#d9a441] active:text-[#f5c96b]"
+              aria-label={t('Меню игры')}
+              aria-expanded={menuOpen}
+            >
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">{t('Меню игры')}</span>
+            </button>
+            {fsSupported && (
+              <button
+                data-fullscreen
+                onClick={() => fsToggle()}
+                className="flex h-11 w-11 touch-none items-center justify-center rounded-full border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition active:border-[#d9a441] active:text-[#f5c96b]"
+                aria-label={fsOn ? t('Свернуть экран') : t('Полный экран')}
+                title={fsOn ? t('Свернуть экран') : t('Полный экран')}
+              >
+                {fsOn ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                <span className="sr-only">{fsOn ? t('Свернуть экран') : t('Полный экран')}</span>
+              </button>
+            )}
+          </div>
           {menuOpen && (
             <div
               data-hud-menu-panel
-              className="absolute left-1/2 top-[52px] flex w-52 -translate-x-1/2 flex-col gap-1 rounded border border-[#5a4632] bg-[#181410]/95 p-2 shadow-xl backdrop-blur-md"
+              className="game-scroll absolute left-1/2 top-[52px] flex w-52 -translate-x-1/2 flex-col gap-1 overflow-y-auto overscroll-contain rounded border border-[#5a4632] bg-[#181410]/95 p-2 shadow-xl backdrop-blur-md"
+              style={{
+                maxHeight: 'calc(100dvh - 88px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+              }}
             >
               {([
                 ['char', 'User', 'Персонаж [C]'],
@@ -248,19 +331,19 @@ export default function Hud() {
                     setMenuOpen(false)
                     getEngine()?.openPanel(id as 'char')
                   }}
-                  className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                  className="flex h-11 shrink-0 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
                 >
                   <GameIcon name={icon} className="h-4 w-4" />
                   {t(title)}
                 </button>
               ))}
-              <div className="my-0.5 h-px bg-[#3a2e20]" />
+              <div className="my-0.5 h-px shrink-0 bg-[#3a2e20]" />
               <button
                 onClick={() => {
                   setMenuOpen(false)
                   getEngine()?.openPanel('pause')
                 }}
-                className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                className="flex h-11 shrink-0 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
               >
                 <GameIcon name="Settings" className="h-4 w-4" />
                 {t('Меню [Esc]')}
@@ -271,7 +354,7 @@ export default function Hud() {
                   setMuted(next)
                   setMutedUi(next)
                 }}
-                className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                className="flex h-11 shrink-0 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
               >
                 {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 {t('Звук')}
@@ -280,7 +363,7 @@ export default function Hud() {
                 <button
                   data-fullscreen
                   onClick={() => fsToggle()}
-                  className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                  className="flex h-11 shrink-0 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
                 >
                   {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   {fsOn ? t('Свернуть экран') : t('Полный экран')}

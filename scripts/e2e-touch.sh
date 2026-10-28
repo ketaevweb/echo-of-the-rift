@@ -41,7 +41,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "title ru: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.1') ? 'TITLE_OK' : 'TITLE_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.2') ? 'TITLE_OK' : 'TITLE_BAD'"
 
 # 2. Новая игра
 say "NEW GAME"
