@@ -38,6 +38,7 @@ import { drawScene } from './render2d/scene'
 import { Renderer3d } from './render3d/Renderer3d'
 import { writeRenderMode } from './store'
 import { applySave, saveGame as saveGameSys, toTitle as toTitleSys } from './systems/save'
+import { completeTutorial, hideTutorial, showTutorial, tickTutorial } from './systems/tutorial'
 import {
   buyItem as buyItemSys,
   equipItem as equipItemSys,
@@ -303,6 +304,8 @@ export class GameEngine implements EngineCtx {
     this.stamina = this.maxStamina
     this.createPlayer({ ...PLAYER_SPAWN })
     this.spawnWorld()
+    // v2.3: обучение — первый шаг «движение» (продолжающим пройденное не показываем)
+    showTutorial('move')
   }
 
   private loadFrom(s: SaveData) {
@@ -461,7 +464,11 @@ export class GameEngine implements EngineCtx {
 
   /** Порядок систем симуляции — см. core/Game.stepWorld. */
   update(dt: number) {
+    const px = this.player.pos.x
+    const py = this.player.pos.y
     stepWorld(this, dt)
+    // v2.3: обучение — шаг «движение» (дистанция за кадр) + таймер «меню»
+    tickTutorial(Math.hypot(this.player.pos.x - px, this.player.pos.y - py), dt)
   }
 
   /** Косметика (частицы/флоатеры/тряска) — тикает даже при паузе/панелях. */
@@ -668,6 +675,7 @@ export class GameEngine implements EngineCtx {
   }
 
   toTitle() {
+    hideTutorial()
     toTitleSys(this)
   }
 
@@ -697,6 +705,8 @@ export class GameEngine implements EngineCtx {
     musicDomain(this.zone)
     const storm = this.siege !== null || this.assault !== null || this.raid !== null
     musicCombat(storm || nearestEnemyOf(this, this.player, 340) !== null)
+    // v2.3: обучение — бой: впервые враг поблизости
+    if (!storm && nearestEnemyOf(this, this.player, 340) !== null) showTutorial('combat')
     musicPaused(this.tacticalPaused)
     // v1.1: адаптивная тема босса — 3 фазы по HP (GDD 04 §4.3)
     const boss = findActiveBoss(this)
@@ -706,8 +716,18 @@ export class GameEngine implements EngineCtx {
 
   // ---------------- Рендер (делегаты render2d) ----------------
 
+  /** v2.3: на таче панели/диалог разворачиваются на весь экран непрозрачно —
+   *  мир за ними можно вообще не рисовать: GPU/батарея отдыхают, пока игрок
+   *  читает журнал/инвентарь/карту или ведёт диалог. musicTick продолжает
+   *  тикать — музыка не замирает. На десктопе (полупрозрачные шторки) рендер
+   *  живёт как раньше. */
+  private renderSuspended(): boolean {
+    const s = useGame.getState()
+    return s.touchUi && (s.panel !== null || this.dialogueTree !== null)
+  }
+
   renderMinimap() {
-    if (!this.mini) return
+    if (!this.mini || this.renderSuspended()) return
     renderer2d.drawMinimap(
       this.mini,
       this.baked,
@@ -726,6 +746,8 @@ export class GameEngine implements EngineCtx {
 
   render() {
     musicTick() // Фаза 8: планировщик музыки — каждый кадр
+    // v2.3: полноэкранная непрозрачная панель/диалог на таче — кадр не рисуем
+    if (this.renderSuspended()) return
     if (this.renderMode === '3d' && this.view3d) {
       this.view3d.render({
         time: this.time,

@@ -36,23 +36,38 @@ function Panel({
   children: React.ReactNode
   wide?: boolean
 }) {
+  // v2.3: на таче ЛЮБАЯ панель — полный экран БЕЗ прозрачности:
+  // игра за ней не видна и не рендерится (движок приостанавливает отрисовку —
+  // телефон отдыхает, пока игрок читает журнал/смотрит инвентарь)
+  const touch = useGame((s) => s.touchUi)
   return (
-    <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className={`game-panel flex max-h-[88vh] w-full flex-col rounded-lg ${wide ? 'max-w-4xl' : 'max-w-2xl'}`}>
-        <div className="flex items-center justify-between border-b border-[#5a4632] px-5 py-3">
+    <div
+      data-game-panel-root
+      className={`pointer-events-auto absolute inset-0 z-30 flex ${
+        touch ? 'items-stretch justify-stretch bg-[#12100c]' : 'items-center justify-center bg-black/60 p-4 backdrop-blur-sm'
+      }`}
+    >
+      <div
+        className={`game-panel flex w-full flex-col ${
+          touch
+            ? 'h-full rounded-none border-0'
+            : `max-h-[88vh] rounded-lg ${wide ? 'max-w-4xl' : 'max-w-2xl'}`
+        }`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-[#5a4632] px-5 py-3">
           <div>
             <h2 className="game-title-font text-lg tracking-[0.25em] text-[#f5c96b]">{title.toUpperCase()}</h2>
             {subtitle && <p className="text-[11px] text-[#8a8068]">{subtitle}</p>}
           </div>
           <button
             onClick={() => getEngine()?.closePanel()}
-            className="rounded border border-[#5a4632] p-1.5 text-[#9a8f78] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+            className="flex h-10 w-10 items-center justify-center rounded border border-[#5a4632] text-[#9a8f78] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             aria-label={t('Закрыть')}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="game-scroll overflow-y-auto p-5">{children}</div>
+        <div className="game-scroll flex-1 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   )

@@ -203,6 +203,10 @@ export function syncUi(ctx: EngineCtx): void {
       }
     : null
   const n = ctx.isFrozen() ? null : nearestInteraction(ctx)
+  // v2.3: на сенсоре клавиатурный ключ «— [F]» в подсказке не нужен —
+  // там крупная иконка-кнопка руки (Hud), текст должен быть чистым
+  const touchUi = useGame.getState().touchUi
+  const keySuffix = touchUi ? '' : ` — [${labelFor('interact')}]`
   st.patch({
     party,
     abilities,
@@ -231,10 +235,10 @@ export function syncUi(ctx: EngineCtx): void {
     bossBar: boss ? { name: t(ENEMY_NAME[boss.enemyType!] ?? 'Хозяин'), hp: Math.round(boss.hp), maxHp: boss.maxHp } : null,
     interactHint: n
       ? n.npc
-        ? t('Поговорить: {x} — [{key}]', { x: t(n.npc.name), key: labelFor('interact') })
+        ? t('Поговорить: {x}', { x: t(n.npc.name) }) + keySuffix
         : n.it
-          ? t('{prompt}: {x} — [{key}]', { prompt: t(n.it.prompt), x: t(n.it.name), key: labelFor('interact') })
-          : t('{label} — [{key}]', { label: t(n.label), key: labelFor('interact') })
+          ? t('{prompt}: {x}', { prompt: t(n.it.prompt), x: t(n.it.name) }) + keySuffix
+          : t('{label}', { label: t(n.label) }) + keySuffix
       : null,
     bestiary: [...ctx.bestiary],
     // Фаза 3: масло, сутки, зона

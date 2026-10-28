@@ -19,6 +19,7 @@ import { t } from '../i18n'
 import { d } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { addItem, countItem, removeItem } from './inventory'
+import { completeTutorial } from './tutorial'
 import { gainXp, openShop, openTrainer } from './progression'
 import { saveGame } from './save'
 import { floater, ring } from './combat'
@@ -555,6 +556,7 @@ export function doInteract(ctx: EngineCtx) {
   if (ctx.isFrozen() || ctx.tacticalPaused) return
   const n = nearestInteraction(ctx)
   if (!n) return
+  completeTutorial('interact') // v2.3: обучение — шаг «интеракт» закрыт реальным действием
   if (n.npc) openDialogue(ctx, n.npc.npc!.dialogue)
   else if (n.it) runInteractable(ctx, n.it)
 }

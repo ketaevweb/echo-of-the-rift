@@ -13,7 +13,7 @@ import type { ZoneId } from '../core/ctx'
 import { ZONE_DATA, zoneViewRect } from '../data/zones'
 import type { EffQuality } from '../settings'
 import { heightAt } from './heightmap'
-import { Terrain, buildSky } from './Terrain'
+import { SKY_RADIUS, Terrain, buildSky } from './Terrain'
 import { Props3d } from './Props'
 import { AvatarFactory } from './Avatars'
 import { Fx3d, OrderLine } from './Fx'
@@ -164,6 +164,8 @@ export class Renderer3d {
     // Мир
     this.sky = buildSky()
     this.skyMat = this.sky.material as THREE.ShaderMaterial
+    // v2.3: применить масштаб под текущий far (applyZoneRange отработал ДО сборки неба)
+    this.sky.scale.setScalar((this.camera.far * 0.9) / SKY_RADIUS)
     this.scene.add(this.sky)
     this.terrain = new Terrain(zone)
     this.scene.add(this.terrain.group)
@@ -269,7 +271,10 @@ export class Renderer3d {
   /** v2.1: дальность камеры/видимости под размер зоны — дальние чанки
    *  отсекаются фрустумом, туман их всё равно скрывает.
    *  v2.2: мобильный пресет режет дальность ×0.55 (и туман гуще) —
-   *  меньше вершин террен-чанков и инстансов на кадр. */
+   *  меньше вершин террен-чанков и инстансов на кадр.
+   *  v2.3: купол неба масштабируется под новый far — иначе на «Мобильном»
+   *  (far 1300–2600 < радиуса 4200) дальняя плоскость отрезала верх сферы:
+   *  над горизонтом висела чёрная «дыра» (репорт Realme 13 5G). */
   private applyZoneRange(zone: ZoneId) {
     const [, , rw, rh] = zoneViewRect(zone)
     const factor = this.q === 'mobile' ? 0.55 : this.q === 'low' ? 0.8 : 1
@@ -277,6 +282,8 @@ export class Renderer3d {
     const far = Math.max(farMin, Math.min(9000, (Math.max(rw, rh) * 1.35 + 700) * factor))
     this.camera.far = far
     this.camera.updateProjectionMatrix()
+    // небо всегда внутри дальней плоскости (глубина-тест у него выключен)
+    if (this.sky) this.sky.scale.setScalar((far * 0.9) / SKY_RADIUS)
   }
 
   /** v2.1: перестроить сцену под зону-сцену (идемпотентно). */
@@ -330,6 +337,8 @@ export class Renderer3d {
       antialias: this.msaa,
       far: Math.round(this.camera.far),
       fogBoost: this.fogBoost,
+      // v2.3: радиус купола неба после масштабирования (должен быть ≤ far)
+      skyRadius: Math.round(SKY_RADIUS * this.sky.scale.x),
     }
   }
 

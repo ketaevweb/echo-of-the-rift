@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Heart, Map, Maximize2, Menu, Minimize2, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
+import { ChevronDown, Hand, Heart, Map, Maximize2, Menu, Minimize2, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
+import { triggerAction } from '@/lib/game/systems/input'
+import { completeTutorial, tutorialText } from '@/lib/game/systems/tutorial'
 import { useGame } from '@/lib/game/store'
 import { t, useLocale } from '@/lib/game/i18n'
 import { useFullscreen } from '@/lib/game/fullscreen'
@@ -142,6 +144,7 @@ export default function Hud() {
   const touchUi = useGame((s) => s.touchUi) // v2.0: сенсорные контролы активны
   const effQuality = useGame((s) => s.effQuality) // v2.2: FPS-чип
   const fps = useGame((s) => s.fps)
+  const tutorial = useGame((s) => s.tutorial) // v2.3: подсказка обучения
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false) // v2.1: шторка меню
@@ -391,6 +394,28 @@ export default function Hud() {
         </div>
       )}
 
+      {/* v2.3: подсказка обучения — верх-центр (в таче — под шторкой),
+          прячется за босс-баром; крестик = шаг пройден */}
+      {tutorial && !bossBar && !paused && (
+        <div
+          data-tutorial
+          className={`pointer-events-auto absolute left-1/2 z-10 flex w-[min(92vw,30rem)] -translate-x-1/2 items-center gap-2 rounded border border-[#d9a441]/50 bg-[#181410]/92 px-3 py-1.5 shadow-lg backdrop-blur-md ${
+            touchUi ? 'top-[64px]' : 'top-3'
+          }`}
+          style={{ marginTop: touchUi ? 'env(safe-area-inset-top, 0px)' : undefined }}
+        >
+          <GameIcon name="Sparkles" className="h-4 w-4 shrink-0 text-[#f5c96b]" />
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-[#e8d5a8]">{tutorialText(tutorial.id as 'move', touchUi)}</p>
+          <button
+            onClick={() => completeTutorial(tutorial.id as 'move')}
+            aria-label={t('Понятно')}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[#8a8068] transition hover:text-[#f5c96b]"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Оборона Бастиона (Фаза 6.3): волна + прочность частокола (v2.1: выше тач-кластера) */}
       {siege && (
         <div className={`absolute left-1/2 w-72 -translate-x-1/2 rounded border border-[#c94f3d]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm ${touchUi ? 'bottom-52' : 'bottom-40'}`}>
@@ -430,33 +455,30 @@ export default function Hud() {
         </div>
       )}
 
-      {/* Тосты */}
-      <div className="absolute left-1/2 top-16 flex w-80 -translate-x-1/2 flex-col items-center gap-1.5">
+      {/* Тосты (v2.3: слева, компактные — стиль «Ведьмак 3»: без крестиков,
+          автоудаление; раньше крупный столбец в центре заслонял обзор и
+          наезжал на плашку зоны «СУМРАЧНЫЙ ЛЕС») */}
+      <div className="absolute left-3 top-1/2 flex w-52 -translate-y-1/2 flex-col gap-1 sm:w-60">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex w-full items-center justify-between gap-2 rounded border px-3 py-1.5 text-xs shadow-lg backdrop-blur-sm ${
+            className={`pointer-events-none flex items-start gap-1.5 rounded-sm border-l-2 bg-[#181410]/80 py-1 pl-2 pr-1.5 text-[11px] leading-snug shadow-md backdrop-blur-sm ${
               t.kind === 'quest'
-                ? 'border-[#d9a441]/60 bg-[#2a2010]/90 text-[#f5c96b]'
+                ? 'border-[#d9a441] text-[#f5c96b]'
                 : t.kind === 'level'
-                  ? 'border-[#f5c96b]/70 bg-[#33270e]/90 text-[#ffe4a0]'
+                  ? 'border-[#f5c96b] text-[#ffe4a0]'
                   : t.kind === 'warn'
-                    ? 'border-[#c94f3d]/60 bg-[#2a1410]/90 text-[#e08a6b]'
+                    ? 'border-[#c94f3d] text-[#e08a6b]'
                     : t.kind === 'loot'
-                      ? 'border-[#5a4632] bg-[#1c1712]/90 text-[#c9b06b]'
-                      : 'border-[#5a4632] bg-[#1c1712]/90 text-[#cfc0a0]'
+                      ? 'border-[#c9b06b] text-[#c9b06b]'
+                      : 'border-[#5a4632] text-[#cfc0a0]'
             }`}
           >
-            <span className="flex items-center gap-2">
-              {t.kind === 'quest' && <ScrollText className="h-3.5 w-3.5 shrink-0" />}
-              {t.kind === 'level' && <GameIcon name="Sparkles" className="h-3.5 w-3.5 shrink-0" />}
-              {t.kind === 'warn' && <Heart className="h-3.5 w-3.5 shrink-0" />}
-              {t.kind === 'loot' && <GameIcon name="Gem" className="h-3.5 w-3.5 shrink-0" />}
-              {t.text}
-            </span>
-            <button onClick={() => clearToast(t.id)} className="shrink-0 opacity-60 hover:opacity-100">
-              <X className="h-3 w-3" />
-            </button>
+            {t.kind === 'quest' && <ScrollText className="mt-0.5 h-3 w-3 shrink-0" />}
+            {t.kind === 'level' && <GameIcon name="Sparkles" className="mt-0.5 h-3 w-3 shrink-0" />}
+            {t.kind === 'warn' && <Heart className="mt-0.5 h-3 w-3 shrink-0" />}
+            {t.kind === 'loot' && <GameIcon name="Gem" className="mt-0.5 h-3 w-3 shrink-0" />}
+            <span className="min-w-0">{t.text}</span>
           </div>
         ))}
       </div>
@@ -481,9 +503,19 @@ export default function Hud() {
           </div>
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded border border-[#5a4632]/70 bg-[#181410]/90 px-4 py-2 text-center backdrop-blur-sm">
             <p className="text-[11px] leading-relaxed text-[#cfc0a0]">
-              <span className="text-[#f5c96b]">{t('ЛКМ по компаньону')}</span> — {t('выбрать')} ·{' '}
-              <span className="text-[#f5c96b]">{t('ЛКМ по земле')}</span> — {t('приказ движения')} ·{' '}
-              <span className="text-[#f5c96b]">{t('ЛКМ по врагу')}</span> — {t('цель отряда')}
+              {touchUi ? (
+                <>
+                  <span className="text-[#f5c96b]">{t('Тап по компаньону')}</span> — {t('выбрать')} ·{' '}
+                  <span className="text-[#f5c96b]">{t('тап по земле')}</span> — {t('приказ движения')} ·{' '}
+                  <span className="text-[#f5c96b]">{t('тап по врагу')}</span> — {t('цель отряда')}
+                </>
+              ) : (
+                <>
+                  <span className="text-[#f5c96b]">{t('ЛКМ по компаньону')}</span> — {t('выбрать')} ·{' '}
+                  <span className="text-[#f5c96b]">{t('ЛКМ по земле')}</span> — {t('приказ движения')} ·{' '}
+                  <span className="text-[#f5c96b]">{t('ЛКМ по врагу')}</span> — {t('цель отряда')}
+                </>
+              )}
             </p>
             <p className="mt-0.5 text-[10px] text-[#8a8068]">
               <span className="text-[#f5c96b]">V</span> {t('— строй:')} {t(formation === 'wedge' ? 'клин' : 'линия')} ·{' '}
@@ -494,11 +526,31 @@ export default function Hud() {
         </>
       )}
 
-      {/* Подсказка взаимодействия (v2.1: в тач-режиме выше кластера действий) */}
+      {/* Подсказка взаимодействия (v2.3: на таче — крупная кликабельная карточка
+          с иконкой руки вместо мелкого текста «… — [F]»: читается и нажимается) */}
       {interactHint && !paused && (
-        <div className={`absolute left-1/2 -translate-x-1/2 ${touchUi ? 'bottom-52' : 'bottom-28'}`}>
-          <p className="rounded border border-[#d9a441]/50 bg-[#181410]/90 px-3 py-1 text-xs text-[#f5c96b]">{interactHint}</p>
-        </div>
+        touchUi ? (
+          <button
+            data-touch-interact-hint
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const eng = getEngine()
+              if (eng) triggerAction(eng, 'interact')
+            }}
+            className="pointer-events-auto absolute bottom-44 right-3 flex max-w-[70%] touch-none items-center gap-2.5 rounded-lg border border-[#f5c96b]/80 bg-[#181410]/95 py-2.5 pl-2.5 pr-4 text-left shadow-[0_0_20px_rgba(217,164,65,0.4)] backdrop-blur-md"
+            style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          >
+            <span className="flex h-10 w-10 shrink-0 animate-pulse items-center justify-center rounded-full border border-[#d9a441]/70 bg-[#2a2010] text-[#f5c96b]">
+              <Hand className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 text-xs font-semibold leading-snug text-[#f5c96b]">{interactHint}</span>
+          </button>
+        ) : (
+          <div className="absolute bottom-28 left-1/2 -translate-x-1/2">
+            <p className="rounded border border-[#d9a441]/50 bg-[#181410]/90 px-3 py-1 text-xs text-[#f5c96b]">{interactHint}</p>
+          </div>
+        )
       )}
 
       {/* Меню слева снизу (v2.1: только для мыши — в тач-режиме шторка сверху,

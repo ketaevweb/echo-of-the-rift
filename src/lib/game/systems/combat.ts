@@ -16,6 +16,7 @@ import { useGame } from '../store'
 // сама функция floater() ниже продолжает использовать t (тело не тронуто)
 import { t, t as tr } from '../i18n'
 import { sfx } from '../sfx'
+import { completeTutorial } from './tutorial'
 import { angleDiff, d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
 import { nearestEnemyOf } from '../core/entity'
@@ -353,6 +354,7 @@ export function castAbility(ctx: EngineCtx, id: string) {
   if (ctx.isFrozen() || ctx.tacticalPaused || !ctx.player.alive) return
   const ab = ABILITY_MAP[id]
   if (!ab) return
+  completeTutorial('combat') // v2.3: обучение — шаг «бой» пройден первым применением умения
   if (ab.kind === 'potion') {
     if (ctx.player.cds['potion'] > 0) return
     const inv = ctx.inventory.find((i) => i.item === id)

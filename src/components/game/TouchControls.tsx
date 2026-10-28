@@ -17,7 +17,7 @@ import { Crosshair, Hand, Pause, Play } from 'lucide-react'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
 import { t, useLocale } from '@/lib/game/i18n'
-import { triggerAction, tapWorld } from '@/lib/game/systems/input'
+import { triggerAction } from '@/lib/game/systems/input'
 import {
   initTouchDetection,
   markTouchSeen,
@@ -168,13 +168,14 @@ export default function TouchControls() {
       const eng = getEngine()
       if (!eng) return
       if (useGame.getState().panel || eng.dialogueTree) return // жест пережил заморозку
+      // v2.3: тап в look-зоне работает ТОЛЬКО в тактической паузе —
+      // там он = приказ отряду (общий путь мыши через canvas-бинд).
+      // В реалтайме тапы по миру отключены целиком (репорт: тапы
+      // «срабатывают когда не нужно») — движение только джойстик.
       if (eng.tacticalPaused) {
-        // v2.0: тап в тактической паузе = приказ (общий путь мыши через canvas-бинд)
         eng.inputCanvas.dispatchEvent(
           new PointerEvent('pointerdown', { button: 0, clientX: e.clientX, clientY: e.clientY, bubbles: true }),
         )
-      } else {
-        tapWorld(eng, e.clientX, e.clientY)
       }
     }
   }

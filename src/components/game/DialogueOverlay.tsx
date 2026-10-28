@@ -361,6 +361,10 @@ export default function DialogueOverlay() {
   useLocale() // v1.6: перерисовка при переключении языка
   const dialogue = useGame((s) => s.dialogue)
   const diceRoll = useGame((s) => s.diceRoll)
+  // v2.3: на таче диалог — полный экран БЕЗ прозрачности, мир за ним
+  // не рендерится (см. engine.renderSuspended); на десктопе — прежняя
+  // нижняя шторка с градиентом
+  const touch = useGame((s) => s.touchUi)
 
   // Таймер-выбор: отсчёт с начала узла; молчание = вариант onTimeout
   useEffect(() => {
@@ -385,9 +389,23 @@ export default function DialogueOverlay() {
   const busy = !!diceRoll // пока кубик летит — выборы заблокированы
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center bg-gradient-to-t from-black/60 via-transparent to-transparent pb-0">
+    <div
+      data-dialogue-root
+      className={`pointer-events-none absolute inset-0 z-20 flex ${
+        touch
+          ? 'items-center justify-center bg-[#12100c] p-3'
+          : 'items-end justify-center bg-gradient-to-t from-black/60 via-transparent to-transparent pb-0'
+      }`}
+      style={touch ? { paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' } : undefined}
+    >
       {diceRoll && <DiceRollOverlay roll={diceRoll} />}
-      <div className="pointer-events-auto m-3 mb-4 w-full max-w-3xl rounded border border-[#5a4632] game-panel p-4 sm:p-5">
+      <div
+        className={`pointer-events-auto game-panel flex flex-col p-4 sm:p-5 ${
+          touch
+            ? 'max-h-full w-full overflow-y-auto rounded-none border-0 game-scroll'
+            : 'm-3 mb-4 w-full max-w-3xl rounded border border-[#5a4632]'
+        }`}
+      >
         <div className="flex gap-4">
           {/* Портретный арт (Фаза 5) */}
           <div className="hidden shrink-0 flex-col items-center sm:flex">

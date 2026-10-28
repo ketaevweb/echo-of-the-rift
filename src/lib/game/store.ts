@@ -165,6 +165,11 @@ export interface ZoneFadeState {
   phase: 'out' | 'in'
 }
 
+/** v2.3: активная подсказка обучения (текст считает Hud — реактивно к тачу/локали). */
+export interface TutorialHudState {
+  id: string
+}
+
 // Режим запуска игры (новая / продолжить) + выбранное происхождение (Фаза 5)
 export const boot: { mode: 'new' | 'continue'; origin: OriginId } = { mode: 'new', origin: 'warden' }
 
@@ -240,6 +245,8 @@ interface GameStore {
   daytime: number
   zoneLabel: string
   zoneFade: ZoneFadeState | null
+  // v2.3: обучение
+  tutorial: TutorialHudState | null
   // Фаза 4
   formation: FormationId
   // Фаза 6
@@ -300,6 +307,7 @@ export const useGame = create<GameStore>((set) => ({
   daytime: 0.3,
   zoneLabel: 'ХЕЙМХОЛЛ И ОКРЕСТНОСТИ',
   zoneFade: null,
+  tutorial: null,
   formation: 'wedge',
   career: null,
   shouts: [],

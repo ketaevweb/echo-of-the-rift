@@ -362,4 +362,40 @@ export const EN_UI: Record<string, string> = {
   'Меню игры': 'Game menu',
   'Земля: {z}. Прочие земли — за вратами (ромбы); увидишь их, когда пройдёшь.':
     'Land: {z}. Other lands lie beyond the gates (diamonds) — you will see them once you pass.',
+  // ---------- v2.3: мобильный комфорт ----------
+  'Поговорить: {x}': 'Talk: {x}',
+  '{prompt}: {x}': '{prompt}: {x}',
+  '{label}': '{label}',
+  'Тап по компаньону': 'Tap a companion',
+  'тап по земле': 'tap the ground',
+  'тап по врагу': 'tap an enemy',
+  'Понятно': 'Got it',
+  'Обучение: джойстик слева — движение · свайп справа — камера · пинч — зум':
+    'Tutorial: left joystick — move · right-side swipe — camera · pinch — zoom',
+  'Обучение: WASD — движение · зажми ПКМ (или стрелки) — камера · колесо — зум':
+    'Tutorial: WASD — move · hold RMB (or arrows) — camera · wheel — zoom',
+  'Обучение: рядом точка интереса — жми жёлтую кнопку с рукой справа':
+    'Tutorial: a point of interest is nearby — press the yellow hand button on the right',
+  'Обучение: рядом точка интереса — нажми F (подсказка внизу)':
+    'Tutorial: a point of interest is nearby — press F (hint at the bottom)',
+  'Обучение: выбирай реплики тапом — ответы меняют награды, доверие и концовку':
+    'Tutorial: pick replies with a tap — answers change rewards, trust and the ending',
+  'Обучение: реплики — цифры 1–9 или клик; ответы меняют награды, доверие и концовку':
+    'Tutorial: replies — keys 1–9 or click; answers change rewards, trust and the ending',
+  'Обучение: задание в Журнале — иконка свитка в шторке сверху · трекер справа ведёт по цели':
+    'Tutorial: the quest is in the Journal — scroll icon in the top menu · the tracker on the right guides you',
+  'Обучение: задание в Журнале [J] · трекер справа ведёт по цели (клик по нему открывает журнал)':
+    'Tutorial: the quest is in the Journal [J] · the tracker on the right guides you (click it to open the journal)',
+  'Обучение: прицел — выбрать врага · знак Огня — поджечь · жёлтая колба — лечит':
+    'Tutorial: crosshair — pick a target · the Flame sign ignites · the yellow vial heals',
+  'Обучение: Tab/прицел — выбрать врага · 1 (Игни) — поджечь · зелье [Q] лечит':
+    'Tutorial: Tab/crosshair — pick a target · 1 (Igni) — ignite · potion [Q] heals',
+  'Обучение: пауза — тап по компаньону: выбрать, по земле: идти, по врагу: цель отряда':
+    'Tutorial: pause — tap a companion to select, the ground to move them, an enemy to focus the squad',
+  'Обучение: в паузе ЛКМ — приказы отряду (компаньон/земля/враг), Space — отпустить мир':
+    'Tutorial: while paused LMB orders the squad (companion/ground/enemy), Space resumes the world',
+  'Обучение: шторка сверху — персонаж, инвентарь, журнал, карта, меню и звук':
+    'Tutorial: the top menu holds character, inventory, journal, map, settings and sound',
+  'Обучение: кнопки слева внизу — персонаж [C], инвентарь [I], журнал [J], карта [M]':
+    'Tutorial: bottom-left buttons — character [C], inventory [I], journal [J], map [M]',
 }

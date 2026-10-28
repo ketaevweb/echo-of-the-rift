@@ -178,6 +178,10 @@ function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
     handleTacticalClick(ctx, ev)
     return
   }
+  // v2.3: на сенсоре в реалтайме клики по земле/миру ОТКЛЮЧЕНЫ —
+  // движение только джойстиком, тапы «срабатывали когда не нужно»
+  // (репорт Realme 13 5G). Тактическая пауза — исключение: тап = приказ.
+  if (ev.pointerType === 'touch') return
   tapWorld(ctx, ev.clientX, ev.clientY)
 }
 

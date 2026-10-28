@@ -15,6 +15,7 @@
 
 import { useGame } from './store'
 import { getLocale, t } from './i18n'
+import { browserSpeak, browserStopVoice } from './browserVoice'
 import { allCombatLines, BarkEvent, BOSS_SPAWN_LINES, COMPANION_LINES, CombatLine, CompanionId } from './data/combatVoice'
 
 /** v1.8: путь WAV по локали — EN-локаль слушает EN-набор (RU — канон-фолбэк). */
@@ -45,6 +46,7 @@ function now(): number {
 
 /** Остановить текущий барк (спавн босса глушит фоновые реплики; выход в титул). */
 export function stopBark() {
+  browserStopVoice()
   if (current) {
     try {
       current.pause()
@@ -57,9 +59,20 @@ export function stopBark() {
   playing = false
 }
 
-function playLine(line: CombatLine, event: BarkEvent) {
+const GENDER_OF: Record<CompanionId, 'male' | 'female'> = { kaya: 'female', torvald: 'male' }
+
+function playLine(line: CombatLine, event: BarkEvent, gender: 'male' | 'female' = 'male') {
   const s = useGame.getState().settings
   if (!s.voiceOn || s.voiceVol <= 0) return
+  // v2.3: сначала системный голос языка интерфейса (настоящий русский TTS
+  // телефона, мгновенно); если его нет — прежние статичные WAV
+  const spoken = t(line.text)
+  const lang = getLocale() === 'en' ? 'en' : 'ru'
+  if (browserSpeak(spoken, lang, gender, s.voiceVol, () => (playing = false))) {
+    playing = true
+    lastBark = { event, id: line.id, text: spoken, at: Date.now() }
+    return
+  }
   try {
     const el = new Audio(lineSrc(line))
     el.volume = Math.max(0, Math.min(1, s.voiceVol))
@@ -122,7 +135,7 @@ export function bark(event: Exclude<BarkEvent, 'spawn'>, opts: { companionId: Co
   poolLast.set(key, t)
   lastIdByPool.set(key, line.id)
   lastGlobal = t
-  playLine(line, event)
+  playLine(line, event, GENDER_OF[opts.companionId])
 }
 
 /**
@@ -142,7 +155,7 @@ export function bossSpawnBark(enemyType: string | null, companionId: CompanionId
   if (line) {
     lastIdByPool.set(`spawn:${enemyType}`, line.id)
     lastGlobal = now()
-    playLine(line, 'spawn')
+    playLine(line, 'spawn', 'male')
   }
   if (companionId) {
     const bpool = COMPANION_LINES[companionId].boss
@@ -151,7 +164,7 @@ export function bossSpawnBark(enemyType: string | null, companionId: CompanionId
       poolLast.set(`boss:${companionId}`, now())
       lastIdByPool.set(`boss:${companionId}`, bline.id)
       // боссовая реплика уже заняла «эфир» — играем реакцию сразу после
-      setTimeout(() => playLine(bline, 'boss'), 2600)
+      setTimeout(() => playLine(bline, 'boss', GENDER_OF[companionId]), 2600)
     }
   }
 }

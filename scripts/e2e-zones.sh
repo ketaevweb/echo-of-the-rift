@@ -35,14 +35,14 @@ if [ "$UP" != "1" ]; then echo "SERVER FAILED TO START"; tail -20 dev.log; exit 
 echo "server up"
 
 # 1. Титул: версия + кнопка полного экрана
-say "TITLE: v2.2 + FULLSCREEN"
+say "TITLE: v2.3 + FULLSCREEN"
 agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 agent-browser eval "localStorage.removeItem('echo-rift-locale'); localStorage.removeItem('echo-rift-settings'); localStorage.removeItem('echo-rift-save-v1'); 'reset'" >/dev/null
 agent-browser eval "location.reload(); 'reload'" >/dev/null
 sleep 3
-check "TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.2') ? 'TITLE_OK' : 'TITLE_BAD'")" "титул v2.2"
+check "TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.3') ? 'TITLE_OK' : 'TITLE_BAD'")" "титул v2.3"
 check "FS_OK" "$(agent-browser eval "document.querySelector('[data-title-fullscreen]') ? 'FS_OK' : 'FS_BAD'")" "кнопка полного экрана на титуле"
 
 # 2. Новая игра (устойчиво к наличию/отсутствию сейва)
@@ -119,7 +119,7 @@ say "EN DICT"
 agent-browser eval "(() => { localStorage.setItem('echo-rift-locale','en'); location.reload(); return 'en'; })()" >/dev/null
 sleep 4
 check "EN_FS_OK" "$(agent-browser eval "document.body.innerText.includes('Fullscreen') ? 'EN_FS_OK' : 'EN_FS_BAD'")" "EN: Fullscreen"
-check "EN_TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('VERSION 2.2') ? 'EN_TITLE_OK' : 'EN_TITLE_BAD'")" "EN: VERSION 2.2"
+check "EN_TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('VERSION 2.3') ? 'EN_TITLE_OK' : 'EN_TITLE_BAD'")" "EN: VERSION 2.3"
 
 # 10. Консоль без ошибок
 say "CONSOLE"

@@ -151,12 +151,20 @@ export class Terrain {
   }
 }
 
-/** Градиентное небо-сфера (без текстур). */
+/** Градиентное небо-сфера (без текстур).
+ *  v2.3: рендерится ВСЕГДА целиком — рендерер масштабирует сферу под
+ *  camera.far (см. Renderer3d.applyZoneRange), иначе на мобильном пресете
+ *  (far ~1300–2600 < радиуса 4200) дальняя плоскость отсекает купол и
+ *  над горизонтом появляется «чёрная дыра». depthTest выключен +
+ *  renderOrder −10: небо рисуется первым и никогда не спорит с миром. */
+export const SKY_RADIUS = 4200
+
 export function buildSky(): THREE.Mesh {
-  const geo = new THREE.SphereGeometry(4200, 24, 16)
+  const geo = new THREE.SphereGeometry(SKY_RADIUS, 24, 16)
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
+    depthTest: false,
     fog: false,
     uniforms: {
       top: { value: new THREE.Color(0.42, 0.5, 0.56) },
@@ -181,5 +189,6 @@ export function buildSky(): THREE.Mesh {
   })
   const sky = new THREE.Mesh(geo, mat)
   sky.frustumCulled = false
+  sky.renderOrder = -10 // раньше всех непрозрачных — фон кадра
   return sky
 }

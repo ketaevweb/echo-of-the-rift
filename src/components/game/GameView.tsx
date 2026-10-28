@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { createEngine, getEngine } from '@/lib/game/engine'
 import { boot, readRenderMode, readSave, useGame } from '@/lib/game/store'
+import { initTutorial } from '@/lib/game/systems/tutorial'
 import { t, useLocale } from '@/lib/game/i18n'
 import Hud from './Hud'
 import DialogueOverlay from './DialogueOverlay'
@@ -20,6 +21,7 @@ export default function GameView() {
 
   useEffect(() => {
     if (screen !== 'game') return
+    initTutorial() // v2.3: обучение — прогресс + подписки на стор
     const canvas = canvasRef.current
     if (!canvas) return
     const save = boot.mode === 'continue' ? readSave() : null

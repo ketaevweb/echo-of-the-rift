@@ -1,13 +1,16 @@
 // ============================================================
-// ЭХО РАЗЛОМА — озвучка ключевых реплик (v1.1, GDD 04 §4.3)
-// TTS через бэкенд-роут /api/tts (z-ai-web-dev-sdk только там).
-// 2 голоса: мужской (xiaochen) и женский (tongtong) — маппинг
-// спикеров VOICE_OF. Кэш blob-URL в памяти сессии; сервер кэширует
-// WAV на диске (db/tts-cache). Ошибки глотаются — озвучка никогда
-// не блокирует диалог.
+// ЭХО РАЗЛОМА — озвучка ключевых реплик (v1.1, GDD 04 §4.3; v2.3)
+// v2.3: сначала браузерный speechSynthesis — ГОЛОС СИСТЕМЫ телефона
+// (настоящий русский TTS, мгновенно и без акцента); бэкенд /api/tts
+// (z-ai-web-dev-sdk только там) — fallback, если системного голоса
+// нужного языка нет. Голоса male/female — маппинг спикеров VOICE_OF.
+// Кэш blob-URL в памяти сессии; сервер кэширует WAV на диске
+// (db/tts-cache). Ошибки глотаются — озвучка никогда не блокирует диалог.
 // ============================================================
 
 import { useGame } from './store'
+import { getLocale } from './i18n'
+import { browserSpeak, browserStopVoice, browserVoiceAvailable } from './browserVoice'
 
 export type VoiceKind = 'male' | 'female'
 
@@ -57,6 +60,7 @@ export function setVoiceVolume(v: number) {
 /** Остановить текущую реплику (закрытие диалога, новая игра, титул). */
 export function stopVoice() {
   lastReq++ // отмена всех незавершённых запросов
+  browserStopVoice()
   if (current) {
     try {
       current.pause()
@@ -100,6 +104,8 @@ async function ensureUrl(key: string, voice: VoiceKind, text: string): Promise<s
 /**
  * Озвучить реплику узла диалога. Вызывается из setNode.
  * Голос есть только у ключевых спикеров (VOICE_OF); текст режется до 400 симв.
+ * v2.3: сперва системный голос языка интерфейса (на RU-локали — русский TTS
+ * телефона); fallback — бэкенд-TTS (китайские голоса SDK).
  */
 export function speakLine(speaker: string, text: string) {
   if (typeof window === 'undefined') return
@@ -109,8 +115,15 @@ export function speakLine(speaker: string, text: string) {
   if (!voice) return
   const clean = text.replace(/\s+/g, ' ').trim().slice(0, MAX_LEN)
   if (clean.length < 2) return
-  const key = `${voice}|${clean}`
+  const lang = getLocale() === 'en' ? 'en' : 'ru'
   const my = ++lastReq
+  // 1) системный голос устройства — мгновенно, по-настоящему на языке игрока
+  if (browserVoiceAvailable(lang)) {
+    browserSpeak(clean, lang, voice, s.voiceVol)
+    return
+  }
+  // 2) fallback: бэкенд-TTS (кэш blob)
+  const key = `${voice}|${clean}`
   void (async () => {
     const url = await ensureUrl(key, voice, clean)
     if (!url || my !== lastReq) return
@@ -124,4 +137,10 @@ export function speakLine(speaker: string, text: string) {
       if (current === el) current = null
     }
   })()
+}
+
+// E2E/отладочный хук: произнести реплику тем же путём, что игра
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __echoSpeak?: (speaker: string, text: string) => void }).__echoSpeak = (speaker, text) =>
+    speakLine(speaker, text)
 }
