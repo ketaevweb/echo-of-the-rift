@@ -182,7 +182,11 @@ export default function Hud() {
           </div>
         </div>
         {(trackerQuest || contractQuest) && (
-          <div className="pointer-events-auto rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm">
+          <div
+            onClick={() => getEngine()?.openPanel('journal')}
+            title={t('Открыть журнал [J]')}
+            className="pointer-events-auto cursor-pointer rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm transition hover:border-[#d9a441]/80"
+          >
             {trackerQuest && (
               <div>
                 <p className="text-[11px] font-semibold text-[#f5c96b]">{trackerQuest.name}</p>

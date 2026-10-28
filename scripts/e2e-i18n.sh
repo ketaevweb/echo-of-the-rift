@@ -33,7 +33,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.7') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.9') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
 
 # 3. Переключение EN на титуле
 say "SWITCH TO EN (title footer)"

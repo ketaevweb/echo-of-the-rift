@@ -1891,11 +1891,15 @@ export function drawFullMap(
   ctx.font = '12px ui-serif, Georgia, serif'
   ctx.textAlign = 'center'
   for (const m of AREA_MARKERS) {
-    ctx.fillStyle = 'rgba(20,16,12,0.6)'
+    // v1.9: кламп метки в границы канваса — «Хребет сигналов» у нижней
+    // кромки обрезался, плашка и текст уходили за пределы карты.
     const tw = ctx.measureText(m.label).width
-    ctx.fillRect(m.pos.x * sx - tw / 2 - 5, m.pos.y * sy - 18, tw + 10, 16)
+    const lx = Math.max(tw / 2 + 6, Math.min(w - tw / 2 - 6, m.pos.x * sx))
+    const ly = Math.max(14, Math.min(h - 6, m.pos.y * sy - 6))
+    ctx.fillStyle = 'rgba(20,16,12,0.6)'
+    ctx.fillRect(lx - tw / 2 - 5, ly - 12, tw + 10, 16)
     ctx.fillStyle = '#e8d5a8'
-    ctx.fillText(m.label, m.pos.x * sx, m.pos.y * sy - 6)
+    ctx.fillText(m.label, lx, ly)
   }
   if (questMarker) {
     ctx.strokeStyle = '#f5c96b'

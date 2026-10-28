@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { ChevronDown, ChevronUp, Play, RotateCcw, ScrollText, Swords, X } from 'lucide-react'
 import { boot, ORIGINS, useGame } from '@/lib/game/store'
 import { setLocale, t, useLocale } from '@/lib/game/i18n'
+import { GAME_VERSION } from '@/lib/game/version'
 import { CreditsBody } from './Panels'
 import { GameIcon } from './GameIcon'
 import { T } from './T'
@@ -58,7 +59,7 @@ export default function TitleScreen() {
           <h1 className="game-title-font mt-3 text-5xl font-bold leading-none text-[#f5e6c4] drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)] sm:text-7xl">
             {t('ЭХО РАЗЛОМА')}
           </h1>
-          <p className="mt-1.5 text-xs tracking-[0.3em] text-[#9a8f78]">{t('ВЕРСИЯ 1.8')}</p>
+          <p className="mt-1.5 text-xs tracking-[0.3em] text-[#9a8f78]">{t('ВЕРСИЯ {v}', { v: GAME_VERSION })}</p>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-[#cfc0a0] sm:text-base">
             {t(
               "РПГ-прототип, сотканный из шести великих игр: ведьмачьи знаки и контракты, тактический отряд Dragon Age, северный мир и крики силы, кубики d20 Baldur's Gate, наставники Готики и диалоги в духе Mass Effect.",

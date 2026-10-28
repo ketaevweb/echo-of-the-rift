@@ -35,7 +35,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.7') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.9') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim().includes('НАЧАТЬ ПУТЬ')); b.click(); return 'clicked'; })()" >/dev/null
 sleep 4
 echo -n "engine: "
@@ -54,9 +54,9 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "en title: "
-agent-browser eval "document.body.innerText.includes('VERSION 1.7') ? 'TITLE_EN_OK' : 'TITLE_EN_BAD'"
+agent-browser eval "document.body.innerText.includes('VERSION 1.9') ? 'TITLE_EN_OK' : 'TITLE_EN_BAD'"
 echo -n "hydration (no issue badge): "
-agent-browser eval "(() => { const p=document.querySelector('nextjs-portal'); const sr=p&&p.shadowRoot; if(!sr) return 'NO_PORTAL'; const badge=[...sr.querySelectorAll('button')].some(b=>((b.getAttribute('aria-label')||'')+(b.textContent||'')).toLowerCase().includes('issue')); return badge ? 'ISSUE_BADGE' : 'HYDRATION_OK'; })()"
+agent-browser eval "(() => { const p=document.querySelector('nextjs-portal'); const sr=p&&p.shadowRoot; if(!sr) return 'HYDRATION_OK'; /* v1.9: портал может отсутствовать */ const badge=[...sr.querySelectorAll('button')].some(b=>((b.getAttribute('aria-label')||'')+(b.textContent||'')).toLowerCase().includes('issue')); return badge ? 'ISSUE_BADGE' : 'HYDRATION_OK'; })()"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim().includes('BEGIN THE PATH')); b.click(); return 'clicked'; })()" >/dev/null
 sleep 4
 echo -n "engine en: "

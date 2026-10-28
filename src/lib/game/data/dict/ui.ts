@@ -4,7 +4,7 @@ export const EN_UI: Record<string, string> = {
   // ---------- Титульный экран ----------
   'ХРОНИКИ СЕВЕРНОЙ ДОЛИНЫ': 'CHRONICLES OF THE NORTHERN VALLEY',
   'ЭХО РАЗЛОМА': 'ECHO OF THE RIFT',
-  'ВЕРСИЯ 1.8': 'VERSION 1.8',
+  'ВЕРСИЯ {v}': 'VERSION {v}',
   "РПГ-прототип, сотканный из шести великих игр: ведьмачьи знаки и контракты, тактический отряд Dragon Age, северный мир и крики силы, кубики d20 Baldur's Gate, наставники Готики и диалоги в духе Mass Effect.":
     "An RPG prototype woven from six great games: Witcher signs and contracts, the Dragon Age tactical party, a northern world with Words of Power, Baldur's Gate d20 dice, Gothic mentors and Mass Effect-style dialogue.",
   'ПРОИСХОЖДЕНИЕ СМОТРИТЕЛЯ': 'WATCHER ORIGIN',
@@ -190,7 +190,8 @@ export const EN_UI: Record<string, string> = {
   // ---------- Торговля ----------
   'Торговля': 'Trade',
   '{merchant} · твоё золото: {n}': '{merchant} · your gold: {n}',
-  'ТОВАР ГРИМА': "GRIM'S WARES",
+  'Товар: {m}': 'Wares: {m}',
+  'Открыть журнал [J]': 'Open journal [J]',
   'ПРОДАТЬ (40% ЦЕНЫ)': 'SELL (40% PRICE)',
   'Торг нечем.': 'Nothing to barter.',
 
@@ -227,7 +228,7 @@ export const EN_UI: Record<string, string> = {
   'Выйти в главное меню': 'Quit to main menu',
 
   // ---------- Настройки ----------
-  'Эхо Разлома · v1.6': 'Echo of the Rift · v1.6',
+  'Эхо Разлома · v{v}': 'Echo of the Rift · v{v}',
   'ГРАФИКА': 'GRAPHICS',
   'Режим рендера': 'Render mode',
   '3D (Three.js)': '3D (Three.js)',
@@ -254,8 +255,12 @@ export const EN_UI: Record<string, string> = {
   'ЯЗЫК / LANGUAGE': 'ЯЗЫК / LANGUAGE',
   'Русский': 'Русский',
   'English': 'English',
-  'Интерфейс переключается мгновенно. Реплики и боевые барки озвучиваются на языке интерфейса (v1.8).':
-    'The UI switches instantly. Dialogue lines and combat barks are voiced in the UI language (v1.8).',
+  'Интерфейс переключается мгновенно. Реплики и боевые барки озвучиваются на языке интерфейса.':
+    'The UI switches instantly. Dialogue lines and combat barks are voiced in the UI language.',
+
+  // ---------- Предметы: статы (v1.9) ----------
+  'урон {n}': 'damage {n}',
+  'КД {n}': 'AC {n}',
 
   // ---------- Раскладка клавиш ----------
   'Бой': 'Combat',
@@ -286,7 +291,7 @@ export const EN_UI: Record<string, string> = {
     'Click an action → press a new key (Esc — cancel). WASD/arrows — movement (fixed), Esc — menu. Russian layout works automatically.',
 
   // ---------- Титры ----------
-  'ВЕРСИЯ 1.8 · ОЗВУЧКА EN ЗАВЕРШЕНА': 'VERSION 1.8 · EN VOICEOVER COMPLETE',
+  'ВЕРСИЯ {v} · ПОЛИРОВКА ЗАВЕРШЕНА': 'VERSION {v} · POLISH PASS COMPLETE',
   'ВДОХНОВЕНИЯ': 'INSPIRATIONS',
   'The Witcher 3 — знаки, контракты, бестиарий': 'The Witcher 3 — signs, contracts, bestiary',
   'Dragon Age: Origins — отряд и тактическая пауза': 'Dragon Age: Origins — party and tactical pause',

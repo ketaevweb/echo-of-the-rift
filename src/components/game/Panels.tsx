@@ -22,6 +22,7 @@ import {
 } from '@/lib/game/bindings'
 import { boot, useGame } from '@/lib/game/store'
 import { setLocale, t, useLocale } from '@/lib/game/i18n'
+import { GAME_VERSION } from '@/lib/game/version'
 import { GameIcon } from './GameIcon'
 
 function Panel({
@@ -57,9 +58,20 @@ function Panel({
   )
 }
 
-function Row({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Row({
+  children,
+  className = '',
+  title,
+}: {
+  children: React.ReactNode
+  className?: string
+  title?: string
+}) {
   return (
-    <div className={`flex items-center justify-between gap-3 rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2 ${className}`}>
+    <div
+      title={title}
+      className={`flex items-center justify-between gap-3 rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2 ${className}`}
+    >
       {children}
     </div>
   )
@@ -115,17 +127,23 @@ function CharPanel() {
         </div>
         <div className="flex flex-col gap-2">
           <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('СНАРЯЖЕНИЕ')}</p>
-          <Row>
-            <span className="flex items-center gap-2 text-sm text-[#e8d5a8]">
-              <GameIcon name="Sword" className="h-4 w-4 text-[#c9b06b]" /> {t('Оружие')}
+          <Row title={player.weapon ? t(ITEMS[player.weapon].desc) : undefined}>
+            <span className="flex min-w-0 items-center gap-2 text-sm text-[#e8d5a8]">
+              <GameIcon name="Sword" className="h-4 w-4 shrink-0 text-[#c9b06b]" /> {t('Оружие')}
             </span>
-            <span className="text-sm text-[#f5c96b]">{player.weapon ? t(ITEMS[player.weapon].name) : t('— кулаки —')}</span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {player.weapon && <GearStat id={player.weapon} />}
+              <span className="truncate text-sm text-[#f5c96b]">{player.weapon ? t(ITEMS[player.weapon].name) : t('— кулаки —')}</span>
+            </span>
           </Row>
-          <Row>
-            <span className="flex items-center gap-2 text-sm text-[#e8d5a8]">
-              <GameIcon name="Shirt" className="h-4 w-4 text-[#c9b06b]" /> {t('Броня')}
+          <Row title={player.armor ? t(ITEMS[player.armor].desc) : undefined}>
+            <span className="flex min-w-0 items-center gap-2 text-sm text-[#e8d5a8]">
+              <GameIcon name="Shirt" className="h-4 w-4 shrink-0 text-[#c9b06b]" /> {t('Броня')}
             </span>
-            <span className="text-sm text-[#f5c96b]">{player.armor ? t(ITEMS[player.armor].name) : t('— нет —')}</span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {player.armor && <GearStat id={player.armor} />}
+              <span className="truncate text-sm text-[#f5c96b]">{player.armor ? t(ITEMS[player.armor].name) : t('— нет —')}</span>
+            </span>
           </Row>
           <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('ЗНАКИ')}</p>
           {signList.map((s) => {
@@ -184,6 +202,25 @@ function CharPanel() {
   )
 }
 
+/** v1.9: чип стата снаряжения — урон оружия / КД брони (d20-терминология). */
+function GearStat({ id }: { id: string }) {
+  const def = ITEMS[id]
+  if (!def) return null
+  if (def.type === 'weapon' && def.damage !== undefined)
+    return (
+      <span className="shrink-0 rounded border border-[#d9a441]/40 px-1.5 py-0.5 text-[11px] text-[#f5c96b]">
+        {t('урон {n}', { n: def.damage })}
+      </span>
+    )
+  if (def.type === 'armor' && def.ac !== undefined)
+    return (
+      <span className="shrink-0 rounded border border-[#8fbf7f]/40 px-1.5 py-0.5 text-[11px] text-[#a8d89a]">
+        {t('КД {n}', { n: def.ac })}
+      </span>
+    )
+  return null
+}
+
 function InvPanel() {
   const inventory = useGame((s) => s.inventory)
   const player = useGame((s) => s.player)
@@ -196,18 +233,21 @@ function InvPanel() {
     <Panel title={t('Инвентарь')} subtitle={t('Золото: {n}', { n: player.gold })}>
       <div className="flex flex-col gap-2">
         {equipped.map((eq) => (
-          <Row key={eq.slot}>
-            <span className="text-sm text-[#e8d5a8]">
-              {eq.label}: <span className="text-[#f5c96b]">{eq.item ? t(ITEMS[eq.item].name) : t('— пусто —')}</span>
+          <Row key={eq.slot} title={eq.item ? t(ITEMS[eq.item].desc) : undefined}>
+            <span className="flex min-w-0 items-center gap-2 text-sm text-[#e8d5a8]">
+              {eq.label}: <span className="truncate text-[#f5c96b]">{eq.item ? t(ITEMS[eq.item].name) : t('— пусто —')}</span>
             </span>
-            {eq.item && (
-              <button
-                onClick={() => getEngine()?.unequipItem(eq.slot)}
-                className="rounded border border-[#5a4632] px-3 py-1 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
-              >
-                {t('Снять')}
-              </button>
-            )}
+            <span className="flex shrink-0 items-center gap-1.5">
+              {eq.item && <GearStat id={eq.item} />}
+              {eq.item && (
+                <button
+                  onClick={() => getEngine()?.unequipItem(eq.slot)}
+                  className="rounded border border-[#5a4632] px-3 py-1 text-xs text-[#cfc0a0] transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+                >
+                  {t('Снять')}
+                </button>
+              )}
+            </span>
           </Row>
         ))}
         <p className="game-title-font mt-3 text-xs tracking-[0.25em] text-[#9a8f78]">{t('СУМКА')}</p>
@@ -216,12 +256,15 @@ function InvPanel() {
           const def = ITEMS[inv.item]
           if (!def) return null
           return (
-            <Row key={inv.item}>
+            <Row key={inv.item} title={t(def.desc)}>
               <div className="flex min-w-0 items-center gap-2">
                 <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-[#e8d5a8]">
-                    {t(def.name)} {inv.qty > 1 && <span className="text-[#c9b06b]">×{inv.qty}</span>}
+                  <p className="flex items-center gap-1.5 text-sm text-[#e8d5a8]">
+                    <span className="truncate">
+                      {t(def.name)} {inv.qty > 1 && <span className="text-[#c9b06b]">×{inv.qty}</span>}
+                    </span>
+                    {(def.type === 'weapon' || def.type === 'armor') && <GearStat id={inv.item} />}
                   </p>
                   <p className="truncate text-[11px] text-[#8a8068]">{t(def.desc)}</p>
                 </div>
@@ -336,17 +379,23 @@ function ShopPanel() {
     <Panel title={t('Торговля')} subtitle={t('{merchant} · твоё золото: {n}', { merchant: t(shop.merchantName), n: player.gold })} wide>
       <div className="grid gap-5 md:grid-cols-2">
         <div>
-          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">{t('ТОВАР ГРИМА')}</p>
-          <div className="flex flex-col gap-2">
+          <p className="game-title-font mb-2 text-xs tracking-[0.25em] text-[#9a8f78]">
+            {/* v1.9: было жёстко «ТОВАР ГРИМА» — у Альры и Брока заголовок врал */}
+            {t('Товар: {m}', { m: shop.merchantName }).toUpperCase()}
+          </p>
+          <div className="game-scroll flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
             {shop.stock.map((id) => {
               const def = ITEMS[id]
               const can = player.gold >= def.price
               return (
-                <Row key={id}>
+                <Row key={id} title={t(def.desc)}>
                   <div className="flex min-w-0 items-center gap-2">
                     <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-[#e8d5a8]">{t(def.name)}</p>
+                      <p className="flex items-center gap-1.5 text-sm text-[#e8d5a8]">
+                        <span className="truncate">{t(def.name)}</span>
+                        {(def.type === 'weapon' || def.type === 'armor') && <GearStat id={id} />}
+                      </p>
                       <p className="truncate text-[11px] text-[#8a8068]">{t(def.desc)}</p>
                     </div>
                   </div>
@@ -373,7 +422,7 @@ function ShopPanel() {
               .map((i) => {
                 const def = ITEMS[i.item]
                 return (
-                  <Row key={i.item}>
+                  <Row key={i.item} title={t(def.desc)}>
                     <span className="flex min-w-0 items-center gap-2 text-sm text-[#e8d5a8]">
                       <GameIcon name={def.icon} className="h-4 w-4 shrink-0 text-[#c9b06b]" />
                       <span className="truncate">
@@ -680,7 +729,7 @@ function SettingsPanel() {
     getEngine()?.applySettings()
   }
   return (
-    <Panel title={t('Настройки')} subtitle={t('Эхо Разлома · v1.6')}>
+    <Panel title={t('Настройки')} subtitle={t('Эхо Разлома · v{v}', { v: GAME_VERSION })}>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <p className="game-title-font text-xs tracking-[0.25em] text-[#9a8f78]">{t('ГРАФИКА')}</p>
@@ -764,7 +813,7 @@ function SettingsPanel() {
             </span>
           </Row>
           <p className="text-[11px] leading-snug text-[#8a8068]">
-            {t('Интерфейс переключается мгновенно. Реплики и боевые барки озвучиваются на языке интерфейса (v1.8).')}
+            {t('Интерфейс переключается мгновенно. Реплики и боевые барки озвучиваются на языке интерфейса.')}
           </p>
         </div>
         <KeybindsSection />
@@ -780,7 +829,7 @@ export function CreditsBody() {
     <div className="flex flex-col gap-4 text-sm">
       <div className="text-center">
         <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">{t('ЭХО РАЗЛОМА')}</p>
-        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ 1.8 · ОЗВУЧКА EN ЗАВЕРШЕНА')}</p>
+        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ {v} · ПОЛИРОВКА ЗАВЕРШЕНА', { v: GAME_VERSION })}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">
