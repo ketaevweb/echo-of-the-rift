@@ -149,3 +149,13 @@
 .ability-slot:hover {
   border-color: #d9a441;
 }
+
+/* v2.0: мобильное управление — без резиновой прокрутки и выделения тапом;
+   скролл-области панелей продолжают работать нормально */
+html,
+body {
+  overscroll-behavior: none;
+}
+body {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -42,7 +42,7 @@ function PartyFrame({
   const isPlayer = p.id === 'player'
   const trusted = p.approval >= 60 // порог парных приёмов (Фаза 4)
   return (
-    <div className="pointer-events-auto w-56 rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm">
+    <div className="pointer-events-auto w-44 rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm sm:w-56">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${p.alive ? 'border-[#d9a441]/60 bg-[#241c14]' : 'border-[#c94f3d] bg-[#c94f3d]/20 text-[#e08a6b]'}`}>
@@ -128,6 +128,7 @@ export default function Hud() {
   const siege = useGame((s) => s.siege)
   const assault = useGame((s) => s.assault)
   const raid = useGame((s) => s.raid)
+  const touchUi = useGame((s) => s.touchUi) // v2.0: сенсорные контролы активны
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
 
@@ -163,8 +164,8 @@ export default function Hud() {
         ))}
       </div>
 
-      {/* Миникарта и трекер справа сверху */}
-      <div className="absolute right-3 top-3 flex w-56 flex-col gap-2">
+      {/* Миникарта и трекер справа сверху (v2.0: на узких экранах — уже) */}
+      <div className="absolute right-3 top-3 flex w-44 flex-col gap-2 sm:w-56">
         <div className="pointer-events-auto overflow-hidden rounded border border-[#5a4632]/80 bg-[#181410]/85 p-1 backdrop-blur-sm">
           <canvas ref={miniRef} data-minimap width={214} height={160} className="h-auto w-full rounded-sm" />
           <div className="mt-1 flex items-center justify-between px-1 pb-0.5">
@@ -329,8 +330,8 @@ export default function Hud() {
         </div>
       )}
 
-      {/* Меню слева снизу */}
-      <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col gap-2">
+      {/* Меню слева снизу (v2.0: в тач-режиме кнопки ≥44px) */}
+      <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col gap-2" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex gap-1.5">
           {[
             { id: 'char', label: 'C', icon: 'User', title: 'Персонаж [C]' },
@@ -342,7 +343,7 @@ export default function Hud() {
               key={b.id}
               onClick={() => getEngine()?.openPanel(b.id as 'char')}
               title={t(b.title)}
-              className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+              className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
             >
               <GameIcon name={b.icon} className="h-4 w-4" />
               <span className="sr-only">{t(b.title)}</span>
@@ -351,7 +352,7 @@ export default function Hud() {
           <button
             onClick={() => getEngine()?.openPanel('pause')}
             title={t('Меню [Esc]')}
-            className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+            className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
           >
             <GameIcon name="Settings" className="h-4 w-4" />
             <span className="sr-only">{t('Меню')}</span>
@@ -363,7 +364,7 @@ export default function Hud() {
               setMutedUi(next)
             }}
             title={t('Звук')}
-            className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441]"
+            className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
           >
             {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             <span className="sr-only">{t('Звук')}</span>
@@ -371,8 +372,8 @@ export default function Hud() {
         </div>
       </div>
 
-      {/* Панель умений снизу по центру */}
-      {player && (
+      {/* Панель умений снизу по центру (v2.0: в тач-режиме бар заменяют сенсорные кнопки) */}
+      {player && !touchUi && (
         <div className="pointer-events-auto absolute bottom-3 left-1/2 -translate-x-1/2">
           <div className="flex items-end gap-1.5 rounded border border-[#5a4632]/70 bg-[#181410]/85 p-2 backdrop-blur-sm">
             {/* Фаза 6.2: крики Ту'ум (R/T) — слева от бара умений */}
@@ -474,11 +475,21 @@ export default function Hud() {
               <span className="text-[10px] tabular-nums text-[#9a8f78]">{t('{s}с', { s: oil.remain })}</span>
             </div>
           )}
-          {/* XP полоска */}
-          <div className="mx-auto mt-1 w-72">
-            <div className="h-1 overflow-hidden rounded-full bg-[#241c14]">
-              <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
+          {/* XP полоска (v2.0: видна и в тач-режиме — отдельный блок ниже) */}
+          {!touchUi && (
+            <div className="mx-auto mt-1 w-72">
+              <div className="h-1 overflow-hidden rounded-full bg-[#241c14]">
+                <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
+              </div>
             </div>
+          )}
+        </div>
+      )}
+      {/* v2.0: XP полоска в тач-режиме — над левым меню, не мешает контролам */}
+      {player && touchUi && (
+        <div className="pointer-events-none absolute bottom-16 left-3 w-44">
+          <div className="h-1 overflow-hidden rounded-full bg-[#241c14]/80">
+            <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
           </div>
         </div>
       )}

@@ -15,7 +15,8 @@ import { EngineCtx } from '../core/ctx'
 import { pickEntity } from '../core/entity'
 import { chooseOption, closeDialogue, doInteract, openDialogue, pickInteractable, runInteractable } from './quest'
 import { cycleFormation } from './party'
-import { ActionId, keyMatches } from '../bindings'
+import { ActionId, ACTION_DEFS, keyMatches } from '../bindings'
+import { resetTouchJoy } from '../touch'
 
 interface InputHandlers {
   keyDown: (ev: KeyboardEvent) => void
@@ -32,6 +33,59 @@ const PANEL_OF: Partial<Record<ActionId, PanelId>> = {
   panel_inv: 'inv',
   panel_journal: 'journal',
   panel_map: 'map',
+}
+
+/**
+ * v2.0: выполнить действие по его ActionId — общий путь клавиатуры
+ * (input.ts) и сенсорных кнопок (TouchControls). Логика повторяет
+ * небоем ветку onKeyDown (та же последовательность проверок).
+ */
+export function triggerAction(ctx: EngineCtx, action: ActionId) {
+  const store = useGame.getState()
+  if (ctx.dialogueTree || store.panel) return
+  switch (action) {
+    case 'pause': {
+      ctx.tacticalPaused = !ctx.tacticalPaused
+      useGame.getState().patch({ paused: ctx.tacticalPaused })
+      ctx.setTactical(ctx.tacticalPaused)
+      if (!ctx.tacticalPaused) ctx.selEid = null
+      sfx('click')
+      return
+    }
+    case 'target':
+      cycleTarget(ctx)
+      return
+    case 'formation':
+      cycleFormation(ctx)
+      return
+    case 'interact':
+      doInteract(ctx)
+      return
+    case 'shout_force':
+      ctx.castAbility('shout_force')
+      return
+    case 'shout_frost':
+      ctx.castAbility('shout_frost')
+      return
+    case 'potion_heal':
+      ctx.castAbility('potion_heal')
+      return
+    case 'potion_stam':
+      ctx.castAbility('potion_stam')
+      return
+    default:
+      break
+  }
+  const panel = PANEL_OF[action]
+  if (panel) {
+    ctx.openPanel(panel)
+    return
+  }
+  const m = /^ability([1-7])$/.exec(action)
+  if (m) {
+    const id = ABILITY_BAR_IDS[Number(m[1]) - 1]
+    if (id) ctx.castAbility(id)
+  }
 }
 
 function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
@@ -69,45 +123,13 @@ function onKeyDown(ctx: EngineCtx, ev: KeyboardEvent) {
   // v1.1: движение читается по «сырым» клавишам (WASD/стрелки не ремапятся),
   // остальные действия — через биндинги (bindings.ts, русская раскладка нормализуется)
   ctx.keys.add(ev.key.toLowerCase())
-  if (keyMatches('pause', ev.key)) {
-    ctx.tacticalPaused = !ctx.tacticalPaused
-    useGame.getState().patch({ paused: ctx.tacticalPaused })
-    ctx.setTactical(ctx.tacticalPaused) // Фаза 4: изометрический отъём камеры
-    if (!ctx.tacticalPaused) ctx.selEid = null // снятие паузы рвёт выбор приказов
-    sfx('click')
-    ev.preventDefault()
-    return
-  }
-  // Фаза 4: смена цели по живым врагам (в бою и в паузе)
-  if (keyMatches('target', ev.key)) {
-    cycleTarget(ctx)
-    ev.preventDefault()
-    return
-  }
-  // Фаза 4: строй отряда (клин ⇄ линия)
-  if (keyMatches('formation', ev.key)) {
-    cycleFormation(ctx)
-    ev.preventDefault()
-    return
-  }
-  if (keyMatches('interact', ev.key)) doInteract(ctx)
-  // Фаза 6.2: крики Ту'ум
-  if (keyMatches('shout_force', ev.key)) ctx.castAbility('shout_force')
-  if (keyMatches('shout_frost', ev.key)) ctx.castAbility('shout_frost')
-  // v1.1: панели через биндинги
-  for (const [action, panel] of Object.entries(PANEL_OF)) {
-    if (panel && keyMatches(action as ActionId, ev.key)) ctx.openPanel(panel)
-  }
-  // v1.1: слоты панели способностей 1–7 через биндинги ability1..7
-  for (let i = 1; i <= 7; i++) {
-    if (keyMatches(`ability${i}` as ActionId, ev.key)) {
-      const id = ABILITY_BAR_IDS[i - 1]
-      if (id) ctx.castAbility(id)
+  // v2.0: вся боевая/панельная логика — общий путь с сенсорными кнопками
+  for (const { id } of ACTION_DEFS) {
+    if (keyMatches(id, ev.key)) {
+      triggerAction(ctx, id)
+      if (id === 'pause' || PANEL_OF[id]) ev.preventDefault()
     }
   }
-  // Q/E — прямые ярлыки зелий (ремапятся независимо от слотов 6/7)
-  if (keyMatches('potion_heal', ev.key)) ctx.castAbility('potion_heal')
-  if (keyMatches('potion_stam', ev.key)) ctx.castAbility('potion_stam')
 }
 
 function onKeyUp(ctx: EngineCtx, ev: KeyboardEvent) {
@@ -152,16 +174,21 @@ function canvasPoint(ctx: EngineCtx, ev: PointerEvent): Vec {
 function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
   if (useGame.getState().panel || ctx.dialogueTree) return
   if (ev.button !== 0) return
-
-  // --- Фаза 4: приказы в тактической паузе (DAO-lite) ---
   if (ctx.tacticalPaused) {
     handleTacticalClick(ctx, ev)
     return
   }
+  tapWorld(ctx, ev.clientX, ev.clientY)
+}
 
+/**
+ * v2.0: тап по миру (общий путь мыши и look-зоны сенсорного управления):
+ * пикинг врага/НПС/интеракта, иначе — приказ движения герою.
+ */
+export function tapWorld(ctx: EngineCtx, clientX: number, clientY: number) {
   // --- 3D-режим: проекционный пикинг + луч в рельеф ---
   if (ctx.renderMode === '3d' && ctx.view3d) {
-    const hit = ctx.view3d.pickAtScreen(ev.clientX, ev.clientY, 18)
+    const hit = ctx.view3d.pickAtScreen(clientX, clientY, 18)
     if (hit && hit.kind === 'enemy' && hit.alive) {
       ctx.targetEid = hit.eid
       sfx('click')
@@ -171,7 +198,7 @@ function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
       openDialogue(ctx, hit.npcDialogue)
       return
     }
-    const ground = ctx.view3d.screenToGround(ev.clientX, ev.clientY)
+    const ground = ctx.view3d.screenToGround(clientX, clientY)
     if (ground) {
       const it = pickInteractable(ctx, ground, 30)
       if (it) {
@@ -185,7 +212,7 @@ function onPointerDown(ctx: EngineCtx, ev: PointerEvent) {
   }
 
   // --- 2D (легаси) ---
-  const p = canvasPoint(ctx, ev)
+  const p = canvasPoint(ctx, { clientX, clientY } as PointerEvent)
   const enemy = pickEntity(ctx, p, (e) => e.kind === 'enemy' && e.alive, 10)
   if (enemy) {
     ctx.targetEid = enemy.eid
@@ -278,4 +305,6 @@ export function unbindInput(ctx: EngineCtx) {
   window.removeEventListener('keyup', h.keyUp)
   ctx.inputCanvas.removeEventListener('pointerdown', h.pointerDown)
   handlers.delete(ctx)
+  // v2.0: движок умирает/перебиндовывается — джойстик обязан отпустить
+  resetTouchJoy()
 }

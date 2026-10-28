@@ -8,7 +8,7 @@ import { getEngine, BESTIARY_INFO } from '@/lib/game/engine'
 import { PORTRAIT_IMG, PORTRAIT_ROMANCE } from '@/lib/game/data/portraits'
 import { ITEMS } from '@/lib/game/data/items'
 import { isMuted, setMuted } from '@/lib/game/sfx'
-import { EffQuality, GameSettings, QUALITY_NAME, QualityId } from '@/lib/game/settings'
+import { EffQuality, GameSettings, QUALITY_NAME, QualityId, TOUCH_MODES, TOUCH_NAME } from '@/lib/game/settings'
 import {
   ACTION_DEFS,
   ActionId,
@@ -724,6 +724,7 @@ function SettingsPanel() {
   const effQuality = useGame((s) => s.effQuality)
   const fps = useGame((s) => s.fps)
   const renderMode = useGame((s) => s.renderMode)
+  const touchUi = useGame((s) => s.touchUi)
   const apply = (partial: Partial<GameSettings>) => {
     useGame.getState().updateSettings(partial)
     getEngine()?.applySettings()
@@ -767,6 +768,34 @@ function SettingsPanel() {
             </div>
             <p className="mt-1.5 text-[11px] leading-snug text-[#8a8068]">
               {t('«Авто» следит за FPS: при просадке пресет снижается, при стабильно высоком — повышается.')}
+            </p>
+          </div>
+          {/* v2.0: мобильное управление (GDD 06 §10) */}
+          <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#e8d5a8]">{t('Мобильное управление')}</span>
+              <span className="text-[11px] text-[#8a8068]">
+                {t('сейчас:')} <b className="text-[#c9b06b]">{touchUi ? t('кнопки на экране') : t('клавиатура')}</b>
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              {TOUCH_MODES.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => apply({ touch: m })}
+                  aria-pressed={settings.touch === m}
+                  className={`rounded border px-2 py-1.5 text-xs transition ${
+                    settings.touch === m
+                      ? 'border-[#d9a441] bg-[#d9a441]/15 text-[#f5c96b]'
+                      : 'border-[#5a4632] text-[#cfc0a0] hover:border-[#8a7a5a]'
+                  }`}
+                >
+                  {t(TOUCH_NAME[m])}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-[#8a8068]">
+              {t('«Авто» включает контролы на сенсорных устройствах. Джойстик — движение, свайп справа — камера, тап по врагу — цель.')}
             </p>
           </div>
           <Row>
@@ -829,7 +858,7 @@ export function CreditsBody() {
     <div className="flex flex-col gap-4 text-sm">
       <div className="text-center">
         <p className="game-title-font text-2xl tracking-[0.3em] text-[#f5e6c4]">{t('ЭХО РАЗЛОМА')}</p>
-        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ {v} · ПОЛИРОВКА ЗАВЕРШЕНА', { v: GAME_VERSION })}</p>
+        <p className="mt-1 text-xs tracking-[0.25em] text-[#c9b06b]">{t('ВЕРСИЯ {v} · МОБИЛЬНОЕ УПРАВЛЕНИЕ', { v: GAME_VERSION })}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded border border-[#3a2e20] bg-[#211a12]/70 p-3">

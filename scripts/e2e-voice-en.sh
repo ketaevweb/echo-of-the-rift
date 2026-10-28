@@ -36,12 +36,12 @@ agent-browser set viewport 1280 800 >/dev/null
 agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
-agent-browser eval "localStorage.removeItem('echo-rift-locale'); 'reset'" >/dev/null
+agent-browser eval "localStorage.removeItem('echo-rift-locale'); localStorage.removeItem('echo-rift-settings'); 'reset'" >/dev/null
 agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title v18: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.9') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.0') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim().includes('НАЧАТЬ ПУТЬ')); b.click(); return 'clicked'; })()" >/dev/null
 sleep 4
 echo -n "engine: "

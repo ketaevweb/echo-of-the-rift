@@ -28,12 +28,12 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 # сброс локали — чистый прогон (прошлые сессии могли оставить en)
-agent-browser eval "localStorage.removeItem('echo-rift-locale'); 'reset'" >/dev/null
+agent-browser eval "localStorage.removeItem('echo-rift-locale'); localStorage.removeItem('echo-rift-settings'); 'reset'" >/dev/null
 agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 1.9') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.0') && document.body.innerText.includes('НАЧАТЬ ПУТЬ') ? 'RU_OK' : 'RU_BAD'"
 
 # 3. Переключение EN на титуле
 say "SWITCH TO EN (title footer)"

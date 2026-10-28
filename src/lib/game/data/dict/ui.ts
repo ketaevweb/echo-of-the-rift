@@ -291,7 +291,7 @@ export const EN_UI: Record<string, string> = {
     'Click an action → press a new key (Esc — cancel). WASD/arrows — movement (fixed), Esc — menu. Russian layout works automatically.',
 
   // ---------- Титры ----------
-  'ВЕРСИЯ {v} · ПОЛИРОВКА ЗАВЕРШЕНА': 'VERSION {v} · POLISH PASS COMPLETE',
+  'ВЕРСИЯ {v} · МОБИЛЬНОЕ УПРАВЛЕНИЕ': 'VERSION {v} · TOUCH CONTROLS',
   'ВДОХНОВЕНИЯ': 'INSPIRATIONS',
   'The Witcher 3 — знаки, контракты, бестиарий': 'The Witcher 3 — signs, contracts, bestiary',
   'Dragon Age: Origins — отряд и тактическая пауза': 'Dragon Age: Origins — party and tactical pause',
@@ -338,4 +338,18 @@ export const EN_UI: Record<string, string> = {
   'Смотритель': 'Watcher',
   'Магистр-странница': 'Traveling Magister',
   'Воитель': 'War Chief',
+
+  // ---------- Мобильное управление (v2.0) ----------
+  'Мобильное управление': 'Touch controls',
+  'Вкл': 'On',
+  'Выкл': 'Off',
+  'сейчас:': 'currently:',
+  'кнопки на экране': 'on-screen buttons',
+  'клавиатура': 'keyboard',
+  '«Авто» включает контролы на сенсорных устройствах. Джойстик — движение, свайп справа — камера, тап по врагу — цель.':
+    '"Auto" enables the controls on touch devices. Joystick — move, right-side swipe — camera, tap an enemy to target.',
+  'Взаимодействовать': 'Interact',
+  'Цель': 'Target',
+  'Джойстик движения': 'Movement joystick',
+  'Свайп справа — камера · тап по врагу — цель': 'Right-side swipe — camera · tap an enemy to target',
 }

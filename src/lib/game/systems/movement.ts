@@ -12,6 +12,7 @@ import { nearestEnemyOf } from '../core/entity'
 import { stepSfx } from '../sfx'
 import { careerRank } from './career'
 import { meleeAttack } from './combat'
+import { touchJoy } from '../touch'
 
 export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: number, dt: number) {
   const kbi = ctx.kb.get(e.eid)
@@ -156,12 +157,22 @@ export function updatePlayer(ctx: EngineCtx, dt: number) {
   if (ctx.keys.has('s') || ctx.keys.has('arrowdown') || ctx.keys.has('ы')) fw -= 1
   if (ctx.keys.has('d') || ctx.keys.has('arrowright') || ctx.keys.has('в')) sd += 1
   if (ctx.keys.has('a') || ctx.keys.has('arrowleft') || ctx.keys.has('ф')) sd -= 1
+  // v2.0: аналоговый джойстик (экранные оси: y вниз → вперёд это −y).
+  const joy = touchJoy()
+  if (joy.active) {
+    fw += -joy.y
+    sd += joy.x
+  }
+  const mag = Math.min(1, Math.hypot(fw, sd))
   const mx = fx * fw + rx * sd
   const my = fy * fw + ry * sd
-  const moving = mx !== 0 || my !== 0
+  const moving = mag > 0.08
   if (moving) {
     const l = Math.hypot(mx, my)
-    p.vel = { x: (mx / l) * p.speed, y: (my / l) * p.speed }
+    // Аналоговая скорость: клавиатура даёт mag ≥ 1 (полный ход),
+    // полунаклоный джойстик — долю скорости (доводка до полной к 0.9).
+    const spd = p.speed * Math.min(1, (mag / 0.9))
+    p.vel = { x: (mx / l) * spd, y: (my / l) * spd }
     p.dest = null
   } else if (p.dest) {
     const dx = p.dest.x - p.pos.x

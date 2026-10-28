@@ -748,3 +748,30 @@ Stage Summary:
 - v1.9 закрыта: единый GAME_VERSION синхронизирует титул/настройки/титры (и будущие бампы), панели получили статы-чипы/тултипы/скролл/динамические метки, HUD-трекер кликабелен, dev-бейдж не перекрывает HUD, метки карты не обрезаются; RU/EN словари согласованы (18/18 E2E).
 - GitHub синхронизирован: origin/main = v1.9 (v1.8 и v1.9 отправлены).
 - Бэклог: пост-релизная поддержка по отзывам.
+
+---
+Task ID: 26
+Agent: Z.ai Code (main)
+Task: v2.0 «Мобильное управление» — сенсорный слой (джойстик/камера/кластер действий), режимы авто/вкл/выкл, адаптация HUD и viewport; рефакторинг ввода на общий путь клавиатура/тач.
+
+Work Log:
+- Разведка: движение — ctx.keys в updatePlayer (WASD относительно yaw камеры); камера — Renderer3d yaw/pitch (мышь-драг ПКМ/СКМ), автоследование; действия — input.ts onKeyDown по биндингам; пикселинг мира — onPointerDown (3D pickAtScreen/screenToGround); HUD-бар умений уже кликабелен; interactHint — зеркало uiSync.
+- touch.ts NEW: детекция (pointer: coarse + ontouchstart + первый touchstart), resolveTouchEnabled(режим), аналоговый вектор джойстика (экранные оси), resetTouchJoy.
+- settings.ts: TouchMode (auto/on/off) в GameSettings (touch:'auto', валидация, TOUCH_NAME/TOUCH_MODES); store: зеркало touchUi.
+- Renderer3d: public orbitBy(dx,dy) / zoomBy(d) — те же коэффициенты, что мышь-орбита.
+- movement.ts updatePlayer: джойстик складывается с WASD (fw += -joy.y, sd += joy.x), аналоговая скорость min(1, mag/0.9), дедзона 0.14 в TouchControls; клавиатурное поведение не изменено (mag≥1 → полная скорость).
+- input.ts рефакторинг: triggerAction(ctx, action) — общий путь клавиатуры и тач-кнопок (pause/target/formation/interact/крики/зелья/панели/ability1-7), onKeyDown теперь цикл по ACTION_DEFS; tapWorld(ctx,x,y) — тап по миру (выделен из onPointerDown, 2D+3D); unbindInput сбрасывает джойстик.
+- TouchControls.tsx NEW: плавающий джойстик (левый низ 46%×44%, ручка появляется под пальцем, кэп радиуса 58px), look-зона (правая половина над кластером: свайп → orbitBy, пинч → zoomBy, тап <350мс/<9px → tapWorld, в тактике — через canvas-бинд = приказ), кластер справа: крики (если открыты) → знаки×5 + пауза → зелья×2 + «Взаимодействовать» (h-16, подсветка от interactHint) + «Цель» (h-16). Слушатели window по pointerId (без setPointerCapture — дружелюбно к синтетике/E2E). При панелях/диалоге active=false → null; effect-клин resetTouchJoy. Зеркало touchUi патчится по enabled.
+- Hud: touchUi → центральный бар умений скрыт (заменён кластером), XP-полоска в отдельном блоке bottom-16 left-3; меню-кнопки h-11 в таче (36px на десктопе); колонки отряда/миникарты w-44 sm:w-56 (376px на 390px-телефоне); safe-area на левом меню.
+- Panels (настройки): строка «Мобильное управление» (Авто/Вкл/Выкл + индикатор «сейчас: клавиатура/кнопки на экране» + подсказка); титры → «ВЕРСИЯ {v} · МОБИЛЬНОЕ УПРАВЛЕНИЕ».
+- layout.tsx: export viewport (userScalable:false, viewportFit:cover, themeColor); globals.css: overscroll-behavior none + tap-highlight transparent. version.ts → 2.0.
+- dict/ui +10 записей (v2.0-блок), credits-ключ заменён.
+- Синхронизация старых E2E (e2e-polish/i18n/i18n-dialogues/voice-en): ВЕРСИЯ 2.0, титры, сброс echo-rift-settings (утечка touch:'on' из прошлых прогонов).
+- E2E scripts/e2e-touch.sh (один батч): 16/16 — контролы рендерятся, бар скрыт, кнопки 44px; джойстик двигает (24 ед. за 1.3с, аналогово); look: yaw −0.915, тап ставит dest; интеракт у Грима открывает диалог; igni тратит 20 ОВ; пауза тугглится; настройки (Выкл → контролы исчезают + бар возвращается; Вкл → после закрытия панели возвращаются); персист после reload+continue; EN-словарь (Touch controls / on-screen buttons / Joystick — move); консоль чиста. Скриншоты .ref/v20-01/02.
+- Итерации E2E: (1) ассерт «Вкл» ждал root при открытой панели — контролы честно скрыты, ассерт исправлен (закрытие панели перед проверкой); (2) в настройках кнопка языка «English», не «EN» (тот «EN» — на титуле). Обе — ошибки ассертов, не кода.
+- Регрессия: e2e-polish.sh 18/18 после рефакторинга input.ts (мышиный путь не сломан), tsc+lint зелёные, dev.log чист.
+
+Stage Summary:
+- v2.0 закрыта: игра полноценно играется с телефона — джойстик+автоатака по тапу на врага, камера свайпом, все действия дублированы сенсорными кнопками; режим Авто включает контролы только на сенсорных устройствах; клавиатура/мышь не изменились (общий triggerAction/tapWorld).
+- GitHub: origin/main = v2.0.
+- Бэклог: пост-релизная поддержка по отзывам.

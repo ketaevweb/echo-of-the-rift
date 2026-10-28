@@ -7,6 +7,7 @@ import { t, useLocale } from '@/lib/game/i18n'
 import Hud from './Hud'
 import DialogueOverlay from './DialogueOverlay'
 import Panels from './Panels'
+import TouchControls from './TouchControls'
 
 export default function GameView() {
   useLocale() // v1.6: перерисовка при переключении языка
@@ -69,6 +70,8 @@ export default function GameView() {
       <Hud />
       <DialogueOverlay />
       <Panels />
+      {/* v2.0: сенсорное управление (сам скрывается по настройке/устройству) */}
+      <TouchControls />
       {/* Переход через Врата Тумана (Фаза 3): затемнение с названием зоны */}
       {zoneFade && (
         <div

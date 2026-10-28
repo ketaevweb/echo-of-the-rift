@@ -232,6 +232,8 @@ interface GameStore {
   hasSave: boolean
   paused: boolean
   interactHint: string | null
+  /** v2.0: сенсорные контролы активны (TouchControls синхронизирует зеркало). */
+  touchUi: boolean
   renderMode: RenderModePref
   // Фаза 3
   oil: OilHudState | null
@@ -292,6 +294,7 @@ export const useGame = create<GameStore>((set) => ({
   hasSave: false,
   paused: false,
   interactHint: null,
+  touchUi: false,
   renderMode: '3d',
   oil: null,
   daytime: 0.3,

@@ -228,6 +228,20 @@ export class Renderer3d {
     return this.yaw
   }
 
+  /** v2.0: сенсорная орбита — свайп по look-зоне (TouchControls).
+   *  Те же коэффициенты, что у мыши-драга (onOrbitMove). */
+  orbitBy(dx: number, dy: number) {
+    if (this.disposed) return
+    this.yaw -= dx * 0.0052
+    this.userPitch = Math.max(0.16, Math.min(1.25, this.userPitch + dy * 0.004))
+  }
+
+  /** v2.0: сенсорный зум — пинч по look-зоне (дельта дистанции в px). */
+  zoomBy(d: number) {
+    if (this.disposed) return
+    this.userDist = Math.max(40, Math.min(260, this.userDist + d))
+  }
+
   /** Фаза 4: тактическая камера — изометрический отъём (DAO-вайб).
    *  yaw остаётся свободным (вращать можно и в паузе). */
   setTactical(on: boolean) {
