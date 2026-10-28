@@ -14,7 +14,11 @@ import { browserSpeak, browserStopVoice, browserVoiceAvailable } from './browser
 
 export type VoiceKind = 'male' | 'female'
 
-/** Спикеры с голосом (ключевые реплики): пол → голос TTS. */
+/** Спикеры с голосом (ключевые реплики): пол → голос TTS.
+ *  v2.4: полный ростер — раньше молчали все персонажи восточных доменов
+ *  (Пруша/Тарбен/Гхарз, Мейра/Хольт/Ингрид/Эйнар, бортжурнал «Двенадцатого»)
+ *  и предметные спикеры (алтари, доски, рог) — репорт «в двух последних
+ *  доменах нет озвучки». Теперь говорит каждый, кто ведёт диалог. */
 const VOICE_OF: Record<string, VoiceKind> = {
   // Мужские голоса
   Бьорн: 'male',
@@ -29,6 +33,18 @@ const VOICE_OF: Record<string, VoiceKind> = {
   'Пожиратель Бурь': 'male',
   'Пожиратель Эха': 'male',
   Ашер: 'male',
+  // v2.4: восточные домены и реплики-предметы
+  'Гхарз Кровавый Пёс': 'male',
+  Тарбен: 'male',
+  'Досент Хольт': 'male',
+  Эйнар: 'male',
+  'Бортжурнал «Двенадцатого»': 'male',
+  'Доска объявлений': 'male',
+  'Древний Алтарь': 'male',
+  'Древняя плита': 'male',
+  'Осколочный барьер': 'male',
+  'Сигнальный рог': 'male',
+  '???': 'male',
   // Женские голоса
   Кайя: 'female',
   Селена: 'female',
@@ -39,6 +55,11 @@ const VOICE_OF: Record<string, VoiceKind> = {
   Ульва: 'female',
   Мирва: 'female',
   Нэри: 'female',
+  // v2.4
+  Пруша: 'female',
+  'Командор Мейра': 'female',
+  Ингрид: 'female',
+  'Семя Разлома': 'female',
 }
 
 const MAX_LEN = 400
@@ -101,9 +122,16 @@ async function ensureUrl(key: string, voice: VoiceKind, text: string): Promise<s
   return job
 }
 
+/** Зеркало для E2E/диагностики: кого и каким голосом взяли озвучивать. */
+export const voiceState: { lastSpeaker: string | null; lastKind: VoiceKind | null; refused: string | null } = {
+  lastSpeaker: null,
+  lastKind: null,
+  refused: null,
+}
+
 /**
  * Озвучить реплику узла диалога. Вызывается из setNode.
- * Голос есть только у ключевых спикеров (VOICE_OF); текст режется до 400 симв.
+ * Голос есть у всех спикеров VOICE_OF; текст режется до 400 симв.
  * v2.3: сперва системный голос языка интерфейса (на RU-локали — русский TTS
  * телефона); fallback — бэкенд-TTS (китайские голоса SDK).
  */
@@ -112,7 +140,13 @@ export function speakLine(speaker: string, text: string) {
   const s = useGame.getState().settings
   if (!s.voiceOn || s.voiceVol <= 0) return
   const voice = VOICE_OF[speaker]
-  if (!voice) return
+  if (!voice) {
+    voiceState.refused = speaker
+    return
+  }
+  voiceState.lastSpeaker = speaker
+  voiceState.lastKind = voice
+  voiceState.refused = null
   const clean = text.replace(/\s+/g, ' ').trim().slice(0, MAX_LEN)
   if (clean.length < 2) return
   const lang = getLocale() === 'en' ? 'en' : 'ru'
@@ -143,4 +177,5 @@ export function speakLine(speaker: string, text: string) {
 if (typeof window !== 'undefined') {
   ;(window as unknown as { __echoSpeak?: (speaker: string, text: string) => void }).__echoSpeak = (speaker, text) =>
     speakLine(speaker, text)
+  ;(window as unknown as { __echoVoiceState?: typeof voiceState }).__echoVoiceState = voiceState
 }

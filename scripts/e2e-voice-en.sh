@@ -41,7 +41,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "ru title v18: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.3') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.4') ? 'TITLE_RU_OK' : 'TITLE_RU_BAD'"
 agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim().includes('НАЧАТЬ ПУТЬ')); b.click(); return 'clicked'; })()" >/dev/null
 sleep 4
 echo -n "engine: "

@@ -41,7 +41,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "title ru: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.3') ? 'TITLE_OK' : 'TITLE_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.4') ? 'TITLE_OK' : 'TITLE_BAD'"
 
 # 2. Новая игра
 say "NEW GAME"
@@ -75,7 +75,7 @@ agent-browser eval "(() => { const l=document.querySelector('[data-touch-look]')
 echo -n "camera yaw changed: "
 agent-browser eval "(() => { const d=Math.abs(window.__echoEngine.view3d.getCameraYaw()-window.__yaw0); return d>0.05 ? 'LOOK_OK' : 'LOOK_BAD'; })()"
 agent-browser eval "(() => { const l=document.querySelector('[data-touch-look]'); const r=l.getBoundingClientRect(); const tx=r.left+r.width*0.5, ty=r.top+r.height*0.35; l.dispatchEvent(new PointerEvent('pointerdown',{pointerId:23,clientX:tx,clientY:ty,bubbles:true})); window.dispatchEvent(new PointerEvent('pointerup',{pointerId:23,clientX:tx,clientY:ty,bubbles:true})); return 'ok'; })()" >/dev/null
-echo -n "tap does NOT move (v2.3: тапы только в тактике): "
+echo -n "tap does NOT move (v2.4: тапы только в тактике): "
 agent-browser eval "window.__echoEngine.player.dest ? 'TAP_MOVED_BAD' : 'TAP_OFF_OK'"
 
 # 5. Интеракт у Грима
@@ -115,7 +115,7 @@ agent-browser eval "(() => { return document.querySelector('[data-touch-root]') 
 
 # 8. Персистентность: reload + продолжить
 say "PERSISTENCE"
-# v2.3: явный сейв — раньше шаг зависел от автосейва 45с (флейк порядка запуска)
+# v2.4: явный сейв — раньше шаг зависел от автосейва 45с (флейк порядка запуска)
 agent-browser eval "(() => { window.__echoEngine.saveGame(false); return 'saved'; })()" >/dev/null
 agent-browser eval "window.location.reload(); 'reloading'" >/dev/null
 sleep 4

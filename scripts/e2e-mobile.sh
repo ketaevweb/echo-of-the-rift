@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E v2.2→2.3 «Мобильный пресет + UX-фиксы» (версионные пины 2.3) — один батч: сервер + браузер.
+# E2E v2.2→2.4 «Мобильный пресет + UX-фиксы» (версионные пины 2.4) — один батч: сервер + браузер.
 # Проверяет:
 #   1. пресет «Мобильное»: effQuality=mobile, pixelRatio ≤ 0.86, тени выкл,
 #      MSAA выкл, дальность камеры урезана, туман гуще (×1.3), frameCap=30;
@@ -13,7 +13,7 @@
 #      действий и миникартой (по прямоугольникам);
 #   7. кластер: закрытые умения скрыты (есть igni, нет aard), пауза в ряду умений;
 #   8. FPS-чип в тач-режиме (data-hud-fps) с именем пресета;
-#   9. EN: пресет «Mobile» в настройках, VERSION 2.3 на титуле;
+#   9. EN: пресет «Mobile» в настройках, VERSION 2.4 на титуле;
 #  10. зоны не сломаны: travelTo(veld→valley) пересобирает сцену;
 #  11. консоль без ошибок.
 set -u
@@ -50,9 +50,9 @@ agent-browser eval "localStorage.setItem('echo-rift-settings', JSON.stringify({q
 agent-browser eval "location.reload(); 'reload'" >/dev/null
 sleep 3
 
-# 1. Титул: версия 2.3
-say "TITLE: v2.3"
-check "TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.3') ? 'TITLE_OK' : (document.body.innerText.match(/ВЕРСИЯ [0-9.]+/)||['none'])[0]")" "титул v2.3"
+# 1. Титул: версия 2.4
+say "TITLE: v2.4"
+check "TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.4') ? 'TITLE_OK' : (document.body.innerText.match(/ВЕРСИЯ [0-9.]+/)||['none'])[0]")" "титул v2.4"
 
 # 2. Новая игра
 say "NEW GAME"
@@ -134,7 +134,7 @@ check "VALLEY_OK" "$(agent-browser eval "window.__echoScene?.zone==='valley' ? '
 say "EN DICT"
 agent-browser eval "(() => { localStorage.setItem('echo-rift-locale','en'); location.reload(); return 'en'; })()" >/dev/null
 sleep 4
-check "EN_TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('VERSION 2.3') ? 'EN_TITLE_OK' : 'EN_TITLE_BAD'")" "EN: VERSION 2.3"
+check "EN_TITLE_OK" "$(agent-browser eval "document.body.innerText.includes('VERSION 2.4') ? 'EN_TITLE_OK' : 'EN_TITLE_BAD'")" "EN: VERSION 2.4"
 agent-browser eval "(async () => { for (let i=0;i<12 && !window.__echoEngine;i++) { [...document.querySelectorAll('button')].find(b=>/NEW GAME|YES, START OVER/.test(b.textContent))?.click(); [...document.querySelectorAll('button')].find(b=>b.textContent.includes('Warden'))?.click(); [...document.querySelectorAll('button')].find(b=>b.textContent.includes('BEGIN'))?.click(); await new Promise(r=>setTimeout(r,400)); } return 'ok'; })()" >/dev/null
 sleep 4
 check "EN_FPSCHIP" "$(agent-browser eval "(() => { const c=document.querySelector('[data-hud-fps]'); return c && /Mobile/.test(c.textContent) ? 'EN_FPSCHIP' : 'EN_BAD:'+(c?c.textContent:'none'); })()")" "EN: FPS-чип показывает пресет Mobile"

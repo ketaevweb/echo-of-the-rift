@@ -121,21 +121,23 @@ function paintWorldTerrain(ctx: CanvasRenderingContext2D) {
   }
 
   // --- Фаза 3: Хребет и Вельд ---
-  // Хребет — серая полоса гор
+  // Хребет — серая полоса гор (v2.4: только западный сектор — долина/Вельд;
+  // раньше полоса рисовалась по всей ширине и ложилась фантомом на карты
+  // восточных доменов)
   const mg = ctx.createLinearGradient(0, RIDGE.y - 200, 0, RIDGE.y + 200)
   mg.addColorStop(0, 'rgba(74,72,62,0)')
   mg.addColorStop(0.5, 'rgba(86,84,72,0.95)')
   mg.addColorStop(1, 'rgba(74,76,58,0)')
   ctx.fillStyle = mg
-  ctx.fillRect(0, RIDGE.y - 200, WORLD.w, 400)
-  // Болота — тёмно-торфяная база + пятна тины
+  ctx.fillRect(0, RIDGE.y - 200, GRIDGE.x, 400)
+  // Болота — тёмно-торфяная база + пятна тины (только Вельд)
   const vg = ctx.createLinearGradient(0, RIDGE.y + 120, 0, WORLD.h)
   vg.addColorStop(0, 'rgba(58,64,42,0.55)')
   vg.addColorStop(1, 'rgba(42,48,32,0.85)')
   ctx.fillStyle = vg
-  ctx.fillRect(0, RIDGE.y + 120, WORLD.w, WORLD.h - RIDGE.y - 120)
+  ctx.fillRect(0, RIDGE.y + 120, GRIDGE.x, WORLD.h - RIDGE.y - 120)
   for (let i = 0; i < 500; i++) {
-    const x = rnd() * WORLD.w
+    const x = rnd() * GRIDGE.x
     const y = RIDGE.y + 200 + rnd() * (WORLD.h - RIDGE.y - 260)
     ctx.fillStyle = rnd() > 0.5 ? 'rgba(52,62,38,0.3)' : 'rgba(38,44,30,0.35)'
     ctx.beginPath()

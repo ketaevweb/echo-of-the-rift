@@ -28,10 +28,17 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
   ny = Math.max(30, Math.min(WORLD.h - 30, ny))
   const er = e.radius * 0.7
   // Хребет между долиной и Вельдом непроходим (Фаза 3): переход только через Врата Тумана.
-  const lo = RIDGE.y - RIDGE.band
-  const hi = RIDGE.y + RIDGE.band
-  if (ny > lo - er && ny < hi + er) {
-    ny = e.pos.y >= RIDGE.y ? Math.max(ny, hi + er) : Math.min(ny, lo - er)
+  // v2.4: хребет существует ТОЛЬКО в западном секторе (долина/Вельд, x < GRIDGE.x).
+  // Раньше банд блокировал всю ширину мира — на востоке он пересекал Гранит,
+  // Пределье, Спорные Земли и Внешний Рубеж по y≈2560, и ЮЖНЫЕ ПОЛОВИНЫ карт
+  // восточных доменов были недостижимы пешком (репорт игрока). Гранит/Мара
+  // и далее отделяются своими хребтами ниже (у каждого свой гард по x/y).
+  if (nx < GRIDGE.x) {
+    const lo = RIDGE.y - RIDGE.band
+    const hi = RIDGE.y + RIDGE.band
+    if (ny > lo - er && ny < hi + er) {
+      ny = e.pos.y >= RIDGE.y ? Math.max(ny, hi + er) : Math.min(ny, lo - er)
+    }
   }
   // Каменный Хребет к Граниту непроходим (Фаза 6): переход только через Врата Гранита.
   const glo = GRIDGE.x - GRIDGE.band
@@ -46,10 +53,13 @@ export function moveWithCollisions(ctx: EngineCtx, e: Entity, vx: number, vy: nu
     nx = e.pos.x >= FRIDGE.x ? Math.max(nx, fhi + er) : Math.min(nx, flo2 - er)
   }
   // Багровый хребет к Маре непроходим (Фаза 6.3): только в секторе Гранита,
-  // переход — через Врата Мары. Вельд западнее не трогаем.
+  // переход — через Врата Мары. v2.4: гард по x с ОБЕИХ сторон — банд
+  // существовал и восточнее Пределья, где Мары нет: стена на y≈3350
+  // пересекала Пределье/Спорные Земли/Рубеж и отрезала их юг (в т.ч.
+  // врата Внешнего Рубежа в Спорных Землях). Вельд западнее не трогаем.
   const mlo = MARA_RIDGE.y - MARA_RIDGE.band
   const mhi = MARA_RIDGE.y + MARA_RIDGE.band
-  if (nx > GRIDGE.x && ny > mlo - er && ny < mhi + er) {
+  if (nx > GRIDGE.x && nx < FRIDGE.x && ny > mlo - er && ny < mhi + er) {
     ny = e.pos.y >= MARA_RIDGE.y ? Math.max(ny, mhi + er) : Math.min(ny, mlo - er)
   }
   // Рубежный Кряж к Спорным Землям непроходим (Фаза 6.4): только через Врата.

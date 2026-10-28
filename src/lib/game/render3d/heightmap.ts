@@ -165,12 +165,17 @@ export function heightAt(x: number, y: number): number {
   }
 
   // --- Фаза 3: Хребет и Вельд ---
-  // Хребет между долиной и Вельдом (движение блокирует systems/movement)
-  const dr = Math.abs(y - RIDGE.y)
-  if (dr < 330) {
-    const jag = (fbm(x / 110 + 51, y / 110 + 7, 2) - 0.5) * 10
-    const t = falloff(dr, 70, 260)
-    h += t * t * (56 + jag)
+  // Хребет между долиной и Вельдом (движение блокирует systems/movement).
+  // v2.4: только западный сектор (x < GRIDGE.x) — как и банд движения.
+  // Раньше горы рисовались по всей ширине мира и «фантомным хребтом»
+  // пересекали середину карт Гранита/Пределья/Спорных Земель.
+  if (x < GRIDGE.x) {
+    const dr = Math.abs(y - RIDGE.y)
+    if (dr < 330) {
+      const jag = (fbm(x / 110 + 51, y / 110 + 7, 2) - 0.5) * 10
+      const t = falloff(dr, 70, 260)
+      h += t * t * (56 + jag)
+    }
   }
   // --- Фаза 6: Каменный Хребет к Граниту (вертикальная стена по x) ---
   const dg = Math.abs(x - GRIDGE.x)
@@ -187,7 +192,10 @@ export function heightAt(x: number, y: number): number {
     h += t * t * (62 + jag)
   }
   // --- Фаза 6.3: Багровый хребет к Маре (горизонтальная стена по y, только сектор Гранита) ---
-  if (x > GRIDGE.x) {
+  // v2.4: гард по x с обеих сторон — раньше горы хребта и багровая пустошь
+  // рисовались и восточнее Пределья (фантомный хребет на y≈3350 на картах
+  // Спорных Земель и Рубежа).
+  if (x > GRIDGE.x && x < FRIDGE.x) {
     const dm = Math.abs(y - MARA_RIDGE.y)
     if (dm < 330) {
       const jag = (fbm(x / 110 + 103, y / 110 + 53, 2) - 0.5) * 11
@@ -465,10 +473,12 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
       }
     }
   }
-  // Хребет — голый камень
-  const drg = Math.abs(y - RIDGE.y)
-  if (drg < 320) {
-    lerp3(tmpA, C_ROCK, falloff(drg, 70, 250) * 0.85, tmpA)
+  // Хребет — голый камень (v2.4: только западный сектор, как и сам хребет)
+  if (x < GRIDGE.x) {
+    const drg = Math.abs(y - RIDGE.y)
+    if (drg < 320) {
+      lerp3(tmpA, C_ROCK, falloff(drg, 70, 250) * 0.85, tmpA)
+    }
   }
   // Каменный Хребет к Граниту — голый камень (Фаза 6)
   const dgg = Math.abs(x - GRIDGE.x)
@@ -534,7 +544,8 @@ export function terrainColorAt(x: number, y: number, h: number, out: [number, nu
   }
 
   // --- Фаза 6.3: Багровая Мара — гниль и багровые жилы (после гранита, перекрывает его) ---
-  if (x > GRIDGE.x && y > MARA_RIDGE.y - 200) {
+  // v2.4: только сектор Гранита по x — багровые тона не текли на восток.
+  if (x > GRIDGE.x && x < FRIDGE.x && y > MARA_RIDGE.y - 200) {
     const mz = falloff(y - (MARA_RIDGE.y - 200), 0, 240)
     if (mz > 0.01) {
       const bl = fbm(x / 210 + 77, y / 210 + 33, 3)
