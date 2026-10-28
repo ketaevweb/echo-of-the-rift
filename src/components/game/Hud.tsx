@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Heart, Map, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
+import { Heart, Map, Maximize2, Menu, Minimize2, Moon, ScrollText, Shield, Snowflake, Sun, User, Volume2, VolumeX, Wind, X } from 'lucide-react'
 import { isMuted, setMuted } from '@/lib/game/sfx'
 import { getEngine } from '@/lib/game/engine'
 import { useGame } from '@/lib/game/store'
 import { t, useLocale } from '@/lib/game/i18n'
+import { useFullscreen } from '@/lib/game/fullscreen'
 import { GameIcon } from './GameIcon'
 
 /** Цели счётчиков побочных квестов для трекера (N из M). */
@@ -35,14 +36,16 @@ function Bar({ value, max, color, bg = 'bg-[#241c14]' }: { value: number; max: n
 
 function PartyFrame({
   p,
+  compact = false,
 }: {
   p: { eid: number; id: string; name: string; role: string; hp: number; maxHp: number; alive: boolean; stance: string; approval: number; abilities: Array<{ id: string; name: string; icon: string; cd: number; cdMax: number }> }
+  compact?: boolean
 }) {
   const engine = getEngine()
   const isPlayer = p.id === 'player'
   const trusted = p.approval >= 60 // порог парных приёмов (Фаза 4)
   return (
-    <div className="pointer-events-auto w-44 rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm sm:w-56">
+    <div className={`pointer-events-auto rounded border border-[#5a4632]/80 bg-[#181410]/85 p-2 backdrop-blur-sm ${compact ? 'w-32' : 'w-44 sm:w-56'}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${p.alive ? 'border-[#d9a441]/60 bg-[#241c14]' : 'border-[#c94f3d] bg-[#c94f3d]/20 text-[#e08a6b]'}`}>
@@ -50,9 +53,11 @@ function PartyFrame({
           </span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[#e8d5a8]">{p.name}</p>
-            <p className="truncate text-[10px] text-[#8a8068]">
-              {isPlayer ? p.role : t(STANCE_LABEL[p.stance] ?? '')}
-            </p>
+            {!compact && (
+              <p className="truncate text-[10px] text-[#8a8068]">
+                {isPlayer ? p.role : t(STANCE_LABEL[p.stance] ?? '')}
+              </p>
+            )}
           </div>
         </div>
         <span className="shrink-0 text-[10px] tabular-nums text-[#9a8f78]">
@@ -62,8 +67,8 @@ function PartyFrame({
       <div className="mt-1.5">
         <Bar value={p.hp} max={p.maxHp} color={p.alive ? (isPlayer ? 'bg-[#8fbf7f]' : 'bg-[#7a9a6a]') : 'bg-[#c94f3d]'} />
       </div>
-      {/* Фаза 4: одобрение компаньона — при ≥60 открываются парные приёмы */}
-      {!isPlayer && (
+      {/* Фаза 4: одобрение компаньона — при ≥60 открываются парные приёмы (в компакт-режиме скрыто) */}
+      {!isPlayer && !compact && (
         <div className="mt-1 flex items-center gap-1.5" title={trusted ? t('Доверие высоко — парные приёмы доступны') : t('Доверие растёт от боёв и квестов. При 60 — парные приёмы')}>
           <Heart className={`h-2.5 w-2.5 shrink-0 ${trusted ? 'text-[#e08a6b]' : 'text-[#6a5f4a]'}`} />
           <div className="h-1 w-full overflow-hidden rounded-sm bg-[#241c14]">
@@ -75,7 +80,7 @@ function PartyFrame({
           <span className={`shrink-0 text-[9px] tabular-nums ${trusted ? 'text-[#f5c96b]' : 'text-[#8a8068]'}`}>{p.approval}</span>
         </div>
       )}
-      {!isPlayer && (
+      {!isPlayer && !compact && (
         <div className="mt-1.5 flex items-center gap-1">
           <button
             onClick={() => engine?.setStance(p.eid)}
@@ -131,6 +136,8 @@ export default function Hud() {
   const touchUi = useGame((s) => s.touchUi) // v2.0: сенсорные контролы активны
   const miniRef = useRef<HTMLCanvasElement | null>(null)
   const [muted, setMutedUi] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false) // v2.1: шторка меню
+  const [fsOn, fsToggle, fsSupported] = useFullscreen()
 
   useEffect(() => {
     const engine = getEngine()
@@ -157,15 +164,15 @@ export default function Hud() {
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans text-[#e8d5a8]">
-      {/* Отряд слева сверху */}
+      {/* Отряд слева сверху (v2.1: в тач-режиме — компактные рамки, не спорятся с меню) */}
       <div className="absolute left-3 top-3 flex flex-col gap-2">
         {party.map((p) => (
-          <PartyFrame key={p.eid} p={p} />
+          <PartyFrame key={p.eid} p={p} compact={touchUi} />
         ))}
       </div>
 
       {/* Миникарта и трекер справа сверху (v2.0: на узких экранах — уже) */}
-      <div className="absolute right-3 top-3 flex w-44 flex-col gap-2 sm:w-56">
+      <div className={`absolute right-3 top-3 flex flex-col gap-2 ${touchUi ? 'w-36' : 'w-44 sm:w-56'}`}>
         <div className="pointer-events-auto overflow-hidden rounded border border-[#5a4632]/80 bg-[#181410]/85 p-1 backdrop-blur-sm">
           <canvas ref={miniRef} data-minimap width={214} height={160} className="h-auto w-full rounded-sm" />
           <div className="mt-1 flex items-center justify-between px-1 pb-0.5">
@@ -210,9 +217,90 @@ export default function Hud() {
         )}
       </div>
 
-      {/* Босс-бар */}
+      {/* v2.1: шторка меню — верх-центр в тач-режиме (нижний угол отдаётся контролам;
+          раньше кнопки лежали под джойстиком и были недоступны) */}
+      {touchUi && (
+        <div className="pointer-events-auto absolute left-1/2 top-3 z-20 -translate-x-1/2" style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}>
+          <button
+            data-hud-menu
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex h-11 w-11 touch-none items-center justify-center rounded-full border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition active:border-[#d9a441] active:text-[#f5c96b]"
+            aria-label={t('Меню игры')}
+            aria-expanded={menuOpen}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">{t('Меню игры')}</span>
+          </button>
+          {menuOpen && (
+            <div
+              data-hud-menu-panel
+              className="absolute left-1/2 top-[52px] flex w-52 -translate-x-1/2 flex-col gap-1 rounded border border-[#5a4632] bg-[#181410]/95 p-2 shadow-xl backdrop-blur-md"
+            >
+              {([
+                ['char', 'User', 'Персонаж [C]'],
+                ['inv', 'Backpack', 'Инвентарь [I]'],
+                ['journal', 'ScrollText', 'Журнал [J]'],
+                ['map', 'Map', 'Карта [M]'],
+              ] as const).map(([id, icon, title]) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    getEngine()?.openPanel(id as 'char')
+                  }}
+                  className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                >
+                  <GameIcon name={icon} className="h-4 w-4" />
+                  {t(title)}
+                </button>
+              ))}
+              <div className="my-0.5 h-px bg-[#3a2e20]" />
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  getEngine()?.openPanel('pause')
+                }}
+                className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+              >
+                <GameIcon name="Settings" className="h-4 w-4" />
+                {t('Меню [Esc]')}
+              </button>
+              <button
+                onClick={() => {
+                  const next = !muted
+                  setMuted(next)
+                  setMutedUi(next)
+                }}
+                className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+              >
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                {t('Звук')}
+              </button>
+              {fsSupported && (
+                <button
+                  data-fullscreen
+                  onClick={() => fsToggle()}
+                  className="flex h-11 items-center gap-3 rounded border border-transparent px-3 text-sm text-[#cfc0a0] transition hover:border-[#d9a441]/50 hover:bg-[#241c14] hover:text-[#f5c96b]"
+                >
+                  {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {fsOn ? t('Свернуть экран') : t('Полный экран')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* v2.1: XP-лента — тонкая полоса по верхней кромке в тач-режиме */}
+      {player && touchUi && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-[#241c14]/70" style={{ paddingTop: 0 }}>
+          <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
+        </div>
+      )}
+
+      {/* Босс-бар (v2.1: в тач-режиме ниже шторки меню) */}
       {bossBar && (
-        <div className="absolute left-1/2 top-3 w-80 -translate-x-1/2">
+        <div className={`absolute left-1/2 w-80 max-w-[70vw] -translate-x-1/2 ${touchUi ? 'top-16' : 'top-3'}`}>
           <p className="game-title-font text-center text-sm tracking-[0.3em] text-[#c9a3e8]">{bossBar.name}</p>
           <div className="mt-1">
             <Bar value={bossBar.hp} max={bossBar.maxHp} color="bg-[#a06bd9]" bg="bg-[#1a1220]" />
@@ -220,9 +308,9 @@ export default function Hud() {
         </div>
       )}
 
-      {/* Оборона Бастиона (Фаза 6.3): волна + прочность частокола */}
+      {/* Оборона Бастиона (Фаза 6.3): волна + прочность частокола (v2.1: выше тач-кластера) */}
       {siege && (
-        <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#c94f3d]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
+        <div className={`absolute left-1/2 w-72 -translate-x-1/2 rounded border border-[#c94f3d]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm ${touchUi ? 'bottom-52' : 'bottom-40'}`}>
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#e08a6b]">
             {t('ОБОРОНА БАСТИОНА · ВОЛНА {a}/{b}', { a: Math.min(siege.wave + 1, siege.waves), b: siege.waves })}
           </p>
@@ -237,7 +325,7 @@ export default function Hud() {
 
       {/* Набег Орды (Фаза 6.4): волны мародёров идут к Роще */}
       {assault && (
-        <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#b0563a]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
+        <div className={`absolute left-1/2 w-72 -translate-x-1/2 rounded border border-[#b0563a]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm ${touchUi ? 'bottom-52' : 'bottom-40'}`}>
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#e08a6b]">
             {t('НАБЕГ ОРДЫ · ВОЛНА {a}/{b}', { a: Math.min(assault.wave + 1, assault.waves), b: assault.waves })}
           </p>
@@ -249,7 +337,7 @@ export default function Hud() {
 
       {/* Рейд в Сердце Разлома (Фаза 7): 4 волны эха + роли отряда */}
       {raid && (
-        <div className="absolute bottom-40 left-1/2 w-72 -translate-x-1/2 rounded border border-[#a06bd9]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm">
+        <div className={`absolute left-1/2 w-72 -translate-x-1/2 rounded border border-[#a06bd9]/60 bg-[#181410]/90 px-3 py-2 backdrop-blur-sm ${touchUi ? 'bottom-52' : 'bottom-40'}`}>
           <p className="game-title-font text-center text-[11px] tracking-[0.25em] text-[#c9a3e8]">
             {t('РЕЙД · ВОЛНА {a}/{b}', { a: Math.min(raid.wave + 1, raid.waves), b: raid.waves })}
           </p>
@@ -323,54 +411,57 @@ export default function Hud() {
         </>
       )}
 
-      {/* Подсказка взаимодействия */}
+      {/* Подсказка взаимодействия (v2.1: в тач-режиме выше кластера действий) */}
       {interactHint && !paused && (
-        <div className="absolute bottom-28 left-1/2 -translate-x-1/2">
+        <div className={`absolute left-1/2 -translate-x-1/2 ${touchUi ? 'bottom-52' : 'bottom-28'}`}>
           <p className="rounded border border-[#d9a441]/50 bg-[#181410]/90 px-3 py-1 text-xs text-[#f5c96b]">{interactHint}</p>
         </div>
       )}
 
-      {/* Меню слева снизу (v2.0: в тач-режиме кнопки ≥44px) */}
-      <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col gap-2" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex gap-1.5">
-          {[
-            { id: 'char', label: 'C', icon: 'User', title: 'Персонаж [C]' },
-            { id: 'inv', label: 'I', icon: 'Backpack', title: 'Инвентарь [I]' },
-            { id: 'journal', label: 'J', icon: 'ScrollText', title: 'Журнал [J]' },
-            { id: 'map', label: 'M', icon: 'Map', title: 'Карта [M]' },
-          ].map((b) => (
+      {/* Меню слева снизу (v2.1: только для мыши — в тач-режиме шторка сверху,
+          нижние углы целиком отданы джойстику и кластеру действий) */}
+      {!touchUi && (
+        <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col gap-2" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="flex gap-1.5">
+            {[
+              { id: 'char', label: 'C', icon: 'User', title: 'Персонаж [C]' },
+              { id: 'inv', label: 'I', icon: 'Backpack', title: 'Инвентарь [I]' },
+              { id: 'journal', label: 'J', icon: 'ScrollText', title: 'Журнал [J]' },
+              { id: 'map', label: 'M', icon: 'Map', title: 'Карта [M]' },
+            ].map((b) => (
+              <button
+                key={b.id}
+                onClick={() => getEngine()?.openPanel(b.id as 'char')}
+                title={t(b.title)}
+                className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
+              >
+                <GameIcon name={b.icon} className="h-4 w-4" />
+                <span className="sr-only">{t(b.title)}</span>
+              </button>
+            ))}
             <button
-              key={b.id}
-              onClick={() => getEngine()?.openPanel(b.id as 'char')}
-              title={t(b.title)}
-              className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
+              onClick={() => getEngine()?.openPanel('pause')}
+              title={t('Меню [Esc]')}
+              className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b]"
             >
-              <GameIcon name={b.icon} className="h-4 w-4" />
-              <span className="sr-only">{t(b.title)}</span>
+              <GameIcon name="Settings" className="h-4 w-4" />
+              <span className="sr-only">{t('Меню')}</span>
             </button>
-          ))}
-          <button
-            onClick={() => getEngine()?.openPanel('pause')}
-            title={t('Меню [Esc]')}
-            className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] hover:text-[#f5c96b] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
-          >
-            <GameIcon name="Settings" className="h-4 w-4" />
-            <span className="sr-only">{t('Меню')}</span>
-          </button>
-          <button
-            onClick={() => {
-              const next = !muted
-              setMuted(next)
-              setMutedUi(next)
-            }}
-            title={t('Звук')}
-            className={`flex items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441] ${touchUi ? 'h-11 w-11' : 'h-9 w-9'}`}
-          >
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            <span className="sr-only">{t('Звук')}</span>
-          </button>
+            <button
+              onClick={() => {
+                const next = !muted
+                setMuted(next)
+                setMutedUi(next)
+              }}
+              title={t('Звук')}
+              className="flex h-9 w-9 items-center justify-center rounded border border-[#5a4632] bg-[#181410]/85 text-[#cfc0a0] backdrop-blur-sm transition hover:border-[#d9a441]"
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              <span className="sr-only">{t('Звук')}</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Панель умений снизу по центру (v2.0: в тач-режиме бар заменяют сенсорные кнопки) */}
       {player && !touchUi && (
@@ -475,21 +566,11 @@ export default function Hud() {
               <span className="text-[10px] tabular-nums text-[#9a8f78]">{t('{s}с', { s: oil.remain })}</span>
             </div>
           )}
-          {/* XP полоска (v2.0: видна и в тач-режиме — отдельный блок ниже) */}
-          {!touchUi && (
-            <div className="mx-auto mt-1 w-72">
-              <div className="h-1 overflow-hidden rounded-full bg-[#241c14]">
-                <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
-              </div>
+          {/* XP полоска (мышь) */}
+          <div className="mx-auto mt-1 w-72">
+            <div className="h-1 overflow-hidden rounded-full bg-[#241c14]">
+              <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
             </div>
-          )}
-        </div>
-      )}
-      {/* v2.0: XP полоска в тач-режиме — над левым меню, не мешает контролам */}
-      {player && touchUi && (
-        <div className="pointer-events-none absolute bottom-16 left-3 w-44">
-          <div className="h-1 overflow-hidden rounded-full bg-[#241c14]/80">
-            <div className="h-full bg-[#c9b06b]/80" style={{ width: `${xpPct}%` }} />
           </div>
         </div>
       )}

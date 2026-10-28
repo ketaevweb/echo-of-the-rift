@@ -6,9 +6,10 @@
 // ============================================================
 
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
+import type { ZoneId } from '../core/ctx'
 
 export interface IRenderer {
-  /** Запечь статичный террейн мира в offscreen-канвас (один раз на игру). */
+  /** Запечь статичный террейн мира в offscreen-канвас (легаси; движок v2.1 использует bakeZoneTerrain). */
   bakeTerrain(): HTMLCanvasElement
   /** Отрисовать проп (дерево/дом/камень/...) с сортировкой по Y снаружи. */
   drawProp(ctx: CanvasRenderingContext2D, p: PropDef, t: number): void
@@ -18,16 +19,24 @@ export interface IRenderer {
   drawParticles(ctx: CanvasRenderingContext2D, ps: Particle[]): void
   /** Всплывающий боевой текст. */
   drawFloaters(ctx: CanvasRenderingContext2D, fs: Floater[]): void
-  /** Миникарта в HUD-канвасе. */
+  /** Миникарта в HUD-канвасе (v2.1: текущая зона). */
   drawMinimap(
     mini: HTMLCanvasElement,
     baked: HTMLCanvasElement,
+    rect: [number, number, number, number],
     entities: Entity[],
     playerPos: Vec,
     questMarker: Vec | null,
     size: number,
     t: number,
   ): void
-  /** Полная карта (панель «Карта»). */
-  drawFullMap(canvas: HTMLCanvasElement, baked: HTMLCanvasElement, playerPos: Vec, questMarker: Vec | null): void
+  /** Полная карта (панель «Карта»; v2.1: текущая зона + врата). */
+  drawFullMap(
+    canvas: HTMLCanvasElement,
+    baked: HTMLCanvasElement,
+    rect: [number, number, number, number],
+    zone: ZoneId,
+    playerPos: Vec,
+    questMarker: Vec | null,
+  ): void
 }

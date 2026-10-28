@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { ChevronDown, ChevronUp, Play, RotateCcw, ScrollText, Swords, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, Play, RotateCcw, ScrollText, Swords, X } from 'lucide-react'
 import { boot, ORIGINS, useGame } from '@/lib/game/store'
 import { setLocale, t, useLocale } from '@/lib/game/i18n'
+import { useFullscreen } from '@/lib/game/fullscreen'
 import { GAME_VERSION } from '@/lib/game/version'
 import { CreditsBody } from './Panels'
 import { GameIcon } from './GameIcon'
@@ -30,6 +31,7 @@ export default function TitleScreen() {
   const [showControls, setShowControls] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [origin, setOrigin] = useState(boot.origin)
+  const [fsOn, fsToggle, fsSupported] = useFullscreen()
 
   const start = (mode: 'new' | 'continue') => {
     boot.mode = mode
@@ -157,6 +159,18 @@ export default function TitleScreen() {
               <ScrollText className="h-4 w-4" />
               {t('ТИТРЫ')}
             </button>
+            {/* v2.1: полноэкранный режим — главный для телефона */}
+            {fsSupported && (
+              <button
+                data-title-fullscreen
+                onClick={() => fsToggle()}
+                className="flex items-center gap-2 text-xs tracking-widest text-[#9a8f78] transition hover:text-[#d9a441]"
+                title={fsOn ? t('Свернуть экран') : t('Полный экран')}
+              >
+                {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                {fsOn ? t('Свернуть экран') : t('Полный экран')}
+              </button>
+            )}
           </div>
           {showControls && (
             <div className="mt-3 grid max-w-xl gap-4 rounded border border-[#5a4632]/70 bg-[#181410]/90 p-4 text-xs text-[#cfc0a0] sm:grid-cols-2">

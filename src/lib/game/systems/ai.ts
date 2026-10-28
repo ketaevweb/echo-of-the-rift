@@ -7,8 +7,10 @@
 
 import { ABILITY_MAP, ENEMY_STATS } from '../data/abilities'
 import { ENEMY_NAME } from '../data/tables'
-import { ASH_MOTHER, BLIGHT_WELLS, DIG_SPOTS, NPCS, PLAYER_SPAWN, SPAWN_ZONES, UNIQUE_SPAWNS, VELD_CLUES } from '../data/world'
-import { Entity, Stance, Vec } from '../types'
+import { ASH_MOTHER, BLIGHT_WELLS, DIG_SPOTS, PLAYER_SPAWN, UNIQUE_SPAWNS, VELD_CLUES, zoneOf } from '../data/world'
+import { ZONE_DATA } from '../data/zones'
+import type { ZoneId } from '../core/ctx'
+import { Entity, SpawnZoneDef, Stance, Vec } from '../types'
 import { sfx } from '../sfx'
 import { d, rndRange } from '../core/util'
 import { EngineCtx } from '../core/ctx'
@@ -53,8 +55,12 @@ export function createPlayer(ctx: EngineCtx, pos: Vec) {
   ctx.entities.push(ctx.player)
 }
 
-export function spawnWorld(ctx: EngineCtx) {
-  for (const n of NPCS) {
+/** v2.1: заселить сцену текущей зоны — НПС, враги спавн-зон, уникали и
+ *  боссы доменов ТОЛЬКО этой земли. Прочие зоны не симулируются и не
+ *  рендерятся: их сцена строится при входе через врата (enterZone). */
+export function spawnZoneContent(ctx: EngineCtx, zone: ZoneId) {
+  const zd = ZONE_DATA[zone]
+  for (const n of zd.npcs) {
     if (n.id === 'kaya' && ctx.companionIds.kaya) continue
     if (n.id === 'torvald_npc' && ctx.companionIds.torvald) continue
     // Фаза 6.4: выборы меняют ландшафт — выжженная роща прячет Ульву и Прушу,
@@ -78,31 +84,32 @@ export function spawnWorld(ctx: EngineCtx) {
       }),
     )
   }
-  for (const z of SPAWN_ZONES) {
+  for (const z of zd.spawns) {
     for (let i = 0; i < z.max; i++) spawnZoneEnemy(ctx, z)
   }
   for (const u of UNIQUE_SPAWNS) {
+    if (zoneOf(u.pos.x, u.pos.y) !== zone) continue
     if (u.enemy === 'alpha' && ctx.flags.alphaDead) continue
     if (u.enemy === 'captain' && ctx.flags.captainDead) continue
     if (u.enemy === 'boss' && ctx.flags.bossDead) continue
     spawnUnique(ctx, u.enemy, u.pos)
   }
   // Вельд (Фаза 3): Пепельная Мать появляется после прочтения всех следов
-  if (ctx.flags.ashMotherRevealed && !ctx.flags.ashMotherDead) {
+  if (zone === 'veld' && ctx.flags.ashMotherRevealed && !ctx.flags.ashMotherDead) {
     spawnAshMother(ctx)
   }
   // Гранит (Фаза 6): Мастер Ямы выходит, если квест дошёл до вызова
-  if (ctx.flags.pitMasterRevealed && !ctx.flags.pitMasterDead) {
+  if (zone === 'granite' && ctx.flags.pitMasterRevealed && !ctx.flags.pitMasterDead) {
     spawnPitMaster(ctx)
   }
   // Пределье (Фаза 6.2): бой с драконом, прерванный загрузкой сейва, продолжается
-  if (
-    ctx.quests.frost_dragon?.stage === 3 &&
-    !ctx.flags.dragonDead &&
-    ctx.player.pos.x > 5500
-  ) {
+  if (zone === 'frost' && ctx.quests.frost_dragon?.stage === 3 && !ctx.flags.dragonDead) {
     spawnDragon(ctx)
   }
+}
+
+export function spawnWorld(ctx: EngineCtx) {
+  // --- Глобальные следы прогресса (removedProps не зависят от зоны) ---
   for (const c of VELD_CLUES) {
     if (ctx.flags['clue_' + c.id]) ctx.removedProps.add(c.id)
   }
@@ -116,10 +123,6 @@ export function spawnWorld(ctx: EngineCtx) {
   for (const d of DIG_SPOTS) {
     if (ctx.flags['dig_' + d.id]) ctx.removedProps.add(d.id)
   }
-  // Фаза 4: спавним по наличию в мире (а не по флагу — сейв ставит
-  // companionIds=true до spawnWorld, и старый гвард молча терял партию при загрузке)
-  if (ctx.companionIds.kaya && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'kaya')) spawnCompanion(ctx, 'kaya')
-  if (ctx.companionIds.torvald && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'torvald')) spawnCompanion(ctx, 'torvald')
   if (ctx.flags.gateOpen) {
     ctx.removedProps.add('barrier')
     ctx.removedProps.add('barrier2')
@@ -128,9 +131,14 @@ export function spawnWorld(ctx: EngineCtx) {
   for (let i = 1; i <= 4; i++) {
     if (ctx.flags['herb_herb' + i]) ctx.removedProps.add('herb' + i)
   }
+  // --- Компаньоны (пересекают зоны вместе с игроком) ---
+  if (ctx.companionIds.kaya && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'kaya')) spawnCompanion(ctx, 'kaya')
+  if (ctx.companionIds.torvald && !ctx.entities.some((x) => x.kind === 'companion' && x.id === 'torvald')) spawnCompanion(ctx, 'torvald')
+  // --- Сцена текущей зоны (v2.1): пропсы/коллайдеры/НПС/враги этой земли ---
+  ctx.enterZone(zoneOf(ctx.player.pos.x, ctx.player.pos.y))
 }
 
-export function spawnZoneEnemy(ctx: EngineCtx, z: (typeof SPAWN_ZONES)[number]) {
+export function spawnZoneEnemy(ctx: EngineCtx, z: SpawnZoneDef) {
   const st = ENEMY_STATS[z.enemy]
   const a = Math.random() * Math.PI * 2
   const rr = Math.random() * z.radius
@@ -190,7 +198,7 @@ export function spawnCompanion(ctx: EngineCtx, id: 'kaya' | 'torvald') {
   // Гвард по сущности в мире (а не по флагу вербовки): флаг уже true при загрузке сейва
   if (ctx.entities.some((x) => x.kind === 'companion' && x.id === id)) return
   ctx.companionIds[id] = true
-  const npcDef = NPCS.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
+  const npcDef = ZONE_DATA.valley.npcs.find((n) => n.id === (id === 'torvald' ? 'torvald_npc' : id))
   const isKaya = id === 'kaya'
   const e = makeEntity(ctx, {
     id,
@@ -462,7 +470,7 @@ export function updateEnemy(ctx: EngineCtx, e: Entity, dt: number) {
         e.aiState = 'idle'
         e.burnT = 0
         e.stunT = 0
-        const zone = SPAWN_ZONES.find((z) => z.id === e.zoneId)
+        const zone = ZONE_DATA[ctx.zone].spawns.find((z) => z.id === e.zoneId)
         if (zone) {
           const a = Math.random() * Math.PI * 2
           const rr = Math.random() * zone.radius

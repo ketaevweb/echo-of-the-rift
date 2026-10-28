@@ -1,14 +1,14 @@
 import { Entity, Floater, Particle, PropDef, Vec } from '../types'
-import { AREA_MARKERS, LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD, FRIDGE, HAVEN, ROOST, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE } from '../data/world'
+import { LAKE, POOLS, RIDGE, ROADS, WORLD, GRIDGE, COLONY, PIT, SHARD, FRIDGE, HAVEN, ROOST, KRAJ, DF_GATES, GROVE, HORDE_CAMP, SHRINE } from '../data/world'
+import type { ZoneId } from '../core/ctx'
+import { ZONE_DATA, gatesOf, zoneViewRect } from '../data/zones'
 
-// ---------------- Терен (запекается один раз) ----------------
+// ---------------- Терен (запекается по зоне — v2.1) ----------------
 
-export function bakeTerrain(): HTMLCanvasElement {
-  const c = document.createElement('canvas')
-  c.width = WORLD.w
-  c.height = WORLD.h
-  const ctx = c.getContext('2d') as CanvasRenderingContext2D
-
+/** Красит терен всего мира в мировых координатах. v2.1: вызывается внутри
+ *  зонного запекания (клип по зоне) — полный канвас 8800×4200 (~148 МБ VRAM)
+ *  больше не создаётся никогда. */
+function paintWorldTerrain(ctx: CanvasRenderingContext2D) {
   // База — тёмная северная тайга
   ctx.fillStyle = '#39472c'
   ctx.fillRect(0, 0, WORLD.w, WORLD.h)
@@ -326,7 +326,45 @@ export function bakeTerrain(): HTMLCanvasElement {
   ctx.fillStyle = eg2
   ctx.fillRect(0, 0, WORLD.w, edge)
   ctx.restore()
+}
 
+/** Легаси-запекание всего мира (совместимость; движок v2.1 использует bakeZoneTerrain). */
+export function bakeTerrain(): HTMLCanvasElement {
+  const c = document.createElement('canvas')
+  c.width = WORLD.w
+  c.height = WORLD.h
+  const ctx = c.getContext('2d') as CanvasRenderingContext2D
+  paintWorldTerrain(ctx)
+  return c
+}
+
+// ---------------- Зонное запекание (v2.1) ----------------
+
+const BAKE_SCALE = 0.5 // терен малодетален — половинное разрешение экономит ×4 памяти
+const zoneBakes = new Map<ZoneId, HTMLCanvasElement>()
+
+/** Запечь терен ТЕКУЩЕЙ зоны (кэш LRU на 2 зоны — соседняя земля и текущая). */
+export function bakeZoneTerrain(zone: ZoneId): HTMLCanvasElement {
+  const cached = zoneBakes.get(zone)
+  if (cached) return cached
+  const rect = zoneViewRect(zone)
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.ceil(rect[2] * BAKE_SCALE))
+  c.height = Math.max(1, Math.ceil(rect[3] * BAKE_SCALE))
+  const ctx = c.getContext('2d') as CanvasRenderingContext2D
+  ctx.scale(BAKE_SCALE, BAKE_SCALE)
+  ctx.translate(-rect[0], -rect[1])
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(rect[0], rect[1], rect[2], rect[3])
+  ctx.clip()
+  paintWorldTerrain(ctx)
+  ctx.restore()
+  zoneBakes.set(zone, c)
+  if (zoneBakes.size > 2) {
+    const oldest = zoneBakes.keys().next().value
+    if (oldest !== undefined && oldest !== zone) zoneBakes.delete(oldest)
+  }
   return c
 }
 
@@ -1832,6 +1870,7 @@ export function drawFloaters(ctx: CanvasRenderingContext2D, fs: Floater[]) {
 export function drawMinimap(
   mini: HTMLCanvasElement,
   baked: HTMLCanvasElement,
+  rect: [number, number, number, number],
   entities: Entity[],
   playerPos: Vec,
   questMarker: Vec | null,
@@ -1840,14 +1879,17 @@ export function drawMinimap(
 ) {
   const ctx = mini.getContext('2d')
   if (!ctx) return
-  const scale = size / WORLD.w
+  // v2.1: миникарта показывает ТЕКУЩУЮ зону, а не весь мир
+  const scale = size / rect[2]
+  const mh = size * (rect[3] / rect[2])
   ctx.clearRect(0, 0, size, size)
-  ctx.drawImage(baked, 0, 0, WORLD.w, WORLD.h, 0, 0, size, size * (WORLD.h / WORLD.w))
-  const mh = size * (WORLD.h / WORLD.w)
+  ctx.drawImage(baked, 0, 0, baked.width, baked.height, 0, 0, size, mh)
+  const sx = (x: number) => (x - rect[0]) * scale
+  const sy = (y: number) => ((y - rect[1]) / rect[3]) * mh
   const dot = (x: number, y: number, color: string, r: number) => {
     ctx.fillStyle = color
     ctx.beginPath()
-    ctx.arc(x * scale, y * (mh / WORLD.h), r, 0, Math.PI * 2)
+    ctx.arc(Math.max(2, Math.min(size - 2, sx(x))), Math.max(2, Math.min(mh - 2, sy(y))), r, 0, Math.PI * 2)
     ctx.fill()
   }
   for (const e of entities) {
@@ -1861,13 +1903,13 @@ export function drawMinimap(
     ctx.strokeStyle = '#f5c96b'
     ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.arc(questMarker.x * scale, questMarker.y * (mh / WORLD.h), 4 + pulse, 0, Math.PI * 2)
+    ctx.arc(sx(questMarker.x), sy(questMarker.y), 4 + pulse, 0, Math.PI * 2)
     ctx.stroke()
   }
   // игрок
   ctx.fillStyle = '#f5c96b'
   ctx.beginPath()
-  ctx.arc(playerPos.x * scale, playerPos.y * (mh / WORLD.h), 3, 0, Math.PI * 2)
+  ctx.arc(sx(playerPos.x), sy(playerPos.y), 3, 0, Math.PI * 2)
   ctx.fill()
   ctx.strokeStyle = 'rgba(255,255,255,0.7)'
   ctx.lineWidth = 1
@@ -1877,6 +1919,8 @@ export function drawMinimap(
 export function drawFullMap(
   canvas: HTMLCanvasElement,
   baked: HTMLCanvasElement,
+  rect: [number, number, number, number],
+  zone: ZoneId,
   playerPos: Vec,
   questMarker: Vec | null,
 ) {
@@ -1885,36 +1929,58 @@ export function drawFullMap(
   const w = canvas.width
   const h = canvas.height
   ctx.clearRect(0, 0, w, h)
-  ctx.drawImage(baked, 0, 0, WORLD.w, WORLD.h, 0, 0, w, h)
-  const sx = w / WORLD.w
-  const sy = h / WORLD.h
+  // фон-подложка (по бокам зоны при неполном совпадении пропорций)
+  ctx.fillStyle = '#0e120c'
+  ctx.fillRect(0, 0, w, h)
+  // v2.1: карта — текущая зона (вписана в канвас с сохранением пропорций)
+  const s = Math.min(w / rect[2], h / rect[3])
+  const ox = (w - rect[2] * s) / 2
+  const oy = (h - rect[3] * s) / 2
+  ctx.drawImage(baked, 0, 0, baked.width, baked.height, ox, oy, rect[2] * s, rect[3] * s)
+  const sx = (x: number) => ox + (x - rect[0]) * s
+  const sy = (y: number) => oy + (y - rect[1]) * s
   ctx.font = '12px ui-serif, Georgia, serif'
   ctx.textAlign = 'center'
-  for (const m of AREA_MARKERS) {
-    // v1.9: кламп метки в границы канваса — «Хребет сигналов» у нижней
-    // кромки обрезался, плашка и текст уходили за пределы карты.
-    const tw = ctx.measureText(m.label).width
-    const lx = Math.max(tw / 2 + 6, Math.min(w - tw / 2 - 6, m.pos.x * sx))
-    const ly = Math.max(14, Math.min(h - 6, m.pos.y * sy - 6))
+  const label = (text: string, x: number, y: number, color: string) => {
+    const tw = ctx.measureText(text).width
+    const lx = Math.max(tw / 2 + 6, Math.min(w - tw / 2 - 6, x))
+    const ly = Math.max(14, Math.min(h - 6, y))
     ctx.fillStyle = 'rgba(20,16,12,0.6)'
     ctx.fillRect(lx - tw / 2 - 5, ly - 12, tw + 10, 16)
-    ctx.fillStyle = '#e8d5a8'
-    ctx.fillText(m.label, lx, ly)
+    ctx.fillStyle = color
+    ctx.fillText(text, lx, ly)
+  }
+  for (const m of ZONE_DATA[zone].markers) {
+    label(m.label, sx(m.pos.x), sy(m.pos.y) - 6, '#e8d5a8')
+  }
+  // врата — ромбы-порталы с подписью направления
+  for (const g of gatesOf(zone)) {
+    const gx = sx(g.pos.x)
+    const gy = sy(g.pos.y)
+    ctx.fillStyle = 'rgba(217,164,65,0.85)'
+    ctx.beginPath()
+    ctx.moveTo(gx, gy - 7)
+    ctx.lineTo(gx + 6, gy)
+    ctx.lineTo(gx, gy + 7)
+    ctx.lineTo(gx - 6, gy)
+    ctx.closePath()
+    ctx.fill()
+    label(g.label, gx, gy + 20, '#d9a441')
   }
   if (questMarker) {
     ctx.strokeStyle = '#f5c96b'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.arc(questMarker.x * sx, questMarker.y * sy, 7, 0, Math.PI * 2)
+    ctx.arc(sx(questMarker.x), sy(questMarker.y), 7, 0, Math.PI * 2)
     ctx.stroke()
     ctx.beginPath()
-    ctx.arc(questMarker.x * sx, questMarker.y * sy, 2.5, 0, Math.PI * 2)
+    ctx.arc(sx(questMarker.x), sy(questMarker.y), 2.5, 0, Math.PI * 2)
     ctx.fillStyle = '#f5c96b'
     ctx.fill()
   }
   ctx.fillStyle = '#f5c96b'
   ctx.beginPath()
-  ctx.arc(playerPos.x * sx, playerPos.y * sy, 5, 0, Math.PI * 2)
+  ctx.arc(sx(playerPos.x), sy(playerPos.y), 5, 0, Math.PI * 2)
   ctx.fill()
   ctx.strokeStyle = '#fff'
   ctx.lineWidth = 1.5

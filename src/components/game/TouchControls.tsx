@@ -52,6 +52,7 @@ export default function TouchControls() {
 
   const [enabled, setEnabled] = useState(false)
   const [joyUi, setJoyUi] = useState<{ ox: number; oy: number; kx: number; ky: number } | null>(null)
+  const [hintOn, setHintOn] = useState(true) // v2.1: подсказка гаснет — экран не перегружен
   const zoneRef = useRef<HTMLDivElement | null>(null)
   const lookRef = useRef<HTMLDivElement | null>(null)
 
@@ -79,6 +80,13 @@ export default function TouchControls() {
   }, [enabled])
 
   const active = enabled && screen === 'game' && !panel && !dialogue
+
+  // v2.1: подсказка раскладки показывается первые 7 секунд сессии
+  useEffect(() => {
+    if (!active || !hintOn) return
+    const t = setTimeout(() => setHintOn(false), 7000)
+    return () => clearTimeout(t)
+  }, [active, hintOn])
 
   // --- Джойстик ---
   const joyPtr = useRef<number | null>(null)
@@ -288,12 +296,12 @@ export default function TouchControls() {
         )}
       </div>
 
-      {/* Look-зона: правые 54% над кластером (камера/пинч/тап) */}
+      {/* Look-зона: правые 54% между шторкой меню и кластером (камера/пинч/тап) */}
       <div
         ref={lookRef}
         data-touch-look
         onPointerDown={lookDown}
-        className="pointer-events-auto absolute right-0 top-[10%] h-[46%] w-[54%] touch-none"
+        className="pointer-events-auto absolute right-0 top-[14%] h-[42%] w-[54%] touch-none"
         aria-hidden
       />
 
@@ -346,10 +354,12 @@ export default function TouchControls() {
         </div>
       </div>
 
-      {/* Подсказка раскладки — первые секунды */}
-      <p className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded bg-[#181410]/70 px-2 py-0.5 text-[10px] text-[#8a8068] opacity-80">
-        {t('Свайп справа — камера · тап по врагу — цель')}
-      </p>
+      {/* Подсказка раскладки — первые секунды сессии (v2.1: затем гаснет) */}
+      {hintOn && (
+        <p className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 rounded bg-[#181410]/70 px-2 py-0.5 text-[10px] text-[#8a8068] opacity-80">
+          {t('Свайп справа — камера · тап по врагу — цель')}
+        </p>
+      )}
     </div>
   )
 }

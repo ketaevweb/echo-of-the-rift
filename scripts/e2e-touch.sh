@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E v2.0 «Мобильное управление» — один батч: сервер + браузер в одном вызове.
+# E2E v2.0→2.1 (проверена и на 2.1) «Мобильное управление» — один батч: сервер + браузер в одном вызове.
 # На десктопе сенсорный режим форсируется настройкой touch:'on' (localStorage ДО загрузки).
 # Проверяет:
 #   1. режим «Вкл» показывает контролы: джойстик-зона, look-зона, кластер действий;
@@ -41,7 +41,7 @@ agent-browser open "http://localhost:$PORT" >/dev/null
 agent-browser wait --load networkidle >/dev/null 2>&1
 sleep 2
 echo -n "title ru: "
-agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.0') ? 'TITLE_OK' : 'TITLE_BAD'"
+agent-browser eval "document.body.innerText.includes('ВЕРСИЯ 2.1') ? 'TITLE_OK' : 'TITLE_BAD'"
 
 # 2. Новая игра
 say "NEW GAME"
@@ -59,8 +59,8 @@ echo -n "touch controls: "
 agent-browser eval "(() => { const q=(s)=>!!document.querySelector(s); return JSON.stringify({root:q('[data-touch-root]'), joy:q('[data-touch-joystick]'), look:q('[data-touch-look]'), target:q('[data-touch-action=\"target\"]'), interact:q('[data-touch-action=\"interact\"]'), pause:q('[data-touch-action=\"pause\"]'), igni:q('[data-touch-ability=\"igni\"]')}); })()"
 echo -n "ability bar hidden: "
 agent-browser eval "document.querySelector('.ability-slot') ? 'BAR_BAD' : 'BAR_HIDDEN'"
-echo -n "menu buttons 44px: "
-agent-browser eval "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.title && x.title.includes('Персонаж')); return b && b.className.includes('h-11') ? 'BTN44_OK' : 'BTN44_BAD'; })()"
+echo -n "menu drawer 44px: "
+agent-browser eval "(async () => { const m=document.querySelector('[data-hud-menu]'); if(!m) return 'DRAWER_BAD'; m.click(); await new Promise(r=>setTimeout(r,80)); const panel=document.querySelector('[data-hud-menu-panel]'); if(!panel) return 'PANEL_BAD'; const b=[...panel.querySelectorAll('button')].find(x=>x.textContent.includes('Персонаж')); return b && b.className.includes('h-11') ? 'BTN44_OK' : 'BTN44_BAD'; })()"
 
 # 3. Джойстик двигает героя
 say "JOYSTICK MOVES"
@@ -80,7 +80,7 @@ agent-browser eval "window.__echoEngine.player.dest ? 'TAP_OK' : 'TAP_BAD'"
 
 # 5. Интеракт у Грима
 say "INTERACT BUTTON"
-agent-browser eval "(() => { const e=window.__echoEngine; const g=e.entities.find(x=>x.name==='Грим'); e.player.pos.x=g.pos.x+30; e.player.pos.y=g.pos.y+30; e.syncUi(); return 'ok'; })()" >/dev/null
+agent-browser eval "(() => { const e=window.__echoEngine; const g=e.entities.find(x=>x.name==='Грим'); e.player.pos.x=g.pos.x+30; e.player.pos.y=g.pos.y+30; e.player.dest=null; e.targetEid=null; e.syncUi(); return 'ok'; })()" >/dev/null
 sleep 0.6
 echo -n "interact enabled+dialogue: "
 agent-browser eval "(() => { const b=document.querySelector('[data-touch-action=\"interact\"]'); if (b.disabled) return 'BTN_DISABLED'; b.dispatchEvent(new PointerEvent('pointerdown',{pointerId:24,bubbles:true})); return 'PRESSED'; })()" >/dev/null

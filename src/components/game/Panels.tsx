@@ -477,12 +477,17 @@ function TrainerPanel() {
 
 function MapPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const zoneLabel = useGame((s) => s.zoneLabel)
   useEffect(() => {
     if (canvasRef.current) getEngine()?.renderFullMap(canvasRef.current)
   }, [])
   return (
-    <Panel title={t('Карта долины')} subtitle={t('Янтарь — твоя позиция, кольцо — текущая цель')} wide>
+    <Panel title={t('Карта: {z}', { z: zoneLabel })} subtitle={t('Янтарь — твоя позиция, кольцо — текущая цель')} wide>
       <canvas ref={canvasRef} width={1024} height={768} className="h-auto w-full rounded border border-[#5a4632]" />
+      {/* v2.1: зоны-сцены — карта показывает текущую землю; прочие земли за вратами */}
+      <p className="mt-2 text-center text-[11px] italic text-[#9a8f78]">
+        {t('Земля: {z}. Прочие земли — за вратами (ромбы); увидишь их, когда пройдёшь.', { z: zoneLabel })}
+      </p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[#8a8068] sm:grid-cols-3">
         <span>{t('◈ Хеймхолл — деревня и NPCs')}</span>
         <span>{t('◈ Сумрачный лес — волки, контракт')}</span>

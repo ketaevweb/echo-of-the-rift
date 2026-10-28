@@ -23,7 +23,8 @@ import {
   Telegraph,
   Vec,
 } from './types'
-import { LAKE, PLAYER_SPAWN, PROPS, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, RB_GATES, zoneOf } from './data/world'
+import { LAKE, PLAYER_SPAWN, GATES, GR_GATES, FR_GATES, MA_GATES, DF_GATES, RB_GATES, zoneOf } from './data/world'
+import { ZONE_DATA, zoneViewRect } from './data/zones'
 import { sfx, setAmbient, setMuted, setVolumes } from './sfx'
 import { setVoiceVolume } from './voice'
 import { musicBoss, musicBossPhase, musicCombat, musicDebug, musicDomain, musicPaused, musicTick } from './audio/MusicDirector'
@@ -32,7 +33,7 @@ import { PanelId, useGame } from './store'
 import { Collider, seedRot } from './core/util'
 import { EngineCtx, AssaultState, RaidState, RenderMode, SiegeState, ToastKind, ZoneId } from './core/ctx'
 import { GameLoop, stepCosmetics, stepWorld } from './core/Game'
-import { renderer2d } from './render2d/renderer'
+import { bakeZoneTerrain, renderer2d } from './render2d/renderer'
 import { drawScene } from './render2d/scene'
 import { Renderer3d } from './render3d/Renderer3d'
 import { writeRenderMode } from './store'
@@ -55,6 +56,7 @@ import {
   createPlayer as createPlayerSys,
   spawnCompanion as spawnCompanionSys,
   spawnWorld as spawnWorldSys,
+  spawnZoneContent,
 } from './systems/ai'
 import { castAbility as castAbilitySys } from './systems/combat'
 import { bindInput as bindInputSys, unbindInput as unbindInputSys } from './systems/input'
@@ -114,8 +116,15 @@ export class GameEngine implements EngineCtx {
   renderMode: RenderMode
   view3d: Renderer3d | null = null
   baked: HTMLCanvasElement
+  /** v2.1: мировые границы запечённого терена текущей зоны (для сцены/миникарты/карты). */
+  bakedRect: [number, number, number, number] = [0, 0, 1, 1]
+  /** v2.1: построенная сцена зоны (идемпотентность enterZone). */
+  private sceneZone: ZoneId | null = null
   colliders: Collider[] = []
-  props = [...PROPS].sort((a, b) => a.pos.y - b.pos.y)
+  /** v2.1: пропсы ТОЛЬКО текущей зоны (сцены-локации) — отсортированы по y. */
+  props = ZONE_DATA.valley.props
+  zoneInteractables = ZONE_DATA.valley.interactables
+  zoneClues = ZONE_DATA.valley.clues
 
   eidSeq = 1
   entities: Entity[] = []
@@ -222,11 +231,16 @@ export class GameEngine implements EngineCtx {
     this.origin = opts?.origin ?? 'warden'
     this.inputCanvas = this.renderMode === '3d' && this.canvas3d ? this.canvas3d : canvas
     if (this.renderMode === '3d' && this.canvas3d) {
-      this.view3d = new Renderer3d(this.canvas3d)
+      // v2.1: 3D-сцена строится сразу под зону (по умолчанию долина; при загрузке
+      // сейва в другой земле enterZone перестроит — идемпотентно)
+      this.view3d = new Renderer3d(this.canvas3d, this.zone)
     }
     this.ctx2d = canvas.getContext('2d') as CanvasRenderingContext2D
-    this.baked = renderer2d.bakeTerrain()
-    this.buildColliders()
+    // v2.1: терен запекается ПО ЗОНЕ (заглушка до первого enterZone).
+    // Полный мир 8800×4200 на канвасе — ~148 МБ VRAM, что душило мобильные GPU.
+    this.baked = document.createElement('canvas')
+    this.baked.width = 1
+    this.baked.height = 1
     this.initQuests()
     if (save) this.loadFrom(save)
     else this.newGame()
@@ -242,7 +256,8 @@ export class GameEngine implements EngineCtx {
   // ---------------- Инициализация ----------------
 
   private buildColliders() {
-    this.colliders = [{ x: LAKE.x, y: LAKE.y, r: LAKE.r - 5, propId: 'lake' }]
+    // v2.1: коллайдеры сцены зоны — озеро только в долине
+    this.colliders = this.zone === 'valley' ? [{ x: LAKE.x, y: LAKE.y, r: LAKE.r - 5, propId: 'lake' }] : []
     for (const p of this.props) {
       if (!p.solid) continue
       if (p.kind === 'house') {
@@ -298,6 +313,44 @@ export class GameEngine implements EngineCtx {
     spawnWorldSys(this)
   }
 
+  /** v2.1: вход в зону-сцену. Фильтрует пропсы/коллайдеры/интерактивы под землю,
+   *  выселяет сущности прошлой сцены, заселяет текущую, пересобирает 3D-вид
+   *  и запекание терена. Идемпотентно (та же зона — нет работы). */
+  enterZone(zone: ZoneId) {
+    if (this.destroyed || this.sceneZone === zone) return
+    this.sceneZone = zone
+    this.zone = zone
+    const zd = ZONE_DATA[zone]
+    this.props = zd.props
+    this.zoneInteractables = zd.interactables
+    this.zoneClues = zd.clues
+    this.buildColliders()
+    // выселить сущности прошлой сцены — герой и партия переходят с игроком
+    this.entities = this.entities.filter((e) => e.kind === 'player' || e.kind === 'companion')
+    this.targetEid = null
+    this.selEid = null
+    spawnZoneContent(this, zone)
+    this.baked = bakeZoneTerrain(zone)
+    this.bakedRect = zoneViewRect(zone)
+    // камера мгновенно к герою — без перелёта через полкарты
+    this.camera = { ...this.player.pos }
+    this.currentArea = '' // плашка зоны/области покажется заново
+    this.view3d?.rebuildZone(zone)
+    this.syncUi()
+    // зеркало для E2E/диагностики (скрипты читают __echoScene)
+    if (typeof window !== 'undefined') {
+      ;(window as unknown as { __echoScene?: object }).__echoScene = {
+        zone,
+        props: this.props.length,
+        entities: this.entities.length,
+        npcs: this.entities.filter((e) => e.kind === 'npc').length,
+        enemies: this.entities.filter((e) => e.kind === 'enemy').length,
+        bakedW: this.baked.width,
+        bakedH: this.baked.height,
+      }
+    }
+  }
+
   spawnCompanion(id: 'kaya' | 'torvald') {
     spawnCompanionSys(this, id)
   }
@@ -311,7 +364,8 @@ export class GameEngine implements EngineCtx {
   }
 
   resize() {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1)
+    // v2.1: на узких экранах (телефон) капим DPR — полный dpr×2.5+ убивает FPS
+    this.dpr = Math.min(window.innerWidth < 768 ? 1.5 : 2, window.devicePixelRatio || 1)
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight
     this.canvas.width = Math.floor(w * this.dpr)
@@ -510,8 +564,6 @@ export class GameEngine implements EngineCtx {
       const p = { ...gate.exit }
       this.player.pos = { ...p }
       this.player.dest = null
-      this.targetEid = null
-      this.selEid = null
       for (const e of this.entities) {
         if (e.kind === 'companion') {
           e.pos = { x: p.x - 26, y: p.y + 18 }
@@ -519,10 +571,9 @@ export class GameEngine implements EngineCtx {
           e.dest = null
         }
       }
-      this.camera = { ...p }
-      this.zone = zone
-      this.currentArea = '' // заставит updateArea показать плашку зоны
-      endPitFightSafe(this)
+      // v2.1: перестроить сцену под зону (на фоне затемнения)
+      this.enterZone(zone)
+      endPitFightSafe(this) // яма остаётся в Граните — телепорт прерывает бой
       useGame.getState().patch({ zoneFade: { label: t(gate.label), phase: 'in' } })
       this.syncUi()
       window.setTimeout(() => {
@@ -541,7 +592,7 @@ export class GameEngine implements EngineCtx {
     this.unbindInput()
     this.inputCanvas = mode === '3d' ? this.canvas3d! : this.canvas
     if (mode === '3d') {
-      this.view3d = new Renderer3d(this.canvas3d!)
+      this.view3d = new Renderer3d(this.canvas3d!, this.zone)
       this.view3d.setQuality(this.effQuality) // Фаза 8: пресет качества и в новом 3D-виде
     } else {
       this.view3d?.dispose()
@@ -645,6 +696,7 @@ export class GameEngine implements EngineCtx {
     renderer2d.drawMinimap(
       this.mini,
       this.baked,
+      this.bakedRect,
       this.entities,
       this.player.pos,
       questMarkerSys(this),
@@ -654,7 +706,7 @@ export class GameEngine implements EngineCtx {
   }
 
   renderFullMap(canvas: HTMLCanvasElement) {
-    renderer2d.drawFullMap(canvas, this.baked, this.player.pos, questMarkerSys(this))
+    renderer2d.drawFullMap(canvas, this.baked, this.bakedRect, this.zone, this.player.pos, questMarkerSys(this))
   }
 
   render() {
@@ -692,8 +744,11 @@ export class GameEngine implements EngineCtx {
       shake: this.shake,
       time: this.time,
       baked: this.baked,
+      bakedRect: this.bakedRect,
       props: this.props,
       removedProps: this.removedProps,
+      interactables: this.zoneInteractables,
+      clues: this.zoneClues,
       entities: this.entities,
       targetEid: this.targetEid,
       particles: this.particles,

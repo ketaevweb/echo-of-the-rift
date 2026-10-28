@@ -203,6 +203,7 @@ export const EN_UI: Record<string, string> = {
 
   // ---------- Карта ----------
   'Карта долины': 'Valley Map',
+  'Карта: {z}': 'Map: {z}',
   'Янтарь — твоя позиция, кольцо — текущая цель': 'Amber — your position, the ring — current objective',
   '◈ Хеймхолл — деревня и NPCs': '◈ Heimhall — village and NPCs',
   '◈ Сумрачный лес — волки, контракт': '◈ the Gloomwood — wolves, contract',
@@ -352,4 +353,10 @@ export const EN_UI: Record<string, string> = {
   'Цель': 'Target',
   'Джойстик движения': 'Movement joystick',
   'Свайп справа — камера · тап по врагу — цель': 'Right-side swipe — camera · tap an enemy to target',
+  // ---------- v2.1: полный экран + шторка меню + карта зон ----------
+  'Полный экран': 'Fullscreen',
+  'Свернуть экран': 'Exit fullscreen',
+  'Меню игры': 'Game menu',
+  'Земля: {z}. Прочие земли — за вратами (ромбы); увидишь их, когда пройдёшь.':
+    'Land: {z}. Other lands lie beyond the gates (diamonds) — you will see them once you pass.',
 }

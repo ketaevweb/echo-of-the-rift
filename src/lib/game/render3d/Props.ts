@@ -6,8 +6,7 @@
 // ============================================================
 
 import * as THREE from 'three'
-import { INTERACTABLES, PROPS } from '../data/world'
-import { PropDef } from '../types'
+import { PropDef, InteractableDef } from '../types'
 import { seedRot } from '../core/util'
 import { heightAt } from './heightmap'
 
@@ -34,22 +33,44 @@ export class Props3d {
   /** Фаза 6.2: кольца рунных камней (обновляются цветом из состояния движка). */
   private runeRings = new Map<string, THREE.Mesh>()
   private disposables: Array<{ dispose(): void }> = []
+  /** v2.1: пропсы/интерактивы ТЕКУЩЕЙ зоны (сцены-локации). */
+  private list: PropDef[]
+  private herbs: InteractableDef[]
 
-  constructor() {
+  constructor(props: PropDef[], interactables: InteractableDef[]) {
+    this.list = props
+    this.herbs = interactables
     this.buildInstanced()
-    for (const p of PROPS) this.buildProp(p)
+    for (const p of this.list) this.buildProp(p)
+    this.buildHerbs()
+  }
+
+  /** v2.1: перестроить все пропсы под зону (вызывается Renderer3d.rebuildZone). */
+  rebuild(props: PropDef[], interactables: InteractableDef[]) {
+    this.dispose()
+    this.removable.clear()
+    this.fires = []
+    this.spinners = []
+    this.herbPulse = []
+    this.runeRings.clear()
+    this.disposables = []
+    while (this.group.children.length) this.group.remove(this.group.children[0])
+    this.list = props
+    this.herbs = interactables
+    this.buildInstanced()
+    for (const p of this.list) this.buildProp(p)
     this.buildHerbs()
   }
 
   // ---------------- Инстансинг: деревья/камни/кусты ----------------
 
   private buildInstanced() {
-    const trees = PROPS.filter((p) => p.kind === 'tree')
-    const rocks = PROPS.filter((p) => p.kind === 'rock')
-    const shrubs = PROPS.filter((p) => p.kind === 'shrub' || p.kind === 'flower')
-    const deadTrees = PROPS.filter((p) => p.kind === 'deadtree')
-    const reeds = PROPS.filter((p) => p.kind === 'reed')
-    const snowTrees = PROPS.filter((p) => p.kind === 'snowtree')
+    const trees = this.list.filter((p) => p.kind === 'tree')
+    const rocks = this.list.filter((p) => p.kind === 'rock')
+    const shrubs = this.list.filter((p) => p.kind === 'shrub' || p.kind === 'flower')
+    const deadTrees = this.list.filter((p) => p.kind === 'deadtree')
+    const reeds = this.list.filter((p) => p.kind === 'reed')
+    const snowTrees = this.list.filter((p) => p.kind === 'snowtree')
 
     if (trees.length) {
       // Ствол
@@ -1133,7 +1154,7 @@ export class Props3d {
   // ---------------- Травы-интерактивы и гранитные жилы ----------------
 
   private buildHerbs() {
-    for (const it of INTERACTABLES) {
+    for (const it of this.herbs) {
       if (it.kind === 'herb') {
         const g = new THREE.Group()
         const stem = new THREE.Mesh(new THREE.ConeGeometry(1.6, 9, 5), groundMat(0x7aa06a))
@@ -1222,5 +1243,8 @@ export class Props3d {
       else if (mat) mat.dispose()
     })
     for (const d of this.disposables) d.dispose()
+    // v2.1: после traverse геометрии/материалы уже освобождены —
+    // снимаем детей с группы, чтобы rebuild не накапливал мёртвые объекты
+    while (this.group.children.length) this.group.remove(this.group.children[0])
   }
 }

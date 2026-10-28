@@ -6,7 +6,7 @@
 // Правило: системы мутируют состояние ТОЛЬКО через ctx.
 // ============================================================
 
-import { Attributes, CareerState, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, OriginId, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
+import { Attributes, CareerState, DialogueChoice, Entity, Faction, Floater, FormationId, InventoryEntry, InteractableDef, OriginId, Particle, PropDef, QuestState, SignId, SkillRanks, Telegraph, Vec } from '../types'
 import { Collider } from './util'
 import type { PanelId } from '../store'
 
@@ -97,6 +97,9 @@ export interface View3dBridge {
   setTactical(on: boolean): void
   /** Фаза 8: пресет качества графики (pixelRatio + тени). */
   setQuality(q: 'low' | 'medium' | 'high'): void
+  /** v2.1: перестроить сцену под зону-сцену (терен/пропсы/дальность камеры).
+   *  Идемпотентно: та же зона — нет работы. */
+  rebuildZone(zone: ZoneId): void
   resize(): void
   dispose(): void
 }
@@ -150,6 +153,9 @@ export interface EngineCtx {
   baked: HTMLCanvasElement
   colliders: Collider[]
   props: PropDef[]
+  /** v2.1: интерактивы и следы текущей зоны (для 2D-сцены). */
+  zoneInteractables: InteractableDef[]
+  zoneClues: Array<{ id: string; pos: Vec }>
   removedProps: Set<string>
   keys: Set<string>
   camera: Vec
@@ -171,6 +177,9 @@ export interface EngineCtx {
   dayClock: number
   /** Текущая зона игрока (пересчитывается в stepWorld). */
   zone: ZoneId
+  /** v2.1: войти в зону-сцену — фильтрует пропсы/коллайдеры/сущности,
+   *  пересобирает 3D-сцену и запекание терена. Идемпотентно. */
+  enterZone(zone: ZoneId): void
   /** Активное масло: остаток секунд и id предмета. */
   oilT: number
   oilKind: string | null

@@ -51,7 +51,10 @@ export function stepWorld(ctx: EngineCtx, dt: number): void {
   // Фаза 3: сутки, масло, зона
   ctx.dayClock = (ctx.dayClock + dt / DAY_LENGTH) % 1
   if (ctx.oilT > 0) ctx.oilT = Math.max(0, ctx.oilT - dt)
-  ctx.zone = zoneOf(ctx.player.pos.x, ctx.player.pos.y)
+  // v2.1: зоны-сцены — при смене земли (врата или телепорт) перестраиваем сцену
+  const z = zoneOf(ctx.player.pos.x, ctx.player.pos.y)
+  if (z !== ctx.zone) ctx.enterZone(z)
+  ctx.zone = z
   updateArea(ctx)
   updateEnding(ctx)
   // камера следует за игроком (в 3D кламп не нужен — там своя орбита)

@@ -9,13 +9,14 @@
 import * as THREE from 'three'
 import { Entity, Vec } from '../types'
 import { WORLD, zoneOf } from '../data/world'
+import type { ZoneId } from '../core/ctx'
+import { ZONE_DATA, zoneViewRect } from '../data/zones'
 import { heightAt } from './heightmap'
 import { Terrain, buildSky } from './Terrain'
 import { Props3d } from './Props'
 import { AvatarFactory } from './Avatars'
 import { Fx3d, OrderLine } from './Fx'
 import { daylightOf } from '../data/tables'
-import type { ZoneId } from '../core/ctx'
 
 // Цвета колец рунных камней (Фаза 6.2): заяц — бледный мох, волк — янтарь, луна — серебро
 const RUNE_COLORS = [0x9fb8a4, 0xd9a441, 0xd8dde2]
@@ -106,21 +107,28 @@ export class Renderer3d {
 
   private canvas: HTMLCanvasElement
   private disposed = false
+  /** v2.1: построенная зона (идемпотентность rebuildZone). */
+  private builtZone: ZoneId
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, zone: ZoneId = 'valley') {
     this.canvas = canvas
+    this.builtZone = zone
+    // v2.1: MSAA — самая дорогая часть кадра на мобильных GPU. При dpr ≥ 2.5
+    // (телефоны) отключаем: при рендере в высоком разрешении лесенка и так не видна.
+    const dpr0 = window.devicePixelRatio || 1
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: dpr0 < 2.5,
       powerPreference: 'high-performance',
     })
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+    this.renderer.setPixelRatio(Math.min(2, dpr0))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 0.88
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 1, 9000)
+    this.applyZoneRange(zone)
 
     // Туман и фон — тёплые, без синевы; лерпятся по зоне/суткам (Фаза 3)
     this.scene.fog = this.fog
@@ -147,9 +155,9 @@ export class Renderer3d {
     this.sky = buildSky()
     this.skyMat = this.sky.material as THREE.ShaderMaterial
     this.scene.add(this.sky)
-    this.terrain = new Terrain()
+    this.terrain = new Terrain(zone)
     this.scene.add(this.terrain.group)
-    this.props = new Props3d()
+    this.props = new Props3d(ZONE_DATA[zone].props, ZONE_DATA[zone].interactables)
     this.scene.add(this.props.group)
     this.scene.add(this.entityGroup)
     this.avatars = new AvatarFactory(this.entityGroup)
@@ -248,12 +256,31 @@ export class Renderer3d {
     this.tactical = on
   }
 
+  /** v2.1: дальность камеры/видимости под размер зоны — дальние чанки
+   *  отсекаются фрустумом, туман их всё равно скрывает. */
+  private applyZoneRange(zone: ZoneId) {
+    const [, , rw, rh] = zoneViewRect(zone)
+    const far = Math.max(2600, Math.min(9000, Math.max(rw, rh) * 1.35 + 700))
+    this.camera.far = far
+    this.camera.updateProjectionMatrix()
+  }
+
+  /** v2.1: перестроить сцену под зону-сцену (идемпотентно). */
+  rebuildZone(zone: ZoneId) {
+    if (this.disposed || this.builtZone === zone) return
+    this.builtZone = zone
+    this.terrain.rebuild(zone)
+    this.props.rebuild(ZONE_DATA[zone].props, ZONE_DATA[zone].interactables)
+    this.applyZoneRange(zone)
+    // аватары сущностей прошлой сцены убирает AvatarFactory.sync на следующем кадре
+  }
+
   /** Фаза 8: пресет качества (GDD 05 Ф8) — pixelRatio + тени.
-   *  low: ratio 1, тени выкл; medium: 1.5, тени 1024; high: dpr≤2, тени 2048. */
+   *  v2.1: капы снижены под мобильные GPU — low 1.0, medium 1.25, high 1.75. */
   setQuality(q: 'low' | 'medium' | 'high') {
     if (this.disposed) return
     const dpr = window.devicePixelRatio || 1
-    this.renderer.setPixelRatio(q === 'low' ? 1 : q === 'medium' ? Math.min(1.5, dpr) : Math.min(2, dpr))
+    this.renderer.setPixelRatio(q === 'low' ? 1 : q === 'medium' ? Math.min(1.25, dpr) : Math.min(1.75, dpr))
     this.renderer.shadowMap.enabled = q !== 'low'
     if (q !== 'low') {
       const size = q === 'medium' ? 1024 : 2048

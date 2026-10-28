@@ -6,7 +6,6 @@
 // передаёт снимок состояния (SceneView).
 // ============================================================
 
-import { INTERACTABLES, VELD_CLUES } from '../data/world'
 import { Entity, Floater, Particle, PropDef, Telegraph, Vec } from '../types'
 import { rndRange } from '../core/util'
 import { IRenderer } from './types'
@@ -22,8 +21,13 @@ export interface SceneView {
   shake: number
   time: number
   baked: HTMLCanvasElement
+  /** v2.1: мировые границы запечённого терена зоны. */
+  bakedRect: [number, number, number, number]
   props: PropDef[]
   removedProps: Set<string>
+  /** v2.1: интерактивы/следы текущей зоны (сцена рисует только свою землю). */
+  interactables: Array<{ id: string; pos: Vec; kind: string }>
+  clues: Array<{ id: string; pos: Vec }>
   entities: Entity[]
   targetEid: number | null
   particles: Particle[]
@@ -40,6 +44,20 @@ export interface SceneView {
   silence?: number
 }
 
+// v2.1: кэш градиента виньетки (пересоздание каждый кадр — лишняя нагрузка на телефон)
+const vignetteCache = new Map<string, CanvasGradient>()
+function vignetteOf(ctx: CanvasRenderingContext2D, w: number, h: number): CanvasGradient {
+  const key = `${w}x${h}`
+  let g = vignetteCache.get(key)
+  if (!g) {
+    g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.75)
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(1, 'rgba(10,8,5,0.55)')
+    vignetteCache.set(key, g)
+  }
+  return g
+}
+
 export function drawScene(v: SceneView) {
   const ctx = v.ctx
   const w = v.w
@@ -49,16 +67,29 @@ export function drawScene(v: SceneView) {
   ctx.fillRect(0, 0, w, h)
   const shakeX = v.shake > 0 ? rndRange(-v.shake, v.shake) : 0
   const shakeY = v.shake > 0 ? rndRange(-v.shake, v.shake) : 0
+  const camX = Math.round(w / 2 - v.camera.x + shakeX)
+  const camY = Math.round(h / 2 - v.camera.y + shakeY)
   ctx.save()
-  ctx.translate(Math.round(w / 2 - v.camera.x + shakeX), Math.round(h / 2 - v.camera.y + shakeY))
-  ctx.drawImage(v.baked, 0, 0)
+  ctx.translate(camX, camY)
+  // v2.1: блит ТОЛЬКО видимого прямоугольника запечённого терена зоны
+  // (раньше каждый кадр целиком блитился терен 8800×4200 — главный тормоз 2D)
+  const [brx, bry, brw, brh] = v.bakedRect
+  ctx.drawImage(v.baked, 0, 0, v.baked.width, v.baked.height, brx, bry, brw, brh)
+  // границы видимости в мировых координатах (+запас на крупные пропсы)
+  const vx0 = v.camera.x - w / 2 - 90
+  const vx1 = v.camera.x + w / 2 + 90
+  const vy0 = v.camera.y - h / 2 - 90
+  const vy1 = v.camera.y + h / 2 + 90
+  const inView = (x: number, y: number, pad = 0) => x >= vx0 - pad && x <= vx1 + pad && y >= vy0 - pad && y <= vy1 + pad
   for (const p of v.props) {
     if (p.id && v.removedProps.has(p.id)) continue
+    if (!inView(p.pos.x, p.pos.y, 60)) continue
     v.renderer.drawProp(ctx, p, v.time)
   }
   // травы-интерактивы (визуал)
-  for (const it of INTERACTABLES) {
+  for (const it of v.interactables) {
     if (it.kind !== 'herb' || v.removedProps.has(it.id)) continue
+    if (!inView(it.pos.x, it.pos.y)) continue
     const pulse = 0.5 + 0.5 * Math.sin(v.time * 2.5 + it.pos.x)
     ctx.fillStyle = `rgba(200,230,190,${0.35 + pulse * 0.3})`
     ctx.beginPath()
@@ -76,8 +107,9 @@ export function drawScene(v: SceneView) {
     ctx.stroke()
   }
   // следы следопытства (Фаза 3): пепельная метка
-  for (const c of VELD_CLUES) {
+  for (const c of v.clues) {
     if (v.removedProps.has(c.id)) continue
+    if (!inView(c.pos.x, c.pos.y)) continue
     const pulse = 0.5 + 0.5 * Math.sin(v.time * 2 + c.pos.x)
     ctx.fillStyle = `rgba(224,112,58,${0.3 + pulse * 0.3})`
     ctx.beginPath()
@@ -139,6 +171,7 @@ export function drawScene(v: SceneView) {
     }
   }
   for (const e of sorted) {
+    if (!inView(e.pos.x, e.pos.y, 40)) continue
     v.renderer.drawEntity(ctx, e, v.time, v.targetEid === e.eid)
   }
   // Фаза 4: кольцо выбора компаньона — над сущностями
@@ -158,10 +191,7 @@ export function drawScene(v: SceneView) {
   v.renderer.drawParticles(ctx, v.particles)
   v.renderer.drawFloaters(ctx, v.floaters)
   ctx.restore()
-  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.75)
-  vg.addColorStop(0, 'rgba(0,0,0,0)')
-  vg.addColorStop(1, 'rgba(10,8,5,0.55)')
-  ctx.fillStyle = vg
+  ctx.fillStyle = vignetteOf(ctx, w, h)
   ctx.fillRect(0, 0, w, h)
   // Атмосфера (Фаза 3): ночь и мрак Вельда
   const dl = daylightOf(v.dayT)
